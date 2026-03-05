@@ -49,7 +49,7 @@ const DepotStockReceived = () => {
             const all = res.data.data || res.data || [];
             const filtered = all.filter(a => {
                 const group = (a.account_group || a.group_name || "").toUpperCase().trim();
-                return group === 'DEPOT';
+                return group === 'DEBTORS - DEPOT - SALES';
             });
             setDepots(filtered);
         } catch (err) { console.error("Master fetch error", err); }
@@ -67,44 +67,48 @@ const DepotStockReceived = () => {
 
     // --- Logic Handlers (Preserved Integrity) ---
     const handleLookupInvoice = async () => {
-        if (!formData.invoice_no) return alert("Please enter an Invoice Number");
-        setIsFetchingInvoice(true);
-        try {
-            const res = await transactionsAPI.directInvoices.getAll();
-            const allInvoices = res.data.data || res.data || [];
-            
-            const target = allInvoices.find(inv => {
-                const inputVal = String(formData.invoice_no).trim().toLowerCase();
-                return (String(inv.invoice_no || "").trim().toLowerCase() === inputVal || 
-                        String(inv.order_no || "").trim().toLowerCase() === inputVal || 
-                        String(inv.id || "").trim().toLowerCase() === inputVal);
-            });
 
-            if (!target) {
-                alert(`Invoice "${formData.invoice_no}" not found.`);
-                setPreviewItems([]);
-                return;
-            }
+    if (!formData.invoice_no) 
+        return alert("Please enter an Invoice Number");
 
-            if (target.is_depot_inwarded === true || target.is_depot_inwarded === 1) {
-                alert("❌ This invoice has already been received in the depot.");
-                setPreviewItems([]);
-                return;
-            }
+    setIsFetchingInvoice(true);
 
-            const items = target.OrderDetails || target.InvoiceDetails || target.items || [];
-            if (!items.length) {
-                alert("Invoice found but no line items available.");
-                setPreviewItems([]);
-                return;
-            }
-            setPreviewItems(items);
-        } catch (err) {
-            alert("Error fetching invoice.");
-        } finally {
-            setIsFetchingInvoice(false);
+    try {
+
+        const res = await transactionsAPI.invoices.getAll();
+        const allInvoices = res.data.data || res.data || [];
+
+        const target = allInvoices.find(inv =>
+            String(inv.invoice_no).trim() === String(formData.invoice_no).trim()
+        );
+
+        if (!target) {
+            alert(`Invoice "${formData.invoice_no}" not found.`);
+            setPreviewItems([]);
+            return;
         }
-    };
+
+        if (target.is_depot_inwarded) {
+            alert("❌ This invoice already inwarded to depot.");
+            return;
+        }
+
+        const items = target.InvoiceDetails || [];
+
+        if (!items.length) {
+            alert("Invoice found but no items.");
+            return;
+        }
+
+        setPreviewItems(items);
+
+    } catch (err) {
+        console.error(err);
+        alert("Error fetching invoice");
+    } finally {
+        setIsFetchingInvoice(false);
+    }
+};
 
     const handleSave = async () => {
         if (!formData.depot_id) return alert("Select a Depot");
@@ -417,7 +421,7 @@ const DepotStockReceived = () => {
                 </div>
             )}
 
-            <style jsx>{`
+            <style>{`
                 input[type='number']::-webkit-inner-spin-button, 
                 input[type='number']::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
                 ::-webkit-scrollbar { width: 5px; height: 5px; }

@@ -62,7 +62,7 @@ export const DepotTransfer = () => {
         try {
             const res = await mastersAPI.accounts.getAll();
             const all = res.data.data || res.data || [];
-            setDepots(all.filter(acc => (acc.account_group || "").toUpperCase().trim() === 'DEPOT'));
+            setDepots(all.filter(acc => (acc.account_group?.includes('DEPOT') || (acc.account_name || '').toUpperCase().includes('DEPOT'))));
         } catch (err) { console.error("Error fetching depots:", err); }
     };
 
@@ -109,34 +109,42 @@ export const DepotTransfer = () => {
     };
 
     const handleExecuteTransfer = async () => {
-        if (!formData.from_depot_id || !formData.to_depot_id) return alert("Select Source and Destination Depots");
-        if (formData.from_depot_id === formData.to_depot_id) return alert("Source and Destination cannot be the same");
+    if (!formData.from_depot_id || !formData.to_depot_id) return alert("Select Source and Destination Depots");
+    if (formData.from_depot_id === formData.to_depot_id) return alert("Source and Destination cannot be the same");
+    
+    // Validation
+    const hasError = formData.items.some(item => !item.product_id || parseFloat(item.qty || 0) <= 0);
+    if (hasError) return alert("Ensure all rows have a product and valid quantity");
+
+    setSubmitLoading(true);
+    try {
+        const payload = {
+            sales_type: 'DEPOT TRANSFER',
+            depot_id: formData.from_depot_id, // Giving Depot
+            party_id: formData.to_depot_id,   // Receiving Depot (stored in party_id)
+            vehicle_no: formData.vehicle_no,
+            remarks: formData.remarks,
+            date: formData.transfer_date,
+            // Re-mapping items for the DB Details table
+            Details: formData.items.map(item => ({
+                product_id: item.product_id,
+                total_kgs: parseFloat(item.qty), // Backend expects total_kgs
+                rate: 0,                        // Transfers are usually 0 value
+                order_type: 'TRANSFER'
+            }))
+        };
+
+        await transactionsAPI.depotSales.create(payload);
         
-        const hasError = formData.items.some(item => !item.product_id || parseFloat(item.qty || 0) <= 0);
-        if (hasError) return alert("Ensure all rows have a product and valid quantity");
-
-        const overStock = formData.items.some(item => parseFloat(item.qty) > parseFloat(item.available));
-        if (overStock) return alert("One or more items exceed available source stock!");
-
-        setSubmitLoading(true);
-        try {
-            const payload = {
-                ...formData,
-                sales_type: 'DEPOT TRANSFER',
-                depot_id: formData.from_depot_id,
-                party_id: formData.to_depot_id,
-                date: formData.transfer_date,
-                Details: formData.items // Mapping to backend Details expected by DepotSales engine
-            };
-
-            await transactionsAPI.depotSales.create(payload);
-            window.dispatchEvent(new Event("depotStockUpdated"));
-            setIsModalOpen(false);
-            fetchRecords();
-        } catch (err) { 
-            alert("Transfer Failed: " + (err.response?.data?.error || err.message)); 
-        } finally { setSubmitLoading(false); }
-    };
+        alert("Stock Transfer Authorized Successfully!");
+        setIsModalOpen(false);
+        fetchRecords();
+        // Trigger a global refresh for inventory components
+        window.dispatchEvent(new Event("depotStockUpdated"));
+    } catch (err) { 
+        alert("Transfer Failed: " + (err.response?.data?.error || err.message)); 
+    } finally { setSubmitLoading(false); }
+};
 
     const handleRowClick = (item) => {
         if (isSelectionMode) {

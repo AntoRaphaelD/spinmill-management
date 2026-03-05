@@ -53,7 +53,18 @@ const ProductMaster = () => {
     const [selectedIds, setSelectedIds] = useState([]);
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 10;
+    // Auto calculate Pack Nett Weight
+useEffect(() => {
+    const wt = parseFloat(formData.wt_per_cone) || 0;
+    const cones = parseFloat(formData.no_of_cones_per_pack) || 0;
 
+    const total = wt * cones;
+
+    setFormData(prev => ({
+        ...prev,
+        pack_nett_wt: total
+    }));
+}, [formData.wt_per_cone, formData.no_of_cones_per_pack]);
     // --- Initialization ---
     useEffect(() => { 
         fetchRecords(); 
@@ -378,7 +389,7 @@ const ProductMaster = () => {
                                             <LedgerInput label="Cones / Pack" value={formData.no_of_cones_per_pack} onChange={val => setFormData({...formData, no_of_cones_per_pack: val})} />
                                         </div>
 
-                                        <LedgerInput label="Pack Nett Wt (KG)" color="text-amber-400" value={formData.pack_nett_wt} onChange={val => setFormData({...formData, pack_nett_wt: val})} />
+                                        <LedgerInput label="Pack Nett Wt (KG)" color="text-amber-400" value={formData.pack_nett_wt} readOnly/>
                                         <LedgerInput label="Charity Amount (₹)" value={formData.charity_rs} onChange={val => setFormData({...formData, charity_rs: val})} />
                                         <LedgerInput label="Other Receipt (₹)" value={formData.other_receipt} onChange={val => setFormData({...formData, other_receipt: val})} />
 
@@ -442,10 +453,17 @@ const InputField = ({ label, className = "", ...props }) => (
     </div>
 );
 
-const LedgerInput = ({ label, value, color = "text-white", onChange }) => (
+const LedgerInput = ({ label, value, color = "text-white", onChange, readOnly=false }) => (
     <div className="space-y-1">
         <label className="text-[8px] font-black text-slate-500 uppercase block tracking-tighter">{label}</label>
-        <input type="number" step="0.001" className={`w-full bg-white/5 border border-white/5 rounded-lg p-2 text-right text-xs font-bold font-mono outline-none focus:border-blue-500 ${color}`} value={value} onChange={e => onChange(e.target.value)} />
+        <input
+            type="number"
+            step="0.001"
+            readOnly={readOnly}
+            className={`w-full bg-white/5 border border-white/5 rounded-lg p-2 text-right text-xs font-bold font-mono outline-none focus:border-blue-500 ${color}`}
+            value={value}
+            onChange={readOnly ? undefined : e => onChange(e.target.value)}
+        />
     </div>
 );
 

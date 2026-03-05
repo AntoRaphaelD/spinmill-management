@@ -51,7 +51,7 @@ const DepotStorage = () => {
             const filtered = all.filter(a => {
                 const grp = String(a.account_group || "").toUpperCase();
                 const name = String(a.account_name || "").toUpperCase();
-                return grp === 'DEPOT' || name.includes('DEPOT');
+                return grp.includes('DEPOT') || name.includes('DEPOT');
             });
             setDepots(filtered);
             if (filtered.length > 0) setSelectedDepot(filtered[0].id);

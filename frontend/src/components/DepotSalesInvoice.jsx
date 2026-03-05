@@ -1,626 +1,506 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { mastersAPI, transactionsAPI } from '../service/api';
 import { 
-    Save, FileText, ShoppingBag, Calculator, 
-    Warehouse, Users, Link, History, Search, 
-    Truck, Plus, Trash2, X, RefreshCw,
-    ChevronLeft, ChevronRight, Square, CheckSquare, 
-    Edit, MapPin, Package, Clock, ShieldCheck,
-    Percent, DollarSign, Info, Filter, Database, 
-    Calendar, Activity, ArrowRightCircle, AlertCircle
+    Save, FileText, Calculator, RefreshCw, X, Plus, 
+    Database, MinusCircle, Box, Layers, Activity, 
+    ShoppingCart, Truck, Search, Hash, Printer, 
+    Warehouse, MapPin, Tag, ChevronLeft, ChevronRight
 } from 'lucide-react';
 
+// ==========================================
+// HELPERS
+// ==========================================
+const num = (v) => isNaN(parseFloat(v)) ? 0 : parseFloat(v);
+const money = (v) => num(v).toFixed(2);
+
 const DepotSalesInvoice = () => {
-    // --- Initial States ---
-    const emptyInvoice = { 
-        id: null,
-        invoice_no: '', 
-        date: new Date().toISOString().split('T')[0], 
-        sales_type: 'DEPOT SALES',
-        invoice_type: '',
-        depot_id: '', 
-        party_id: '', 
-        address: '',
-        credit_days: 0,
-        interest_pct: 0,
-        transport_id: '',
-        lr_no: '',
-        lr_date: new Date().toISOString().split('T')[0],
-        vehicle_no: '',
-        removal_time: new Date().toISOString().slice(0, 16),
-        agent_name: '',
-        pay_mode: 'IMMEDIATE',
-        remarks: '',
-        are_no: '',
-        form_jj: '',
-        // Value Section Fields
-        assessable_value: 0, 
-        charity: 0, 
-        vat_tax: 0,
-        cenvat: 0,
-        duty: 0,
-        cess: 0,
-        hs_cess: 0,
-        tcs: 0,
-        discount: 0,
-        pf_amount: 0,
-        freight: 0,
-        gst: 0, 
-        igst: 0,
-        sub_total: 0,
-        round_off: 0,
-        final_invoice_value: 0
+    // ==========================================
+    // 1. INITIAL STATES
+    // ==========================================
+    const emptyInvoice = {
+        id: null, invoice_no: '', date: new Date().toISOString().split('T')[0],
+        sales_type: 'DEPOT SALES', invoice_type_id: '', depot_id: '', party_id: '', address: '',
+        credit_days: 0, interest_pct: 0, transport_id: '', lr_no: '', lr_date: new Date().toISOString().split('T')[0],
+        country: '', are_no: '', vehicle_no: '', remarks: '', agent_name: '', pay_mode: 'CREDIT', form_jj: '',
+        // Aggregates
+        total_assessable: 0, total_charity: 0, total_vat: 0, total_cenvat: 0,
+        total_duty: 0, total_cess: 0, total_hr_sec_cess: 0, total_tcs: 0,
+        total_sgst: 0, total_cgst: 0, total_igst: 0, total_discount: 0, total_other: 0,
+        pf_amount: 0, freight: 0, sub_total: 0, round_off: 0, final_invoice_value: 0
     };
 
-    // --- Main States ---
-    const [list, setList] = useState([]);
+    const [listData, setListData] = useState({
+        types: [], parties: [], depots: [], transports: [], 
+        products: [], orders: [], history: [], brokers: []
+    });
+
     const [formData, setFormData] = useState(emptyInvoice);
-    const [gridRows, setGridRows] = useState([{ order_no: '', product_id: '', packs: 0, packing_type_id: '', total_kgs: 0, rate: 0, amount: 0, avg_content: 0 }]);
+    const [gridRows, setGridRows] = useState([]);
     const [loading, setLoading] = useState(false);
     const [submitLoading, setSubmitLoading] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [activeTab, setActiveTab] = useState('head');
+    // FILTER STATES (ERP style)
+const [searchField, setSearchField] = useState('invoice_no');
+const [searchCondition, setSearchCondition] = useState('Like');
+const [searchValue, setSearchValue] = useState('');
 
-    // Master Data
-    const [depots, setDepots] = useState([]);
-    const [parties, setParties] = useState([]);
-    const [orders, setOrders] = useState([]);
-    const [products, setProducts] = useState([]);
-    const [transports, setTransports] = useState([]);
-    const [brokers, setBrokers] = useState([]);
-    const [packingTypes, setPackingTypes] = useState([]);
+    // ==========================================
+    // 2. MATH ENGINE (Strict Model Alignment)
+    // ==========================================
+    const runCalculations = useCallback((rows, typeId, hFreight = formData.freight, pf = formData.pf_amount) => {
+        if (!typeId) return rows;
+        const config = listData.types.find(t => t.id === parseInt(typeId));
+        if (!config) return rows;
 
-    // Search & Selection
-    const [searchField, setSearchField] = useState('invoice_no');
-    const [searchCondition, setSearchCondition] = useState('Like');
-    const [searchValue, setSearchValue] = useState('');
-    const [isSelectionMode, setIsSelectionMode] = useState(false);
-    const [selectedIds, setSelectedIds] = useState([]);
-    const [currentPage, setCurrentPage] = useState(1);
-    const itemsPerPage = 10;
+        let hTotals = { 
+            assess: 0, charity: 0, vat: 0, cenvat: 0, duty: 0, cess: 0, 
+            hcess: 0, tcs: 0, sgst: 0, cgst: 0, igst: 0, disc: 0, other: 0, net: 0 
+        };
 
-    // --- EFFECT: Automatic Financial Calculation Engine ---
-    useEffect(() => {
-        const totalAssessable = gridRows.reduce((sum, row) => sum + (parseFloat(row.amount) || 0), 0);
+        const updatedRows = rows.map((item) => {
+            const product = listData.products.find(p => p.id === parseInt(item.product_id));
+            
+            // 1. [H] Base
+            const H = num(item.rate) * num(item.total_kgs);
+            const avgContent = num(item.packs) > 0 ? num(item.total_kgs) / num(item.packs) : 0;
 
-        const charity = parseFloat(formData.charity) || 0;
-        const vat = parseFloat(formData.vat_tax) || 0;
-        const cenvat = parseFloat(formData.cenvat) || 0;
-        const duty = parseFloat(formData.duty) || 0;
-        const cess = parseFloat(formData.cess) || 0;
-        const hs_cess = parseFloat(formData.hs_cess) || 0;
-        const tcs = parseFloat(formData.tcs) || 0;
-        const pf = parseFloat(formData.pf_amount) || 0;
-        const gst = parseFloat(formData.gst) || 0;
-        const igst = parseFloat(formData.igst) || 0;
-        const discount = parseFloat(formData.discount) || 0;
-        const freight = parseFloat(formData.freight) || 0;
-        const roundOff = parseFloat(formData.round_off) || 0;
+            // 2. [A] Assessable
+            const A = H - num(item.resale) + num(item.convert_to_hank) - (item.convert_to_cone ? num(item.rate) : 0);
 
-        const subTotal = (totalAssessable + charity + vat + cenvat + duty + cess + hs_cess + tcs + pf + gst + igst) - discount;
-        const finalValue = subTotal + freight + roundOff;
+            // 3. Taxes
+            const charity = config.charity_checked ? num(product?.charity_rs) * num(item.total_kgs) : 0;
+            const vat     = num(item.vat_per)    * A / 100;
+            const sgst    = num(item.sgst_per)   * A / 100;
+            const cgst    = num(item.cgst_per)   * A / 100;
+            const igst    = num(item.igst_per)   * A / 100;
+
+            // 4. Basis
+            const basis = A + sgst + cgst + igst + vat + charity + num(item.other_amt) + num(item.freight_amt);
+            const discAmt = num(item.discount_percentage) * basis / 100;
+            const rowTotal = basis - discAmt;
+
+            // Header accumulators
+            hTotals.assess += A; hTotals.charity += charity; hTotals.vat += vat;
+            hTotals.sgst += sgst; hTotals.cgst += cgst; hTotals.igst += igst; 
+            hTotals.disc += discAmt; hTotals.other += num(item.other_amt); hTotals.net += rowTotal;
+
+            return {
+                ...item, avg_content: avgContent.toFixed(3), assessable_value: A, charity_amt: charity,
+                vat_amt: vat, sgst_amt: sgst, cgst_amt: cgst, igst_amt: igst, discount_amt: discAmt,
+                sub_total: basis, final_value: rowTotal
+            };
+        });
+
+        const finalRawTotal = hTotals.net + num(hFreight) + num(pf);
+        const finalNetTotal = Math.round(finalRawTotal);
 
         setFormData(prev => ({
             ...prev,
-            assessable_value: totalAssessable.toFixed(2),
-            sub_total: subTotal.toFixed(2),
-            final_invoice_value: finalValue.toFixed(2)
+            total_assessable: money(hTotals.assess), total_charity: money(hTotals.charity),
+            total_vat: money(hTotals.vat), total_sgst: money(hTotals.sgst), 
+            total_cgst: money(hTotals.cgst), total_igst: money(hTotals.igst),
+            total_discount: money(hTotals.disc), total_other: money(hTotals.other),
+            sub_total: money(finalRawTotal), round_off: (finalNetTotal - finalRawTotal).toFixed(2),
+            final_invoice_value: finalNetTotal
         }));
-    }, [
-        gridRows, 
-        formData.charity, formData.vat_tax, formData.cenvat, formData.duty, 
-        formData.cess, formData.hs_cess, formData.tcs, formData.pf_amount, 
-        formData.gst, formData.igst, formData.discount, formData.freight, formData.round_off
-    ]);
 
-    // --- Initialization ---
-    useEffect(() => {
-        fetchMasters();
-        fetchRecords();
-    }, []);
+        return updatedRows;
+    }, [listData.types, listData.products, formData.freight, formData.pf_amount]);
 
-    const fetchMasters = async () => {
-        try {
-            const [dep, par, ord, pro, tra, bro, pack] = await Promise.all([
-                mastersAPI.accounts.getAll({ account_group: 'DEPOT' }),
-                mastersAPI.accounts.getAll(),
-                transactionsAPI.orders.getAll({ status: 'OPEN' }),
-                mastersAPI.products.getAll(),
-                mastersAPI.transports.getAll(),
-                mastersAPI.brokers.getAll(),
-                mastersAPI.packingTypes.getAll()
-            ]);
-            setDepots(dep.data.data || []);
-            setParties(par.data.data || []);
-            setOrders(ord.data.data || []);
-            setProducts(pro.data.data || []);
-            setTransports(tra.data.data || []);
-            setBrokers(bro.data.data || []);
-            setPackingTypes(pack.data.data || []);
-        } catch (err) { console.error("Master Load Error", err); }
-    };
-
-    const fetchRecords = async () => {
+    // ==========================================
+    // 3. DATA LOAD
+    // ==========================================
+    const init = async () => {
         setLoading(true);
         try {
-            const res = await transactionsAPI.depotSales.getAll();
-            setList(res.data.data || []);
-        } catch (err) { console.error("Fetch Error", err); }
-        finally { setLoading(false); }
+            const [types, accounts, transports, products, orders, history, brokers] = await Promise.all([
+                mastersAPI.invoiceTypes.getAll(), mastersAPI.accounts.getAll(), mastersAPI.transports.getAll(),
+                mastersAPI.products.getAll(), transactionsAPI.orders.getAll(), 
+                transactionsAPI.depotSales.getAll(), mastersAPI.brokers.getAll()
+            ]);
+
+            const accs = accounts.data?.data || [];
+            const hist = history.data?.data || [];
+
+            setListData({
+                types: types.data?.data || [], 
+                parties: accs.filter(a => !a.account_group?.toUpperCase().includes('DEPOT')),
+                depots: accs.filter(a => a.account_group?.toUpperCase().includes('DEPOT')),
+                transports: transports.data?.data || [], 
+                products: products.data?.data || [],
+                orders: orders.data?.data || [],
+                history: hist, brokers: brokers.data?.data || []
+            });
+        } catch (e) { console.error(e); } finally { setLoading(false); }
     };
 
-    // --- Action Handlers ---
-    const handleAddNew = () => {
-        const nextId = list.length > 0 ? Math.max(...list.map(o => o.id)) + 1 : 1;
-        setFormData({ ...emptyInvoice, invoice_no: nextId.toString() });
-        setGridRows([{ order_no: '', product_id: '', packs: 0, packing_type_id: '', total_kgs: 0, rate: 0, amount: 0, avg_content: 0 }]);
-        setActiveTab('head');
-        setIsModalOpen(true);
-    };
+    useEffect(() => { init(); }, []);
 
-    const updateGrid = (index, field, value) => {
-        const updated = [...gridRows];
-        updated[index][field] = value;
+    // ==========================================
+    // 4. HANDLERS
+    // ==========================================
+    const handleOrderSync = (e) => {
+        const val = e.target.value; if (!val) return;
+        const [source, orderNo] = val.split('|');
+        const config = listData.types.find(t => t.id === parseInt(formData.invoice_type_id));
+        if (!config) return alert("Select Invoice Type first.");
+
+        const order = listData.orders.find(o => o.order_no === orderNo);
+        const details = order?.OrderDetails || [];
         
-        const kgs = parseFloat(updated[index].total_kgs) || 0;
-        const rate = parseFloat(updated[index].rate) || 0;
-        const packs = parseFloat(updated[index].packs) || 0;
-
-        updated[index].amount = (kgs * rate).toFixed(2);
-        updated[index].avg_content = packs > 0 ? (kgs / packs).toFixed(3) : 0;
-
-        setGridRows(updated);
-    };
-
-    const handleOrderSync = (orderId) => {
-        const order = orders.find(o => o.id === parseInt(orderId));
-        if (order) {
-            setFormData(prev => ({ ...prev, party_id: order.party_id }));
-            const newRows = order.OrderDetails.map(d => ({
-                order_no: order.order_no,
-                product_id: d.product_id,
-                packs: 0,
-                packing_type_id: '',
-                total_kgs: d.qty,
-                rate: d.rate_cr || 0,
-                amount: (d.qty * (d.rate_cr || 0)).toFixed(2),
-                avg_content: 0
-            }));
-            setGridRows(newRows);
-            setActiveTab('detail');
-        }
+        const newRows = details.map(d => ({
+            order_no: orderNo, order_type: 'WITH_ORDER',
+            product_id: d.product_id, product_description: d.Product?.product_name || '',
+            packs: d.packs || 0, total_kgs: d.qty || 0, rate: d.rate_cr || 0, 
+            rate_per: 'KG', broker_code: order.Broker?.broker_code || '', 
+            packing_type: d.packing_type || 'BAGS', identification_mark: '', 
+            vat_per: config.vat_percentage || 0, sgst_per: config.sgst_percentage || 0,
+            cgst_per: config.cgst_percentage || 0, igst_per: config.igst_percentage || 0,
+            resale: 0, convert_to_hank: 0, convert_to_cone: false, other_amt: 0, 
+            freight_amt: 0, discount_percentage: 0
+        }));
+        setGridRows(runCalculations([...gridRows, ...newRows], formData.invoice_type_id));
+        e.target.value = "";
     };
 
     const handleSave = async () => {
-        if (!formData.depot_id || !formData.party_id) return alert("Source and Destination required");
         setSubmitLoading(true);
         try {
             const payload = { ...formData, Details: gridRows };
             if (formData.id) await transactionsAPI.depotSales.update(formData.id, payload);
             else await transactionsAPI.depotSales.create(payload);
-            setIsModalOpen(false);
-            fetchRecords();
-        } catch (err) { alert("Save failed"); }
-        finally { setSubmitLoading(false); }
+            setIsModalOpen(false); init();
+        } catch (e) { alert("Save Error: Check Console"); } finally { setSubmitLoading(false); }
     };
 
-    // NEW: Row click handler (edit OR selection toggle)
-    const handleRowClick = (item) => {
-        if (isSelectionMode) {
-            setSelectedIds(prev =>
-                prev.includes(item.id)
-                    ? prev.filter(id => id !== item.id)
-                    : [...prev, item.id]
-            );
-            return;
+const filteredHistory = useMemo(() => {
+
+    const history = Array.isArray(listData.history) ? listData.history : [];
+    const term = searchValue.toLowerCase().trim();
+
+    return history.filter(item => {
+
+        let fieldValue = '';
+
+        switch (searchField) {
+
+            case 'invoice_no':
+                fieldValue = String(item.invoice_no || '');
+                break;
+
+            case 'date':
+                fieldValue = String(item.date || '');
+                break;
+
+            case 'type':
+                const typeObj = listData.types.find(t => t.id === item.invoice_type_id);
+                fieldValue = typeObj?.type_name || '';
+                break;
+
+            case 'depot':
+                fieldValue = item.Depot?.account_name || '';
+                break;
+
+            case 'party':
+                fieldValue = item.Party?.account_name || '';
+                break;
+
+            default:
+                fieldValue = '';
         }
 
-        // Edit mode
-        setFormData({
-            ...emptyInvoice,
-            ...item,
-            date: item.date ? item.date.split('T')[0] : new Date().toISOString().split('T')[0],
-            lr_date: item.lr_date ? item.lr_date.split('T')[0] : new Date().toISOString().split('T')[0],
-            removal_time: item.removal_time || new Date().toISOString().slice(0, 16),
-        });
-        setGridRows(
-            item.Details && item.Details.length > 0
-                ? item.Details.map(d => ({ ...d }))
-                : [{ order_no: '', product_id: '', packs: 0, packing_type_id: '', total_kgs: 0, rate: 0, amount: 0, avg_content: 0 }]
-        );
-        setActiveTab('head');
-        setIsModalOpen(true);
-    };
+        const value = fieldValue.toLowerCase();
 
-    // --- Dynamic Filtering Logic ---
-    const filteredData = useMemo(() => {
-        let result = Array.isArray(list) ? [...list] : [];
-        if (searchValue.trim()) {
-            result = result.filter(item => {
-                let itemValue = "";
-                if (searchField === 'party_name') itemValue = item.Party?.account_name || "";
-                else itemValue = String(item[searchField] || "");
-                const term = searchValue.toLowerCase().trim();
-                return searchCondition === 'Equal' ? itemValue.toLowerCase() === term : itemValue.toLowerCase().includes(term);
-            });
-        }
-        return result.sort((a, b) => b.id - a.id);
-    }, [list, searchValue, searchField, searchCondition]);
+        return searchCondition === 'Equal'
+            ? value === term
+            : value.includes(term);
 
-    const currentItems = filteredData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
-    const totalPages = Math.ceil(filteredData.length / itemsPerPage) || 1;
+    });
+
+}, [listData.history, listData.types, searchField, searchCondition, searchValue]);
 
     return (
-        <div className="min-h-screen bg-slate-50 p-6 font-sans text-slate-900">
-            
-            {/* 1. HEADER SECTION */}
-            <div className="flex justify-between items-center mb-6">
-                <div>
-                    <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-                        <Warehouse className="text-blue-600" /> Depot Sales machine
-                    </h1>
-                    <p className="text-sm text-slate-500">Secondary distribution and warehouse-to-party ledger</p>
-                </div>
-                <div className="flex gap-2">
-                    <button onClick={() => { setIsSelectionMode(!isSelectionMode); setSelectedIds([]); }}
-                        className={`px-5 py-2 border rounded-lg font-semibold transition-all ${isSelectionMode ? 'bg-amber-100 border-amber-300 text-amber-700' : 'bg-white border-slate-200 text-blue-600 hover:bg-slate-50'}`}>
-                        {isSelectionMode ? 'Cancel' : 'Select'}
-                    </button>
-                    <button onClick={handleAddNew} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg font-semibold shadow-sm transition-all active:scale-95">
-                        <Plus size={18} /> New Entry
-                    </button>
-                    <button onClick={fetchRecords} className="p-2 border border-slate-200 rounded-lg bg-white text-slate-400 hover:text-blue-600 transition-colors">
-                        <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
-                    </button>
-                </div>
-            </div>
+        <div className="min-h-screen bg-slate-100 p-6 font-sans">
+            <div className="flex justify-between items-center mb-4">
+    <h1 className="text-2xl font-black uppercase tracking-tighter flex items-center gap-3">
+        <Warehouse className="text-blue-600"/> Depot Sales Registry
+    </h1>
 
-            {/* 2. FILTER BAR */}
-            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm mb-6">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-                    <div>
-                        <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block ml-1">Search Field</label>
-                        <select value={searchField} onChange={(e) => setSearchField(e.target.value)} className="w-full border border-slate-200 p-2 rounded-lg text-sm outline-none focus:ring-1 focus:ring-blue-500">
-                            <option value="invoice_no">Invoice No</option>
-                            <option value="party_name">Party Name</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block ml-1">Condition</label>
-                        <select value={searchCondition} onChange={(e) => setSearchCondition(e.target.value)} className="w-full border border-slate-200 p-2 rounded-lg text-sm outline-none focus:ring-1 focus:ring-blue-500">
-                            <option value="Like">Like</option>
-                            <option value="Equal">Equal</option>
-                        </select>
-                    </div>
-                    <div className="md:col-span-1">
-                        <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block ml-1">Value</label>
-                        <div className="relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                            <input type="text" placeholder="Search..." value={searchValue} onChange={(e) => setSearchValue(e.target.value)} className="w-full border border-slate-200 pl-10 pr-4 py-2 rounded-lg text-sm outline-none focus:ring-1 focus:ring-blue-500 bg-white" />
-                        </div>
-                    </div>
-                    <div className="flex gap-2">
-                        <button onClick={() => setSearchValue('')} className="flex-1 border border-slate-200 py-2 rounded-lg text-sm font-bold hover:bg-slate-50 transition-all">Clear</button>
-                        <div className="flex-1 bg-blue-50 text-blue-600 border border-blue-100 py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-2">
-                            <Filter size={14}/> {filteredData.length} Matches
-                        </div>
-                    </div>
-                </div>
-            </div>
+    <button 
+        onClick={() => { 
+            const nextId = (listData.history?.length || 0) + 1;
 
-            {/* 3. DATA TABLE - with meaningful empty state */}
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse">
-                        <thead>
-                            <tr className="bg-blue-600 text-white">
-                                {isSelectionMode && <th className="p-4 w-12 text-center"><Square size={18} className="mx-auto" /></th>}
-                                <th className="p-4 text-sm font-semibold uppercase tracking-wider">Inv #</th>
-                                <th className="p-4 text-sm font-semibold uppercase tracking-wider">Date</th>
-                                <th className="p-4 text-sm font-semibold uppercase tracking-wider">Source Depot</th>
-                                <th className="p-4 text-sm font-semibold uppercase tracking-wider">Receiving Party</th>
-                                <th className="p-4 text-sm font-semibold uppercase tracking-wider text-right">Net Value (₹)</th>
-                                {!isSelectionMode && <th className="p-4 w-10"></th>}
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100 font-mono">
-                            {loading ? (
-                                <tr>
-                                    <td colSpan={6} className="py-24">
-                                        <div className="flex flex-col items-center justify-center">
-                                            <RefreshCw size={48} className="animate-spin text-blue-500 mb-4" />
-                                            <p className="text-slate-500 font-medium">Loading depot sales records...</p>
-                                        </div>
+setFormData({
+  ...emptyInvoice,
+  invoice_no: `${nextId}`
+});
+            setGridRows([]); 
+            setIsModalOpen(true); 
+        }} 
+        className="bg-blue-600 text-white px-8 py-2 rounded-xl font-bold uppercase text-xs flex items-center gap-2 shadow-lg"
+    >
+        <Plus size={18}/> New Depot Invoice
+    </button>
+</div>
+{/* FILTER BAR */}
+<div className="bg-white p-4 rounded-xl border border-slate-300 shadow-sm mb-6">
+    <div className="grid grid-cols-5 gap-4 items-end">
+
+        {/* FIELD */}
+        <div>
+            <label className="text-[9px] font-black text-slate-500 uppercase block mb-1">
+                Search Field
+            </label>
+            <select
+                value={searchField}
+                onChange={(e) => setSearchField(e.target.value)}
+                className="w-full border border-slate-300 p-2 text-xs font-bold rounded"
+            >
+                <option value="invoice_no">Invoice No</option>
+                <option value="date">Date</option>
+                <option value="type">Invoice Type</option>
+                <option value="depot">Depot</option>
+                <option value="party">Party</option>
+            </select>
+        </div>
+
+        {/* CONDITION */}
+        <div>
+            <label className="text-[9px] font-black text-slate-500 uppercase block mb-1">
+                Condition
+            </label>
+            <select
+                value={searchCondition}
+                onChange={(e) => setSearchCondition(e.target.value)}
+                className="w-full border border-slate-300 p-2 text-xs font-bold rounded"
+            >
+                <option value="Like">Contains</option>
+                <option value="Equal">Exact</option>
+            </select>
+        </div>
+
+        {/* VALUE */}
+        <div>
+            <label className="text-[9px] font-black text-slate-500 uppercase block mb-1">
+                Search Value
+            </label>
+            <div className="relative">
+                <Search className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400" size={14}/>
+                <input
+                    placeholder="Type to search..."
+                    value={searchValue}
+                    onChange={(e) => setSearchValue(e.target.value)}
+                    className="pl-7 pr-3 py-2 border border-slate-300 rounded text-xs font-bold outline-none w-full"
+                />
+            </div>
+        </div>
+
+        {/* CLEAR */}
+        <div>
+            <button
+                onClick={() => setSearchValue('')}
+                className="w-full border border-slate-300 py-2 rounded text-xs font-bold hover:bg-slate-50"
+            >
+                Clear Filter
+            </button>
+        </div>
+
+        {/* MATCH COUNT */}
+        <div className="bg-blue-50 text-blue-700 border border-blue-200 py-2 rounded text-xs font-bold flex items-center justify-center">
+            {filteredHistory.length} Matches
+        </div>
+
+    </div>
+</div>
+
+            <div className="bg-white rounded-2xl border border-slate-300 shadow-sm overflow-hidden">
+                <table className="w-full text-left">
+                    <thead className="bg-slate-900 text-white text-[10px] uppercase font-black tracking-widest">
+                        <tr>
+                            <th className="p-5">Inv</th>
+                            <th className="p-5">Date</th>
+                            <th className="p-5">Type</th>
+                            <th className="p-5">Depot (Source)</th>
+                            <th className="p-5">Party (Customer)</th>
+                            <th className="p-5 text-right">Net Value</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y text-sm font-mono">
+                        {filteredHistory.map(item => {
+                            const typeObj = listData.types.find(t => t.id === item.invoice_type_id);
+                            return (
+                                <tr key={item.id} className="hover:bg-blue-50 cursor-pointer" onClick={() => { setFormData(item); setGridRows(item.DepotSalesDetails || []); setIsModalOpen(true); }}>
+                                    <td className="p-5 font-bold text-blue-600">{item.invoice_no}</td>
+                                    <td className="p-5 text-slate-500">{item.date}</td>
+                                    <td className="p-5">
+                                        <span className="text-[9px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded font-black border border-blue-200">
+                                            {typeObj?.type_name || 'N/A'}
+                                        </span>
                                     </td>
+                                    <td className="p-5 uppercase text-xs">{item.Depot?.account_name}</td>
+                                    <td className="p-5 uppercase font-bold text-xs">{item.Party?.account_name}</td>
+                                    <td className="p-5 text-right font-black">₹{parseFloat(item.final_invoice_value).toLocaleString()}</td>
                                 </tr>
-                            ) : currentItems.length > 0 ? (
-                                currentItems.map((item) => (
-                                    <tr 
-                                        key={item.id} 
-                                        onClick={() => handleRowClick(item)} 
-                                        className={`transition-all cursor-pointer hover:bg-blue-50/50 ${selectedIds.includes(item.id) ? 'bg-blue-50' : ''}`}
-                                    >
-                                        {isSelectionMode && (
-                                            <td className="p-4 text-center" onClick={(e) => {e.stopPropagation(); handleRowClick(item);}}>
-                                                {selectedIds.includes(item.id) ? <CheckSquare size={18} className="text-blue-600 mx-auto"/> : <Square size={18} className="text-slate-200 mx-auto"/>}
-                                            </td>
-                                        )}
-                                        <td className="p-4 text-sm font-black text-blue-600">DEP-{item.invoice_no}</td>
-                                        <td className="p-4 text-sm text-slate-500 font-sans">{item.date}</td>
-                                        <td className="p-4 text-sm font-bold text-slate-700 uppercase font-sans">{item.Depot?.account_name}</td>
-                                        <td className="p-4 text-sm font-bold text-slate-500 uppercase font-sans">{item.Party?.account_name}</td>
-                                        <td className="p-4 text-sm font-black text-right text-emerald-600 font-mono">₹{parseFloat(item.final_invoice_value).toLocaleString()}</td>
-                                        {!isSelectionMode && <td className="p-4"><Edit size={16} className="text-slate-300" /></td>}
-                                    </tr>
-                                ))
-                            ) : (
-                                <tr>
-                                    <td colSpan={6} className="py-28">
-                                        <div className="flex flex-col items-center justify-center text-center">
-                                            <div className="w-24 h-24 bg-slate-100 rounded-3xl flex items-center justify-center mb-8 shadow-inner">
-                                                {searchValue.trim() ? (
-                                                    <Search size={56} className="text-amber-400" />
-                                                ) : (
-                                                    <Package size={56} className="text-slate-300" />
-                                                )}
-                                            </div>
-                                            
-                                            <h3 className="text-2xl font-semibold text-slate-800 mb-3 tracking-tight">
-                                                {searchValue.trim() ? "No matching records found" : "No depot sales yet"}
-                                            </h3>
-                                            
-                                            <p className="text-slate-500 max-w-md text-[15px]">
-                                                {searchValue.trim() 
-                                                    ? `We couldn't find any invoices matching "${searchValue}".`
-                                                    : "Your depot sales invoices will appear here. Ready to start secondary distribution?"
-                                                }
-                                            </p>
-
-                                            {searchValue.trim() ? (
-                                                <button 
-                                                    onClick={() => setSearchValue('')}
-                                                    className="mt-8 px-6 py-3 bg-white border border-slate-300 hover:border-slate-400 rounded-2xl text-sm font-medium text-slate-700 transition-colors flex items-center gap-2"
-                                                >
-                                                    <RefreshCw size={18} /> Clear search
-                                                </button>
-                                            ) : (
-                                                <button 
-                                                    onClick={handleAddNew}
-                                                    className="mt-8 flex items-center gap-3 bg-blue-600 hover:bg-blue-700 text-white px-8 py-3.5 rounded-2xl font-semibold shadow-sm active:scale-[0.97] transition-all"
-                                                >
-                                                    <Plus size={20} /> Create First Depot Sale
-                                                </button>
-                                            )}
-                                        </div>
-                                    </td>
-                                </tr>
-                            )}
-                        </tbody>
-                    </table>
-                </div>
+                            )
+                        })}
+                    </tbody>
+                </table>
             </div>
 
-            {/* 4. MODAL COCKPIT (unchanged) */}
+            {/* MODAL COCKPIT */}
             {isModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-7xl overflow-hidden flex flex-col max-h-[95vh] animate-in zoom-in duration-200">
-                        
-                        {/* Modal Header */}
-                        <div className="bg-blue-600 p-4 flex justify-between items-center text-white shadow-lg">
-                            <div className="flex items-center gap-4">
-                                <div className="p-2 bg-white/20 rounded-lg"><FileText size={20} /></div>
-                                <div>
-                                    <h2 className="font-bold uppercase tracking-tight">Depot Sales Transaction Entry</h2>
-                                    <p className="text-[10px] font-bold text-blue-100 uppercase">Registry Code: DEP-{formData.invoice_no}</p>
-                                </div>
-                            </div>
-                            <button onClick={() => setIsModalOpen(false)} className="hover:bg-blue-500 p-1 rounded-full"><X size={24}/></button>
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4">
+                    <div className="bg-[#D9E5F7] rounded-lg shadow-2xl w-full max-w-[1250px] flex flex-col overflow-hidden border border-slate-400 h-[98vh]">
+                        <div className="bg-[#FCD166] p-1.5 border-b border-slate-400 flex justify-between items-center">
+                            <span className="text-[13px] font-bold text-slate-700 ml-2">Depot Sales Invoice Engine</span>
+                            <button onClick={() => setIsModalOpen(false)} className="bg-red-500 text-white px-2 rounded font-bold">×</button>
                         </div>
 
-                        {/* Navigation Tabs */}
-                        <div className="flex bg-slate-50 border-b px-6">
-                            <button onClick={() => setActiveTab('head')} className={`py-4 px-6 text-[10px] font-bold uppercase tracking-widest relative ${activeTab === 'head' ? 'text-blue-600' : 'text-slate-400'}`}>
-                                01. Transaction Header {activeTab === 'head' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-600"/>}
-                            </button>
-                            <button onClick={() => setActiveTab('detail')} className={`py-4 px-6 text-[10px] font-bold uppercase tracking-widest relative ${activeTab === 'detail' ? 'text-blue-600' : 'text-slate-400'}`}>
-                                02. Sales Grid {activeTab === 'detail' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-600"/>}
-                            </button>
+                        <div className="flex bg-[#D9E5F7] pt-2 px-4 gap-1">
+                            {['head', 'detail'].map(t => (
+                                <button key={t} onClick={() => setActiveTab(t)} className={`px-6 py-1 text-[11px] font-bold border border-b-0 rounded-t-md ${activeTab === t ? 'bg-white text-blue-700 border-slate-400' : 'bg-[#EBF2FA] text-slate-500 border-slate-300'}`}>{t.toUpperCase()}</button>
+                            ))}
                         </div>
 
-                        {/* Modal Body */}
-                        <div className="flex-1 overflow-y-auto p-6 flex flex-col lg:flex-row gap-6">
-                            
-                            {/* LEFT SIDE: Entry Form */}
-                            <div className="flex-1 space-y-6">
-                                {activeTab === 'head' ? (
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="flex-1 bg-white mx-4 mb-4 border border-slate-400 p-5 overflow-hidden flex flex-col">
+                            {activeTab === 'head' ? (
+                                <div className="grid grid-cols-12 gap-6 h-full overflow-y-auto">
+                                    <div className="col-span-8 space-y-2">
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <RowInput label="Invoice No" value={formData.invoice_no} readOnly color="bg-slate-50" />
+                                            <RowInput label="Date" type="date" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} />
+                                        </div>
+                                        <RowSelect label="Invoice Type" value={formData.invoice_type_id} options={listData.types.map(t => ({value:t.id, label:t.type_name}))} onChange={e => setFormData({...formData, invoice_type_id: e.target.value})} />
+                                        <RowSelect label="Depot (Source)" value={formData.depot_id} options={listData.depots.map(d => ({value:d.id, label:d.account_name}))} onChange={e => setFormData({...formData, depot_id: e.target.value})} />
+                                        <RowSelect label="Party (Customer)" value={formData.party_id} options={listData.parties.map(p => ({value:p.id, label:p.account_name}))} onChange={e => { const acc = listData.parties.find(a => a.id == e.target.value); setFormData({...formData, party_id: e.target.value, address: acc?.address || ''})}} />
+                                        <RowInput label="Address" value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} />
                                         
-                                        {/* SECTION A: IDENTITY */}
-                                        <div className="bg-slate-50 p-5 rounded-xl space-y-4 border">
-                                            <div className="flex items-center gap-2 mb-2 text-slate-400"><Database size={14}/><span className="text-[9px] font-black uppercase">Metadata</span></div>
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <InputField label="Invoice No" value={formData.invoice_no} readOnly className="font-mono text-blue-600" />
-                                                <InputField label="Date" type="date" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} />
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <InputField label="Sales Type" value={formData.sales_type} readOnly />
-                                                <InputField label="Invoice Type" value={formData.invoice_type} placeholder="BHIWANDI GST..." onChange={e => setFormData({...formData, invoice_type: e.target.value.toUpperCase()})} />
-                                            </div>
-                                            <div className="space-y-1">
-                                                <label className="text-[10px] font-bold text-slate-400 uppercase">Depot Name (Source)</label>
-                                                <select value={formData.depot_id} onChange={e => setFormData({...formData, depot_id: e.target.value})} className="w-full bg-white border border-slate-200 p-2 rounded-lg text-sm font-bold">
-                                                    <option value="">-- Choose Depot --</option>
-                                                    {depots.map(d => <option key={d.id} value={d.id}>{d.account_name}</option>)}
-                                                </select>
-                                            </div>
-                                            <div className="space-y-1">
-                                                <label className="text-[10px] font-bold text-slate-400 uppercase">Party Name (Receiver)</label>
-                                                <select value={formData.party_id} onChange={e => setFormData({...formData, party_id: e.target.value})} className="w-full bg-white border border-slate-200 p-2 rounded-lg text-sm font-bold">
-                                                    <option value="">-- Choose Party --</option>
-                                                    {parties.map(p => <option key={p.id} value={p.id}>{p.account_name}</option>)}
-                                                </select>
-                                            </div>
+                                        <div className="grid grid-cols-3 gap-2">
+                                            <RowInput label="Credit Days" type="number" value={formData.credit_days} onChange={e => setFormData({...formData, credit_days: e.target.value})} />
+                                            <RowInput label="Interest %" type="number" value={formData.interest_pct} onChange={e => setFormData({...formData, interest_pct: e.target.value})} />
+                                            <RowSelect label="Pay Mode" value={formData.pay_mode} options={[{value:'CREDIT', label:'CREDIT'}, {value:'CASH', label:'CASH'}]} onChange={e => setFormData({...formData, pay_mode: e.target.value})} />
                                         </div>
-
-                                        {/* SECTION B: LOGISTICS */}
-                                        <div className="bg-slate-50 p-5 rounded-xl space-y-4 border">
-                                            <div className="flex items-center gap-2 mb-2 text-slate-400"><Truck size={14}/><span className="text-[9px] font-black uppercase">Fleet & Logistics</span></div>
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div className="space-y-1">
-                                                    <label className="text-[10px] font-bold text-slate-400 uppercase">Transport</label>
-                                                    <select value={formData.transport_id} onChange={e => setFormData({...formData, transport_id: e.target.value})} className="w-full bg-white border border-slate-200 p-2 rounded-lg text-sm font-bold">
-                                                        <option value="">-- Select --</option>
-                                                        {transports.map(t => <option key={t.id} value={t.id}>{t.transport_name}</option>)}
-                                                    </select>
-                                                </div>
-                                                <InputField label="Vehicle No" value={formData.vehicle_no} onChange={e => setFormData({...formData, vehicle_no: e.target.value.toUpperCase()})} />
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <InputField label="LR No" value={formData.lr_no} onChange={e => setFormData({...formData, lr_no: e.target.value})} />
-                                                <InputField label="LR Date" type="date" value={formData.lr_date} onChange={e => setFormData({...formData, lr_date: e.target.value})} />
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <InputField label="Removal Time" type="datetime-local" value={formData.removal_time} onChange={e => setFormData({...formData, removal_time: e.target.value})} />
-                                                <InputField label="ARE No" value={formData.are_no} onChange={e => setFormData({...formData, are_no: e.target.value})} />
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <InputField label="Form JJ" value={formData.form_jj} onChange={e => setFormData({...formData, form_jj: e.target.value})} />
-                                                <div className="space-y-1">
-                                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Agent Name</label>
-                                                    <select 
-                                                        value={formData.agent_name} 
-                                                        onChange={e => setFormData({...formData, agent_name: e.target.value})} 
-                                                        className="w-full bg-white border border-slate-200 p-2 rounded-lg text-xs font-bold outline-none focus:ring-1 focus:ring-blue-500 appearance-none"
-                                                    >
-                                                        <option value="">-- Choose Agent --</option>
-                                                        {brokers.map(b => <option key={b.id} value={b.broker_name}>{b.broker_name}</option>)}
-                                                    </select>
-                                                </div>
-                                            </div>
+<RowSelect
+    label="Broker"
+    value={formData.broker_id}
+    options={listData.brokers.map(b => ({
+        value: b.id,
+        label: b.broker_name
+    }))}
+    onChange={e => setFormData({
+        ...formData,
+        broker_id: e.target.value
+    })}
+/>
+                                        <div className="grid grid-cols-2 gap-4 pt-2 border-t">
+                                            <RowSelect label="Transport" value={formData.transport_id} options={listData.transports.map(t => ({value:t.id, label:t.transport_name}))} onChange={e => setFormData({...formData, transport_id: e.target.value})} />
+                                            <RowInput label="Vehicle No" value={formData.vehicle_no} onChange={e => setFormData({...formData, vehicle_no: e.target.value})} />
                                         </div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <RowInput label="LR No" value={formData.lr_no} onChange={e => setFormData({...formData, lr_no: e.target.value})} />
+                                            <RowInput label="LR Date" type="date" value={formData.lr_date} onChange={e => setFormData({...formData, lr_date: e.target.value})} />
+                                        </div>
+                                    </div>
 
-                                        {/* SECTION C: CREDIT TERMS */}
-                                        <div className="bg-slate-50 p-5 rounded-xl space-y-4 border md:col-span-2">
-                                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                                                <div className="space-y-1">
-                                                    <label className="text-[10px] font-bold text-slate-400 uppercase">PayMode</label>
-                                                    <select value={formData.pay_mode} onChange={e => setFormData({...formData, pay_mode: e.target.value})} className="w-full bg-white border border-slate-200 p-2 rounded-lg text-sm font-bold">
-                                                        <option>IMMEDIATE</option>
-                                                        <option>CREDIT</option>
-                                                    </select>
-                                                </div>
-                                                <InputField label="Credit Days" type="number" value={formData.credit_days} onChange={e => setFormData({...formData, credit_days: e.target.value})} />
-                                                <InputField label="Interest %" type="number" value={formData.interest_pct} onChange={e => setFormData({...formData, interest_pct: e.target.value})} />
-                                                <InputField label="Remarks" value={formData.remarks} onChange={e => setFormData({...formData, remarks: e.target.value})} />
+                                    <div className="col-span-4 bg-slate-50 border border-slate-300 p-4 rounded flex flex-col gap-1 shadow-inner">
+                                        <h3 className="text-xs font-black text-blue-800 mb-2 border-b pb-1 uppercase tracking-tighter">Aggregate Value</h3>
+                                        <TotalRow label="Assessable" value={formData.total_assessable} />
+                                        <TotalRow label="Charity" value={formData.total_charity} />
+                                        <TotalRow label="VAT Tax" value={formData.total_vat} />
+                                        <TotalRow label="SGST Total" value={formData.total_sgst} />
+                                        <TotalRow label="CGST Total" value={formData.total_cgst} />
+                                        <TotalRow label="IGST Total" value={formData.total_igst} />
+                                        <TotalRow label="Discount" value={formData.total_discount} color="text-red-600" />
+                                        <TotalRow label="PF Charges" value={formData.pf_amount} isEditable onChange={v => setFormData(p => ({...p, pf_amount: v}))} />
+                                        <TotalRow label="Freight" value={formData.freight} isEditable onChange={v => setFormData(p => ({...p, freight: v}))} />
+                                        
+                                        <div className="mt-auto pt-4 border-t-2 border-slate-400">
+                                            <div className="flex justify-between items-center py-2 px-2 bg-white border border-slate-400 rounded">
+                                                <span className="text-[11px] font-black uppercase">Invoice Net Value</span>
+                                                <span className="text-xl font-black font-mono text-blue-700">₹ {num(formData.final_invoice_value).toLocaleString()}</span>
                                             </div>
                                         </div>
                                     </div>
-                                ) : (
-                                    <div className="space-y-4">
-                                        <div className="bg-blue-600 p-4 rounded-xl text-white flex items-center justify-between shadow-lg">
-                                            <div className="flex items-center gap-3"><ShoppingBag size={18} className="text-blue-200" /><span className="text-[10px] font-black uppercase tracking-widest">Order Sync Engine</span></div>
-                                            <select className="bg-white/10 border-none p-2 rounded-lg text-[10px] font-bold outline-none cursor-pointer" onChange={(e) => handleOrderSync(e.target.value)}>
-                                                <option value="" className="text-slate-900">Pull from booking order...</option>
-                                                {orders.map(o => <option className="text-slate-900" key={o.id} value={o.id}>{o.order_no} | {o.Party?.account_name}</option>)}
+                                </div>
+                            ) : (
+                                <div className="space-y-4 h-full flex flex-col">
+                                    <div className="bg-blue-50 p-2 border border-blue-200 flex items-center justify-between rounded shadow-sm">
+                                        <div className="flex items-center gap-4">
+                                            <span className="text-[10px] font-black uppercase text-blue-700">Sync Mill Order:</span>
+                                            <select onChange={handleOrderSync} className="border border-slate-300 text-[11px] p-1 w-72 font-bold rounded">
+                                                <option value="">-- Choose Order --</option>
+                                                {listData.orders.map(o => <option key={o.id} value={`WITH|${o.order_no}`}>{o.order_no} | {o.Party?.account_name}</option>)}
                                             </select>
                                         </div>
-                                        <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm bg-white">
-                                            <table className="w-full border-collapse">
-                                                <thead className="bg-slate-900 text-white text-[9px] uppercase font-bold tracking-widest">
-                                                    <tr>
-                                                        <th className="p-3 text-left">Product Selection</th>
-                                                        <th className="p-3 text-center">Packs</th>
-                                                        <th className="p-3 text-center">Type</th>
-                                                        <th className="p-3 text-center">Total Kgs</th>
-                                                        <th className="p-3 text-center">Rate</th>
-                                                        <th className="p-3 text-center">Avg Content</th>
-                                                        <th className="p-3 w-10"></th>
+                                    </div>
+
+                                    <div className="flex-1 border border-slate-300 overflow-auto bg-slate-50 shadow-inner rounded">
+                                        <table className="min-w-[4000px] text-[10px] border-collapse bg-white">
+                                            <thead className="bg-slate-800 text-white sticky top-0 z-10 font-bold">
+                                                <tr>
+                                                    <th className="p-3 border-r w-32">Order No</th>
+                                                    <th className="p-3 border-r w-80">Product Description</th>
+                                                    <th className="p-3 border-r w-24">Packs</th>
+                                                    <th className="p-3 border-r w-32">Packing Type</th>
+                                                    <th className="p-3 border-r w-32">Total Kgs</th>
+                                                    <th className="p-3 border-r w-24">Rate</th>
+                                                    <th className="p-3 border-r w-40 bg-blue-900">Assess Value</th>
+                                                    <th className="p-3 border-r w-32">VAT Amt</th>
+                                                    <th className="p-3 border-r w-32">SGST Amt</th>
+                                                    <th className="p-3 border-r w-32">CGST Amt</th>
+                                                    <th className="p-3 border-r w-32">IGST Amt</th>
+                                                    <th className="p-3 border-r w-32 bg-red-900">Disc Amt</th>
+                                                    <th className="p-3 border-r w-40 bg-emerald-800">Final Value</th>
+                                                    <th className="p-3 w-10"></th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-200">
+                                                {gridRows.map((r, i) => (
+                                                    <tr key={i} className="hover:bg-blue-50 font-bold">
+                                                        <td className="p-2 border-r text-blue-600">{r.order_no}</td>
+                                                        <td className="p-2 border-r uppercase">{r.product_description}</td>
+                                                        <td className="p-1 border-r text-center">{r.packs}</td>
+                                                        <td className="p-1 border-r text-center">{r.packing_type}</td>
+                                                        <td className="p-1 border-r"><input type="number" className="w-full text-center" value={r.total_kgs} onChange={e => {
+                                                            const updated = [...gridRows];
+                                                            updated[i].total_kgs = e.target.value;
+                                                            setGridRows(runCalculations(updated, formData.invoice_type_id));
+                                                        }} /></td>
+                                                        <td className="p-1 border-r"><input type="number" className="w-full text-center" value={r.rate} onChange={e => {
+                                                            const updated = [...gridRows];
+                                                            updated[i].rate = e.target.value;
+                                                            setGridRows(runCalculations(updated, formData.invoice_type_id));
+                                                        }} /></td>
+                                                        <td className="p-2 border-r text-center bg-blue-50">₹{num(r.assessable_value).toFixed(2)}</td>
+                                                        <td className="p-2 border-r text-center">₹{num(r.vat_amt).toFixed(2)}</td>
+                                                        <td className="p-2 border-r text-center text-blue-600">₹{num(r.sgst_amt).toFixed(2)}</td>
+                                                        <td className="p-2 border-r text-center text-blue-600">₹{num(r.cgst_amt).toFixed(2)}</td>
+                                                        <td className="p-2 border-r text-center text-blue-600">₹{num(r.igst_amt).toFixed(2)}</td>
+                                                        <td className="p-2 border-r text-center text-red-600 bg-red-50">₹{num(r.discount_amt).toFixed(2)}</td>
+                                                        <td className="p-2 border-r text-right bg-emerald-50 font-black">₹{num(r.final_value).toFixed(2)}</td>
+                                                        <td className="p-2 text-center">
+                                                            <button onClick={() => setGridRows(prev => prev.filter((_, idx) => idx !== i))} className="text-red-500"><MinusCircle size={18}/></button>
+                                                        </td>
                                                     </tr>
-                                                </thead>
-                                                <tbody className="divide-y divide-slate-100 font-mono">
-                                                    {gridRows.map((row, idx) => (
-                                                        <tr key={idx} className="hover:bg-slate-50">
-                                                            <td className="p-2">
-                                                                <select value={row.product_id} onChange={e => updateGrid(idx, 'product_id', e.target.value)} className="w-full p-2 text-xs font-bold outline-none bg-transparent font-sans">
-                                                                    <option value="">-- Choose SKU --</option>
-                                                                    {products.map(p => <option key={p.id} value={p.id}>{p.product_name}</option>)}
-                                                                </select>
-                                                            </td>
-                                                            <td className="p-2"><input type="number" value={row.packs} onChange={e => updateGrid(idx, 'packs', e.target.value)} className="w-full p-2 text-center text-xs font-bold outline-none" /></td>
-                                                            <td className="p-2">
-                                                                <select value={row.packing_type_id} onChange={e => updateGrid(idx, 'packing_type_id', e.target.value)} className="w-full p-2 text-[10px] font-bold outline-none bg-transparent">
-                                                                    <option value="">-- Select --</option>
-                                                                    {packingTypes.map(pt => <option key={pt.id} value={pt.id}>{pt.packing_type}</option>)}
-                                                                </select>
-                                                            </td>
-                                                            <td className="p-2"><input type="number" value={row.total_kgs} onChange={e => updateGrid(idx, 'total_kgs', e.target.value)} className="w-full p-2 text-center text-sm font-bold outline-none" /></td>
-                                                            <td className="p-2"><input type="number" value={row.rate} onChange={e => updateGrid(idx, 'rate', e.target.value)} className="w-full p-2 text-center text-sm font-black text-blue-600 outline-none" /></td>
-                                                            <td className="p-2 text-center text-xs font-bold text-slate-400">{row.avg_content}</td>
-                                                            <td className="p-2">
-                                                                <button onClick={() => setGridRows(gridRows.filter((_, i) => i !== idx))} className="text-slate-300 hover:text-red-500"><MinusCircle size={18}/></button>
-                                                            </td>
-                                                        </tr>
-                                                    ))}
-                                                </tbody>
-                                            </table>
-                                            <button onClick={() => setGridRows([...gridRows, { order_no: '', product_id: '', packs: 0, packing_type_id: '', total_kgs: 0, rate: 0, amount: 0, avg_content: 0 }])} className="w-full p-4 bg-slate-50 text-blue-600 text-[10px] font-black uppercase tracking-widest hover:bg-blue-100 transition-all flex justify-center items-center gap-2">+ Append Line</button>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* RIGHT SIDE: Financial Cockpit */}
-                            <div className="w-full lg:w-96 bg-slate-900 rounded-2xl p-6 text-white flex flex-col justify-between shadow-2xl">
-                                <div className="space-y-4">
-                                    <div className="text-center mb-6">
-                                        <Activity size={32} className="text-blue-400 mx-auto mb-1" />
-                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Financial Ledger Dashboard</p>
-                                    </div>
-
-                                    <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-                                        <LedgerInput label="Assessable Value" value={formData.assessable_value} onChange={val => setFormData({...formData, assessable_value: val})} />
-                                        <LedgerInput label="Charity" value={formData.charity} onChange={val => setFormData({...formData, charity: val})} />
-                                        <LedgerInput label="VAT Tax" value={formData.vat_tax} onChange={val => setFormData({...formData, vat_tax: val})} />
-                                        <LedgerInput label="Cenvat" value={formData.cenvat} onChange={val => setFormData({...formData, cenvat: val})} />
-                                        <LedgerInput label="Duty" value={formData.duty} onChange={val => setFormData({...formData, duty: val})} />
-                                        <LedgerInput label="Cess" value={formData.cess} onChange={val => setFormData({...formData, cess: val})} />
-                                        <LedgerInput label="H.S. Cess" value={formData.hs_cess} onChange={val => setFormData({...formData, hs_cess: val})} />
-                                        <LedgerInput label="TCS" value={formData.tcs} onChange={val => setFormData({...formData, tcs: val})} />
-                                        <LedgerInput label="Discount" value={formData.discount} onChange={val => setFormData({...formData, discount: val})} />
-                                        <LedgerInput label="PF Amount" value={formData.pf_amount} onChange={val => setFormData({...formData, pf_amount: val})} />
-                                        <LedgerInput label="Freight" value={formData.freight} onChange={val => setFormData({...formData, freight: val})} />
-                                        <LedgerInput label="GST" value={formData.gst} color="text-amber-400" onChange={val => setFormData({...formData, gst: val})} />
-                                        <LedgerInput label="IGST" value={formData.igst} color="text-amber-400" onChange={val => setFormData({...formData, igst: val})} />
-                                    </div>
-                                    
-                                    <div className="pt-4 space-y-3 border-t border-white/5 mt-4">
-                                        <div className="flex justify-between items-center text-xs font-bold"><span className="text-slate-500 uppercase">Sub Total</span><span className="font-mono tracking-tighter">₹ {formData.sub_total}</span></div>
-                                        <div className="flex justify-between items-center text-xs font-bold"><span className="text-slate-500 uppercase">Round off</span><input type="number" step="0.01" className="w-20 bg-transparent border-b border-slate-700 text-right font-mono" value={formData.round_off} onChange={e => setFormData({...formData, round_off: e.target.value})} /></div>
+                                                ))}
+                                            </tbody>
+                                        </table>
                                     </div>
                                 </div>
-
-                                <div className="mt-8 p-6 bg-blue-600/10 rounded-3xl border border-blue-500/20 text-center relative overflow-hidden group">
-                                    <Database className="absolute -right-2 -bottom-2 text-white/5 group-hover:scale-110 transition-transform" size={80} />
-                                    <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-1 relative z-10">Net Document Value</p>
-                                    <h3 className="text-3xl font-black text-white font-mono relative z-10">₹ {formData.final_invoice_value}</h3>
-                                </div>
-                            </div>
+                            )}
                         </div>
 
-                        {/* Modal Footer */}
-                        <div className="p-6 bg-slate-50 border-t flex justify-end items-center gap-4">
-                            <button onClick={() => setIsModalOpen(false)} className="px-8 py-3 font-bold text-slate-400 hover:text-slate-600 text-xs tracking-widest uppercase transition-colors">Discard</button>
-                            <button onClick={handleSave} disabled={submitLoading} className="bg-blue-600 hover:bg-blue-700 text-white px-10 py-3 rounded-xl font-black shadow-xl flex items-center gap-2 active:scale-95 transition-all text-xs tracking-widest uppercase">
-                                <Save size={18}/> {submitLoading ? 'SAVING...' : 'FINALIZE & POST'}
+                        <div className="bg-[#D9E5F7] p-3 border-t border-slate-400 flex justify-end gap-3 px-6 shadow-inner">
+                            <button onClick={() => setIsModalOpen(false)} className="bg-white border border-slate-400 px-10 py-2 text-[11px] font-black rounded">CANCEL</button>
+                            <button onClick={handleSave} disabled={submitLoading || gridRows.length === 0} className="bg-blue-600 text-white border border-blue-700 px-12 py-2 text-[11px] font-black rounded flex items-center gap-2">
+                                <Save size={16}/> {submitLoading ? "SAVING..." : "COMMIT INVOICE"}
                             </button>
                         </div>
                     </div>
                 </div>
             )}
-
-            <style jsx>{`
-                input[type='number']::-webkit-inner-spin-button, 
-                input[type='number']::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+            <style>{`
                 ::-webkit-scrollbar { width: 5px; height: 5px; }
                 ::-webkit-scrollbar-track { background: transparent; }
                 ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
@@ -629,21 +509,15 @@ const DepotSalesInvoice = () => {
     );
 };
 
-// HELPER COMPONENTS
-const InputField = ({ label, className = "", ...props }) => (
-    <div className={`space-y-1 ${className}`}>
-        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">{label}</label>
-        <input {...props} className="w-full bg-white border border-slate-200 p-2 rounded-lg text-xs font-bold outline-none focus:ring-1 focus:ring-blue-500" />
-    </div>
+// --- ERP HELPERS ---
+const RowInput = ({ label, width = "w-full", color = "bg-white", ...props }) => (
+    <div className="flex items-center"><label className="w-[140px] text-[10px] font-black text-slate-700 uppercase tracking-tighter">{label}</label><input {...props} className={`border border-slate-300 p-1 px-2 text-[11px] font-bold outline-none rounded-sm shadow-sm ${width} ${color}`} /></div>
 );
-
-const LedgerInput = ({ label, value, color = "text-white", onChange }) => (
-    <div className="space-y-1">
-        <label className="text-[8px] font-black text-slate-500 uppercase block tracking-tighter">{label}</label>
-        <input type="number" step="0.01" className={`w-full bg-white/5 border border-white/5 rounded-lg p-1.5 text-right text-xs font-bold font-mono outline-none focus:border-blue-500 ${color}`} value={value} onChange={e => onChange(e.target.value)} />
-    </div>
+const RowSelect = ({ label, options, width = "w-full", ...props }) => (
+    <div className="flex items-center"><label className="w-[140px] text-[10px] font-black text-slate-700 uppercase tracking-tighter">{label}</label><select {...props} className={`border border-slate-300 p-1 text-[11px] font-bold outline-none rounded-sm shadow-sm ${width}`}><option value="">-- Select --</option>{options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}</select></div>
 );
-
-const MinusCircle = ({ size, className }) => ( <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10"/><line x1="8" y1="12" x2="16" y2="12"/></svg> );
+const TotalRow = ({ label, value, isEditable = false, onChange, color = "text-slate-900" }) => (
+    <div className="flex justify-between items-center text-[10px] py-0.5 px-2 hover:bg-white rounded transition-colors"><span className="font-black text-slate-500 uppercase tracking-tighter">{label}</span><input readOnly={!isEditable} value={value} onChange={e => onChange?.(e.target.value)} className={`w-32 border border-slate-300 text-right p-0.5 font-mono text-[11px] font-black outline-none rounded shadow-inner ${color} ${isEditable ? 'bg-white border-blue-400' : 'bg-slate-50'}`} /></div>
+);
 
 export default DepotSalesInvoice;

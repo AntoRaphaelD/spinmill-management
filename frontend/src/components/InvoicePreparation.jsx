@@ -1,596 +1,1323 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { useReactToPrint } from 'react-to-print';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { mastersAPI, transactionsAPI } from '../service/api';
-import TaxInvoiceTemplate from '../print/TaxInvoiceTemplate';
 import { 
-    Save, FileText, Printer, Search, Calculator, RefreshCw, 
-    Truck, Info, X, Plus, Trash2, Database, MinusCircle, 
-    CheckCircle2, MapPin, Hash, User, Settings, Layers, Box, 
-    Percent, Tag, Clock, ShieldCheck, Lock, Activity, 
-    Filter, ChevronLeft, ChevronRight, Square, CheckSquare,
-    CreditCard, Calendar, Timer, DollarSign, ArrowRightCircle
+    Save, FileText, Calculator, RefreshCw, X, Plus, 
+    Database, MinusCircle, Box, Layers, Activity, Lock, 
+    ShoppingCart, ChevronDown, Clock, Truck, User, 
+    Search, Hash, Info, MapPin, Printer, FileJson
 } from 'lucide-react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+
+// =====================================================
+// SAFE NUMBER HELPERS (PREVENT NaN + DECIMAL ISSUES)
+// =====================================================
+const num = (v) => {
+    const n = Number(v);
+    return isNaN(n) ? 0 : n;
+};
+
+const money = (v) => Number(num(v).toFixed(2));
+// =====================================================
+// INDIAN RUPEES TO WORDS (Professional GST Requirement)
+// =====================================================
+const numberToWords = (amount) => {
+    if (!amount || amount === 0) return "Zero Rupees Only";
+    
+    const ones = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten",
+                  "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
+    const tens = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+    
+    const convert = (n) => {
+        if (n < 20) return ones[n];
+        if (n < 100) return tens[Math.floor(n / 10)] + (n % 10 ? " " + ones[n % 10] : "");
+        if (n < 1000) return ones[Math.floor(n / 100)] + " Hundred" + (n % 100 ? " and " + convert(n % 100) : "");
+        return "";
+    };
+    
+    let str = "";
+    const crore = Math.floor(amount / 10000000);
+    const lakh = Math.floor((amount % 10000000) / 100000);
+    const thousand = Math.floor((amount % 100000) / 1000);
+    const hundred = amount % 1000;
+    
+    if (crore) str += convert(crore) + " Crore ";
+    if (lakh) str += convert(lakh) + " Lakh ";
+    if (thousand) str += convert(thousand) + " Thousand ";
+    if (hundred) str += convert(hundred);
+    
+    return str.trim() + " Rupees Only";
+};
+
+// =====================================================
+// PREMIUM PRINT VIEW - EXACTLY AS PER YOUR SPECIFICATION
+// =====================================================
+const ModernPrintView = ({ data, listData, getHSN }) => {
+    if (!data) return null;
+
+    const getProduct = (pid) => listData.products.find(p => p.id === pid);
+    const netAmount = num(data.net_amount);
+  
+    return (
+        <div id="printable-invoice-wrapper" className="p-8 bg-white text-slate-800 font-sans border border-slate-900 max-w-[210mm] mx-auto shadow-xl">
+            {/* 1. HEADER */}
+            <div className="flex justify-between items-start border-b-2 border-gray-300 pb-6 mb-6">
+                <div>
+                    <h1 className="text-5xl font-black text-blue-600 tracking-tighter">TAX INVOICE</h1>
+                    <div className="mt-2 inline-block bg-blue-100 text-blue-700 text-xs font-bold px-5 py-1 rounded">Original for Buyer</div>
+                </div>
+                <div className="text-right text-xs">
+                    <div className="font-bold">Duplicate for Transporter</div>
+                    <div className="font-bold">Triplicate for File Copy</div>
+                    <div className="font-bold">Extra Copy</div>
+                </div>
+            </div>
+
+            {/* 2. COMPANY DETAILS */}
+            <div className="grid grid-cols-2 gap-8 mb-8">
+                <div>
+                    <h2 className="text-xl font-black">KAYAAR EXPORTS PRIVATE LIMITED</h2>
+                    <p className="text-xs leading-tight mt-1">
+                        D.No: 43/5, Railway Feeder Road<br />
+                        K.R. Nagar – 628503<br />
+                        Kovilpatti – Taluk<br />
+                        Tuticorin Dist, Tamilnadu, India
+                    </p>
+                    <p className="text-xs mt-3">Phone: 04632 – 248258, 9443238761</p>
+                    <p className="text-xs">Email: ttnkrgroup@gmail.com</p>
+                    <p className="text-xs font-bold mt-3">GSTIN: 33AAACK4468M1ZA</p>
+                </div>
+
+                {/* 3. CERTIFICATION + REGISTRATION */}
+                <div className="text-right">
+                    <div className="border border-gray-300 bg-gray-50 p-4 rounded-xl inline-block text-xs">
+                        <div className="font-black text-emerald-700">OEKO-TEX Standard 100</div>
+                        <div className="text-[10px]">Tested for harmful substances</div>
+                        <div className="text-[10px]">www.oeko-tex.com/standard100</div>
+                    </div>
+                    <div className="mt-6 text-xs">
+                        <div>PAN: <span className="font-mono">AAACK4468M</span></div>
+                        <div>CIN: <span className="font-mono">U51101TN1991PTC020933</span></div>
+                    </div>
+                </div>
+            </div>
+
+            {/* 5. PARTY DETAILS + 6. INVOICE INFO */}
+            <div className="grid grid-cols-2 gap-12 mb-10 border border-slate-300 p-6 rounded-2xl">
+                <div>
+                    <div className="uppercase text-blue-700 text-[10px] font-black tracking-widest mb-1">Bill To</div>
+                    <div className="font-black text-lg">{data.Party?.account_name}</div>
+                    <div className="text-xs mt-2 leading-tight whitespace-pre-wrap">{data.address}</div>
+                    <div className="mt-4 text-xs font-bold">GST No: <span className="font-mono">{data.Party?.gst_no || 'N/A'}</span></div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-6 text-xs">
+                    <div>
+                        <div className="font-black text-slate-500">Invoice No</div>
+                        <div className="font-mono text-2xl font-black">#{data.invoice_no}</div>
+                    </div>
+                    <div>
+                        <div className="font-black text-slate-500">Invoice Date</div>
+                        <div className="font-bold text-lg">{data.date}</div>
+                    </div>
+                    <div>
+                        <div className="font-black text-slate-500">E-Way Bill No</div>
+                        <div className="font-mono">{data.ebill_no || 'PENDING'}</div>
+                    </div>
+                    <div>
+                        <div className="font-black text-slate-500">Vehicle No</div>
+                        <div className="font-bold uppercase">{data.vehicle_no || 'N/A'}</div>
+                    </div>
+                    <div>
+                        <div className="font-black text-slate-500">Delivery At</div>
+                        <div className="font-medium">{data.delivery || 'MUMBAI'}</div>
+                    </div>
+                </div>
+            </div>
+
+            {/* 7. PRODUCT TABLE */}
+            <table className="w-full border-collapse mb-8 text-xs">
+                <thead>
+                    <tr className="bg-gray-100 text-gray-800 font-bold text-[10px] border-b">
+                        <th className="py-4 px-4 text-left border-r border-slate-700">Description of Goods</th>
+                        <th className="py-4 px-4 text-center border-r border-slate-700">No of Bags</th>
+                        <th className="py-4 px-4 text-center border-r border-slate-700">Net Weight</th>
+                        <th className="py-4 px-4 text-center border-r border-slate-700">S.L No</th>
+                        <th className="py-4 px-4 text-right border-r border-slate-700">Rate Per Kgs</th>
+                        <th className="py-4 px-4 text-right">Assessable Value</th>
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                    {(data.Details || data.InvoiceDetails || []).map((item, idx) => {
+                        const prod = getProduct(item.product_id);
+                        return (
+                            <tr key={idx} className="text-[11px]">
+                                <td className="py-4 px-4">
+                                    <div className="font-black uppercase">{item.product_description}</div>
+                                    <div className="text-[10px] text-slate-500">HSN: {getHSN(item.product_id)}</div>
+                                </td>
+                                <td className="py-4 px-4 text-center font-bold">{item.packs}</td>
+                                <td className="py-4 px-4 text-center font-black">{item.total_kgs}</td>
+                                <td className="py-4 px-4 text-center">{item.from_no} - {item.to_no}</td>
+                                <td className="py-4 px-4 text-right font-bold">₹{item.rate}</td>
+                               <td className="py-4 px-4 text-right font-black">{num(item.assessable_value).toLocaleString('en-IN')}</td>
+                            </tr>
+                        );
+                    })}
+                </tbody>
+            </table>
+
+            {/* 9. TOTALS (Exact match to your screenshot) */}
+            <div className="flex justify-end">
+                <div className="w-96">
+                    <div className="space-y-2 text-sm border-b pb-4">
+                        <div className="flex justify-between"><span>Assessable Value</span><span className="font-mono">₹{num(data.total_assessable).toLocaleString('en-IN')}</span></div>
+                        <div className="flex justify-between"><span>Charity</span><span className="font-mono">₹{num(data.total_charity).toLocaleString('en-IN')}</span></div>
+                        <div className="flex justify-between"><span>Freight Charges</span><span className="font-mono">₹{num(data.freight_charges).toLocaleString('en-IN')}</span></div>
+                        <div className="flex justify-between border-t pt-3 font-bold"><span>GST Total</span><span className="font-mono">₹{num(data.total_gst).toLocaleString('en-IN')}</span></div>
+                    </div>
+
+                    {/* GRAND TOTAL - BLACK BOX LIKE YOUR SCREENSHOT */}
+                    <div className="mt-6 bg-blue-50 border border-blue-200 rounded-2xl px-8 py-5 flex justify-between items-center">
+                        <span className="text-lg font-bold text-blue-700 tracking-widest">GRAND TOTAL</span>
+                        <span className="text-3xl font-black font-mono text-blue-700">₹{netAmount.toLocaleString('en-IN')}</span>
+                    </div>
+
+                    {/* Amount in Words */}
+                    <div className="mt-8 text-xs font-bold text-slate-700">
+                        Amount Chargeable (in words):<br />
+                        <span className="font-mono text-blue-700 text-sm">{numberToWords(netAmount)}</span>
+                    </div>
+                </div>
+            </div>
+
+            {/* Declaration & Signatures */}
+            <div className="mt-16 text-[10px] italic text-slate-500">
+                We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.
+            </div>
+
+            <div className="grid grid-cols-2 mt-12 text-xs">
+                <div>
+                    <div className="border border-dashed border-slate-400 w-52 h-24 rounded"></div>
+                    <p className="mt-3">Receiver's Signature</p>
+                </div>
+                <div className="text-right">
+                    <p className="font-black">For KAYAAR EXPORTS PRIVATE LIMITED</p>
+                    <p className="mt-10">Authorised Signatory</p>
+                </div>
+            </div>
+        </div>
+    );
+};
 
 const InvoicePreparation = () => {
-    // --- Initial States (Preserving all fields) ---
+    // ==========================================
+    // 1. INITIAL STATES
+    // ==========================================
     const emptyInvoice = {
-        id: null,
-        invoice_no: '', 
-        date: new Date().toISOString().split('T')[0], 
-        sales_type: 'GST SALES', 
-        load_id: '', 
-        invoice_type_id: '',
-        party_id: '', 
-        transport_id: '', 
-        vehicle_no: '', 
-        delivery: '',
-        address: '', 
-        credit_days: 0, 
-        interest_percentage: 0, 
-        lr_no: '',
-        lr_date: '', 
-        ebill_no: '', 
-        removal_time: '', 
-        prepare_time: '',
-        pay_mode: 'Credit', 
-        form_j: '', 
-        sales_against: '', 
-        epcg_no: '', 
-        remarks: '',
-        // Calculation aggregates
+        id: null, invoice_no: '', load_id: '', date: new Date().toISOString().split('T')[0],
+        sales_type: 'GST SALES', invoice_type_id: '', party_id: '', address: '',
+        credit_days: 0, interest_percentage: 0, transport_id: '', lr_no: '',
+        delivery: '', lr_date: new Date().toISOString().split('T')[0], ebill_no: '',
+        vehicle_no: '', remarks: '', removal_time: '12:00', prepare_time: '12:00',
+        pay_mode: 'CREDIT', form_j: '', sales_against: '', epcg_no: '', broker_id: '', is_approved: false,
+        // Header Totals
         total_assessable: 0, total_charity: 0, total_vat: 0, total_cenvat: 0,
         total_duty: 0, total_cess: 0, total_hr_sec_cess: 0, total_tcs: 0,
-        total_sgst: 0, total_cgst: 0, total_igst: 0, total_other: 0,
-        sub_total: 0, freight_charges: 0, round_off: 0, net_amount: 0,
-        is_approved: false
+        total_gst: 0, total_igst: 0, total_discount: 0, total_broker: 0,
+        total_other: 0, freight_charges: 0, sub_total: 0, round_off: 0, net_amount: 0
     };
 
-    // --- Main States ---
-    const [listData, setListData] = useState({ 
-        types: [], parties: [], transports: [], 
-        products: [], orders: [], directOrders: [], history: [], loads: [] 
-    });
+    const [listData, setListData] = useState({
+    types: [],parties: [],transports: [],products: [],orders: [],directOrders: [],history: [],loads: [],brokers: []
+});
+
     const [formData, setFormData] = useState(emptyInvoice);
     const [gridRows, setGridRows] = useState([]);
     const [loading, setLoading] = useState(false);
     const [submitLoading, setSubmitLoading] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [activeTab, setActiveTab] = useState('head');
-
-    // Search & Selection
-    const [searchValue, setSearchValue] = useState('');
-    const [searchField, setSearchField] = useState('invoice_no');
-    const [isSelectionMode, setIsSelectionMode] = useState(false);
-    const [selectedIds, setSelectedIds] = useState([]);
-    const [currentPage, setCurrentPage] = useState(1);
-    const itemsPerPage = 10;
-
-    // --- Printing ---
+    // SEARCH FILTERS (like AccountMaster)
+const [searchField, setSearchField] = useState('invoice_no');
+const [searchCondition, setSearchCondition] = useState('Like');
+const [searchValue, setSearchValue] = useState('');
     const [printData, setPrintData] = useState(null);
-    const printRef = useRef();
-    const handlePrintAction = useReactToPrint({ 
-        contentRef: printRef,
-        onAfterPrint: () => setPrintData(null)
+    // ==========================================
+// SEARCH FILTER ENGINE
+// ==========================================
+const filteredInvoices = useMemo(() => {
+
+    let result = [...listData.history];
+
+    if (searchValue.trim()) {
+
+        result = result.filter(item => {
+
+            let fieldValue = '';
+
+            switch (searchField) {
+                case 'invoice_no':
+                    fieldValue = String(item.invoice_no || '');
+                    break;
+
+                case 'date':
+                    fieldValue = String(item.date || '');
+                    break;
+
+                case 'party':
+                    fieldValue = String(item.Party?.account_name || '');
+                    break;
+
+                case 'status':
+                    fieldValue = item.is_approved ? 'APPROVED' : 'PENDING';
+                    break;
+
+                default:
+                    fieldValue = '';
+            }
+
+            const term = searchValue.toLowerCase().trim();
+            const value = fieldValue.toLowerCase();
+
+            return searchCondition === 'Equal'
+                ? value === term
+                : value.includes(term);
+        });
+
+    }
+
+    return result;
+
+}, [listData.history, searchField, searchCondition, searchValue]);
+
+    // =====================================================
+    // PROFESSIONAL EXPORT TO PDF - MATCHES PRINT VIEW 100%
+    // =====================================================
+const getHSN = (productId) => {
+    const prod = listData.products.find(p => p.id === productId);
+    return prod?.printing_tariff_sub_head_no || '';
+};
+    const exportToPDF = () => {
+        const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+        const data = formData;
+        const rows = gridRows;
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const margin = 15;
+        const getProduct = (pid) => listData.products.find(p => p.id === pid);
+
+        // Header
+        doc.setTextColor(0);
+doc.setFont("helvetica", "bold");
+doc.setFontSize(26);
+doc.text("TAX INVOICE", pageWidth / 2, 22, { align: "center" });
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(26);
+        doc.text("TAX INVOICE", pageWidth / 2, 22, { align: "center" });
+
+        doc.setFontSize(10);
+        const checkboxX = pageWidth - margin - 45;
+let checkboxY = 14;
+
+const drawCheckbox = (label) => {
+    doc.setDrawColor(0);
+    doc.rect(checkboxX, checkboxY - 3, 4, 4);
+    doc.setFontSize(9);
+    doc.text(label, checkboxX + 7, checkboxY);
+    checkboxY += 6;
+};
+
+drawCheckbox("ORIGINAL FOR BUYER");
+drawCheckbox("DUPLICATE FOR TRANSPORTER");
+drawCheckbox("TRIPLICATE FOR FILE COPY");
+drawCheckbox("EXTRA COPY");
+
+        // Company Details
+        doc.setTextColor(0);
+        doc.setFontSize(12);
+        doc.text("KAYAAR EXPORTS PRIVATE LIMITED", margin, 48);
+        doc.setFontSize(9);
+        doc.text("D.No: 43/5, Railway Feeder Road", margin, 54);
+        doc.text("K.R. Nagar – 628503, Kovilpatti – Taluk", margin, 59);
+        doc.text("Tuticorin Dist, Tamilnadu, India", margin, 64);
+        doc.text("Phone: 04632 – 248258, 9443238761", margin, 69);
+        doc.text("Email: ttnkrgroup@gmail.com", margin, 74);
+        doc.text("GSTIN: 33AAACK4468M1ZA", margin, 79);
+
+        // PAN & CIN
+        doc.text("PAN: AAACK4468M", pageWidth - margin - 45, 52);
+        doc.text("CIN: U51101TN1991PTC020933", pageWidth - margin - 45, 57);
+
+        // OEKO-TEX
+        doc.setDrawColor(0);
+        doc.rect(pageWidth - margin - 50, 65, 55, 18);
+        doc.setFontSize(8);
+        doc.text("OEKO-TEX Standard 100", pageWidth - margin - 45, 72);
+        doc.text("Tested for harmful substances", pageWidth - margin - 45, 77);
+
+        // Party & Invoice Info
+        doc.setFontSize(10);
+        doc.text("Bill To:", margin, 95);
+        doc.text(data.Party?.account_name || "", margin, 102);
+        const addr = doc.splitTextToSize(data.address || "", 85);
+        doc.text(addr, margin, 107);
+
+        doc.text("Invoice No :", pageWidth / 2, 95);
+        doc.text(`#${data.invoice_no}`, pageWidth / 2 + 25, 95);
+        doc.text("Date :", pageWidth / 2, 102);
+        doc.text(data.date, pageWidth / 2 + 25, 102);
+        doc.text("E-Way Bill :", pageWidth / 2, 109);
+        doc.text(data.ebill_no || "PENDING", pageWidth / 2 + 25, 109);
+        doc.text("Vehicle :", pageWidth / 2, 116);
+        doc.text(data.vehicle_no || "N/A", pageWidth / 2 + 25, 116);
+        doc.text("Delivery At :", pageWidth / 2, 123);
+        doc.text(data.delivery || "MUMBAI", pageWidth / 2 + 25, 123);
+
+        // Table
+const tableRows = rows.map(r => [
+    `${r.product_description}\nHSN: ${getHSN(r.product_id)}`,
+    r.packs,
+    r.total_kgs,
+    `${r.from_no || ''} - ${r.to_no || ''}`,
+    `Rs. ${Number(r.rate).toLocaleString('en-IN')}`,
+    num(r.assessable_value).toLocaleString()
+]);
+
+        autoTable(doc, {
+            startY: 135,
+            head: [['Description of Goods', 'No of Bags', 'Net Weight', 'S.L No', 'Rate Per Kgs', 'Assessable Value']],
+            body: tableRows,
+            theme: 'grid',
+            headStyles: { textColor: 0, fontStyle: 'bold', fontSize: 9 },
+            styles: { lineColor: 0, lineWidth: 0.2 },
+            columnStyles: {
+                0: { cellWidth: 70 },
+                1: { halign: 'center' },
+                2: { halign: 'center' },
+                3: { halign: 'center' },
+                4: { halign: 'right' },
+                5: { halign: 'right' }
+            }
+        });
+
+        const finalY = doc.lastAutoTable.finalY + 12;
+
+        // Totals
+        doc.setFontSize(11);
+        doc.text("Assessable Value", pageWidth - 85, finalY);
+        doc.text(`Rs. ${num(data.total_assessable).toLocaleString('en-IN')}`, pageWidth - margin, finalY, { align: "right" });
+
+        doc.text("Charity", pageWidth - 85, finalY + 7);
+        doc.text(`Rs. ${num(data.total_charity).toLocaleString('en-IN')}`, pageWidth - margin, finalY + 7, { align: "right" });
+
+        doc.text("Freight Charges", pageWidth - 85, finalY + 14);
+        doc.text(`Rs. ${num(data.freight_charges).toLocaleString('en-IN')}`, pageWidth - margin, finalY + 14, { align: "right" });
+
+        doc.text("GST Total", pageWidth - 85, finalY + 21);
+        doc.text(`Rs.${num(data.total_gst).toLocaleString('en-IN')}`, pageWidth - margin, finalY + 21, { align: "right" });
+
+        // Grand Total Box
+        doc.setDrawColor(0);
+        doc.roundedRect(pageWidth - 85, finalY + 28, 80, 18, 4, 4);
+        doc.setTextColor(0);
+        doc.setFontSize(12);
+        doc.text("GRAND TOTAL", pageWidth - 75, finalY + 39);
+        doc.setFontSize(18);
+        doc.text(`Rs. ${num(data.net_amount).toLocaleString('en-IN')}`, pageWidth - 10, finalY + 39, { align: "right" });
+
+        // Amount in Words
+        const wordsY = finalY + 58;
+        doc.setTextColor(0);
+        doc.setFontSize(10);
+        doc.text("Amount Chargeable (in words):", margin, wordsY);
+        doc.setFont("helvetica", "bold");
+        doc.text(numberToWords(num(data.net_amount)), margin, wordsY + 7);
+
+        // Declaration & Sign
+        doc.setFontSize(9);
+        doc.setFont("helvetica", "italic");
+        doc.text("We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.", margin, wordsY + 22);
+
+        doc.setFont("helvetica", "normal");
+        doc.text("Authorised Signatory", pageWidth - margin - 70, wordsY + 45);
+        doc.text("For KAYAAR EXPORTS PRIVATE LIMITED", pageWidth - margin - 70, wordsY + 50);
+
+        doc.save(`Kayaar_TAX_INVOICE_${data.invoice_no}.pdf`);
+    };
+
+    // ==========================================
+    // 2. MATH ENGINE (Strict Logic: H -> A -> Tax -> Deductions)
+    // ==========================================
+    const handlePrint = (item) => {
+        setPrintData(item);
+        setTimeout(() => {
+            window.print();
+        }, 800);
+    };
+
+    const runCalculations = useCallback((rows, typeId, hFreight = formData.freight_charges) => {
+
+    if (!typeId) return rows;
+
+    const config = listData.types.find(t => t.id === parseInt(typeId));
+    if (!config) return rows;
+
+    // Total weight for freight distribution
+    const totalWeight = rows.reduce((sum, r) => sum + num(r.total_kgs), 0);
+
+    let hTotals = {
+        assess: 0, charity: 0, vat: 0, cenvat: 0,
+        duty: 0, cess: 0, hcess: 0, tcs: 0,
+        gst: 0, igst: 0, disc: 0, brok: 0,
+        other: 0, net: 0
+    };
+
+    const updatedRows = rows.map((item) => {
+
+        const product = listData.products.find(
+            p => p.id === parseInt(item.product_id)
+        );
+
+        // ======================
+        // 1. BASE VALUE [H]
+        // ======================
+        const H = num(item.rate) * num(item.total_kgs);
+
+        // ======================
+        // AVG CONTENT AUTO CALC
+        // ======================
+        const avgContent =
+            num(item.packs) > 0
+                ? num(item.total_kgs) / num(item.packs)
+                : 0;
+
+        // ======================
+        // 2. ASSESS VALUE [A]
+        // ======================
+        const A =
+              H
+            - num(item.resale)
+            + num(item.convert_to_hank)
+            - num(item.convert_to_cone);
+
+        // ======================
+        // FREIGHT DISTRIBUTION
+        // ======================
+        const freightShare =
+            totalWeight > 0
+                ? (num(hFreight) * num(item.total_kgs)) / totalWeight
+                : 0;
+
+        const taxable = A + freightShare;
+
+        // ======================
+        // TAXES
+        // ======================
+        const charity = config.charity_checked
+            ? num(product?.charity_rs) * num(item.total_kgs)
+            : 0;
+
+        const vat    = config.vat_checked    ? num(item.vat_per)    * taxable / 100 : 0;
+        const cenvat = config.cenvat_checked ? num(item.cenvat_per) * taxable / 100 : 0;
+        const duty   = config.duty_checked   ? num(item.duty_per)   * taxable / 100 : 0;
+        const cess   = config.cess_checked   ? num(item.cess_per)   * taxable / 100 : 0;
+        const hcess  = config.hr_sec_cess_checked ? num(item.hcess_per) * taxable / 100 : 0;
+        const tcs    = config.tcs_checked    ? num(item.tcs_per)    * taxable / 100 : 0;
+
+        const sgst = config.gst_checked ? num(item.sgst_per) * taxable / 100 : 0;
+        const cgst = config.gst_checked ? num(item.cgst_per) * taxable / 100 : 0;
+        const igst = config.igst_checked ? num(item.igst_per) * taxable / 100 : 0;
+
+        // ======================
+        // BASIS VALUE
+        // ======================
+        const basis =
+              taxable
+            + sgst + cgst + igst
+            + vat + cenvat + duty + cess + hcess + tcs
+            + charity
+            + num(item.other_amt);
+
+        // ======================
+        // DEDUCTIONS
+        // ======================
+        const discAmt = num(item.discount_percentage) * basis / 100;
+        const brokAmt = num(item.broker_percentage) * basis / 100;
+
+        // ======================
+        // FINAL VALUE
+        // ======================
+        const rowTotal = basis - discAmt - brokAmt;
+
+        const roundedValue = Number(rowTotal.toFixed(2));
+
+        const rowRoundedOff =
+            Number((roundedValue - Number(rowTotal.toFixed(2))).toFixed(2));
+
+        // ======================
+        // HEADER TOTALS
+        // ======================
+        hTotals.assess += A;
+        hTotals.charity += charity;
+        hTotals.vat += vat;
+        hTotals.cenvat += cenvat;
+        hTotals.duty += duty;
+        hTotals.cess += cess;
+        hTotals.hcess += hcess;
+        hTotals.tcs += tcs;
+        hTotals.gst += (sgst + cgst);
+        hTotals.igst += igst;
+        hTotals.disc += discAmt;
+        hTotals.brok += brokAmt;
+        hTotals.other += num(item.other_amt);
+        hTotals.net += rowTotal;
+
+        return {
+            ...item,
+
+            avg_content: avgContent,
+
+            base_h: H,
+
+            assessable_value: A,
+
+            freight_amt: freightShare,
+
+            charity_amt: charity,
+
+            vat_amt: vat,
+            cenvat_amt: cenvat,
+            duty_amt: duty,
+            cess_amt: cess,
+            hr_sec_cess_amt: hcess,
+            tcs_amt: tcs,
+
+            sgst_amt: sgst,
+            cgst_amt: cgst,
+            igst_amt: igst,
+
+            discount_amt: discAmt,
+            broker_amt: brokAmt,
+
+            sub_total: basis,
+
+            rounded_off: rowRoundedOff,
+
+            final_value: roundedValue
+        };
     });
 
-    // --- Formula Engine (Preserved Logic) ---
-    const evaluateFormula = (formula, context) => {
-        if (!formula || formula === '-' || formula === '') return 0;
-        try {
-            let processed = formula;
-            Object.keys(context).forEach(key => {
-                const regex = new RegExp(`\\[${key}\\]`, 'g');
-                processed = processed.replace(regex, context[key] || 0);
-            });
-            processed = processed.replace(/Round\(/gi, 'Math.round(');
-            const result = eval(processed);
-            return isNaN(result) ? 0 : parseFloat(result.toFixed(2));
-        } catch { return 0; }
-    };
+    // ======================
+    // HEADER TOTAL
+    // ======================
+    const finalRawTotal = hTotals.net;
 
-    const runCalculations = (rows, typeId, freightVal = formData.freight_charges) => {
-        const config = listData.types.find(t => t.id === parseInt(typeId));
-        if (!config) return rows;
+    const finalNetTotal = Math.round(finalRawTotal);
 
-        let hTotals = { assess: 0, charity: 0, igst: 0, sgst: 0, cgst: 0, sub: 0, net: 0 };
+    setFormData(prev => ({
+        ...prev,
 
-        const updatedRows = rows.map(item => {
-            const product = listData.products.find(p => p.id === parseInt(item.product_id));
-            const ctx = {
-                "Rate / Kg": parseFloat(item.rate) || 0,
-                "Total Kgs": parseFloat(item.total_kgs) || 0,
-                "H": (parseFloat(item.rate) || 0) * (parseFloat(item.total_kgs) || 0),
-                "CharityRs": product ? parseFloat(product.charity_rs || 0) : 0,
-                "Lorryfright": parseFloat(freightVal || 0),
-                "igstper": parseFloat(config.igst_percentage || 0),
-                "sgstper": parseFloat(config.sgst_percentage || 0),
-                "cgstper": parseFloat(config.cgst_percentage || 0),
-            };
+        total_assessable: money(hTotals.assess),
+        total_charity: money(hTotals.charity),
 
-            const charity = config.charity_checked ? evaluateFormula(config.charity_formula, ctx) : 0;
-            const igst = config.igst_checked ? evaluateFormula(config.igst_formula, ctx) : 0;
-            const sgst = config.gst_checked ? evaluateFormula(config.sgst_formula, ctx) : 0;
-            const cgst = config.gst_checked ? evaluateFormula(config.cgst_formula, ctx) : 0;
+        total_vat: money(hTotals.vat),
+        total_cenvat: money(hTotals.cenvat),
 
-            ctx["Charity"] = charity; ctx["igstamt"] = igst; ctx["sgstamt"] = sgst; ctx["cgstamt"] = cgst;
+        total_duty: money(hTotals.duty),
+        total_cess: money(hTotals.cess),
 
-            const assess = config.assess_checked ? evaluateFormula(config.assess_formula, ctx) : ctx["H"];
-            ctx["A"] = assess;
-            const sub = evaluateFormula(config.sub_total_formula, ctx); 
-            ctx["I"] = sub;
-            const final = evaluateFormula(config.total_value_formula, ctx);
+        total_hr_sec_cess: money(hTotals.hcess),
 
-            hTotals.assess += assess; hTotals.charity += charity; hTotals.igst += igst; 
-            hTotals.sgst += sgst; hTotals.cgst += cgst; hTotals.sub += sub; hTotals.net += final;
+        total_tcs: money(hTotals.tcs),
 
-            return { 
-                ...item, assessable_value: assess.toFixed(2), charity_amt: charity.toFixed(2), 
-                igst_amt: igst.toFixed(2), sgst_amt: sgst.toFixed(2), cgst_amt: cgst.toFixed(2),
-                sub_total: sub.toFixed(2), final_value: final.toFixed(2) 
-            };
-        });
+        total_gst: money(hTotals.gst),
+        total_igst: money(hTotals.igst),
 
-        setFormData(prev => ({ 
-            ...prev, total_assessable: hTotals.assess.toFixed(2), total_charity: hTotals.charity.toFixed(2), 
-            total_igst: hTotals.igst.toFixed(2), total_sgst: hTotals.sgst.toFixed(2),
-            total_cgst: hTotals.cgst.toFixed(2), sub_total: hTotals.sub.toFixed(2), 
-            net_amount: hTotals.net.toFixed(2) 
-        }));
-        return updatedRows;
-    };
+        total_discount: money(hTotals.disc),
+        total_broker: money(hTotals.brok),
 
-    // --- Data Fetching ---
-    const fetchInitialData = async () => {
+        total_other: money(hTotals.other),
+
+        sub_total: money(finalRawTotal),
+
+        round_off: money(finalNetTotal - finalRawTotal),
+
+        net_amount: finalNetTotal
+    }));
+
+    return updatedRows;
+
+}, [listData.types, listData.products, formData.freight_charges]);
+
+    // ==========================================
+    // 3. INITIAL LOAD
+    // ==========================================
+    const init = async () => {
         setLoading(true);
         try {
-            const [invT, acc, tra, pro, ord, dor, his, lod] = await Promise.all([
-                mastersAPI.invoiceTypes.getAll(), mastersAPI.accounts.getAll(),
-                mastersAPI.transports.getAll(), mastersAPI.products.getAll(),
-                transactionsAPI.orders.getAll(), transactionsAPI.directInvoices.getAll(),
-                transactionsAPI.invoices.getAll(), transactionsAPI.despatch.getAll()
-            ]);
-            setListData({ 
-                types: invT.data.data, parties: acc.data.data, transports: tra.data.data, 
-                products: pro.data.data, orders: ord.data.data, directOrders: dor.data.data,
-                history: his.data.data, loads: lod.data.data
-            });
-        } catch (e) { console.error("Sync Error", e); } finally { setLoading(false); }
+            const [types, accounts, transports, products, orders, direct, invoices, despatch, brokers] = await Promise.all([
+    mastersAPI.invoiceTypes.getAll(),
+    mastersAPI.accounts.getAll(),
+    mastersAPI.transports.getAll(),
+    mastersAPI.products.getAll(),
+    transactionsAPI.orders.getAll(),
+    transactionsAPI.directInvoices.getAll(),
+    transactionsAPI.invoices.getAll(),
+    transactionsAPI.despatch.getAll(),
+    mastersAPI.brokers.getAll()
+]);
+
+            const historyData = invoices.data.data || [];
+            setListData({
+    types: types.data.data || [],
+    parties: accounts.data.data || [],
+    transports: transports.data.data || [],
+    products: products.data.data || [],
+    orders: orders.data.data || [],
+    directOrders: direct.data.data || [],
+    history: historyData,
+    loads: despatch.data.data || [],
+    brokers: brokers.data.data || []
+});
+
+            const maxNo = historyData.reduce((max, item) => Math.max(max, parseInt(item.invoice_no) || 0), 0);
+            setFormData(prev => ({ ...prev, invoice_no: (maxNo + 1).toString() }));
+        } catch (e) { console.error(e); } finally { setLoading(false); }
     };
 
-    useEffect(() => { fetchInitialData(); }, []);
+    useEffect(() => { init(); }, []);
 
-    // --- Action Handlers ---
-    const handleAddNew = () => {
-        const nextId = listData.history.length > 0 ? Math.max(...listData.history.map(h => parseInt(h.invoice_no) || 0)) + 1 : 1001;
-        setFormData({ ...emptyInvoice, invoice_no: String(nextId) });
-        setGridRows([]);
-        setActiveTab('head');
-        setIsModalOpen(true);
+    // ==========================================
+    // 4. HANDLERS
+    // ==========================================
+const handleLoadSync = (loadId) => {
+
+    const load = listData.loads.find(l => l.id === parseInt(loadId));
+
+    if (!load) return;
+
+    const bags = num(load.no_of_bags);
+
+    // ✅ Update header values including freight
+    const updatedForm = {
+        ...formData,
+        load_id: loadId,
+        vehicle_no: load.vehicle_no || '',
+        delivery: load.delivery || '',
+        freight_charges: load.freight || 0,
+        lr_no: load.lr_no || '',
+        lr_date: load.lr_date || formData.lr_date,
+        ebill_no: load.insurance_no || '',
+        transport_id: load.transport_id || formData.transport_id
     };
 
-    const handleRowClick = (item) => {
-        if (isSelectionMode) {
-            setSelectedIds(prev => prev.includes(item.id) ? prev.filter(id => id !== item.id) : [...prev, item.id]);
-            return;
-        }
-        setFormData({ ...item });
-        setGridRows(item.Details || []);
-        setActiveTab('head');
-        setIsModalOpen(true);
+    setFormData(updatedForm);
+
+    // 🔥 Update packs in grid rows
+    setGridRows(prev => {
+
+        const updatedRows = prev.map(r => ({
+    ...r,
+    packs: bags,
+    freight_amt: load.freight || 0   // sync detail freight
+}));
+
+        // ✅ Recalculate totals with new freight
+        return runCalculations(updatedRows, updatedForm.invoice_type_id, load.freight);
+    });
+};
+    const handleAccountSync = (accId) => {
+        const acc = listData.parties.find(a => a.id === parseInt(accId));
+        if (acc) setFormData(prev => ({ ...prev, party_id: accId, address: acc.address || '' }));
     };
 
-    const handleLoadChange = (loadId) => {
-        const load = listData.loads.find(l => l.id === parseInt(loadId));
-        if (load) {
-            setFormData(prev => ({
-                ...prev, load_id: loadId, transport_id: load.transport_id,
-                vehicle_no: load.vehicle_no, delivery: load.delivery, 
-                freight_charges: load.freight || 0, lr_no: load.lr_no || '', lr_date: load.lr_date || ''
-            }));
-            setGridRows(prev => runCalculations(prev, formData.invoice_type_id, load.freight));
-        }
-    };
-
-    const handlePartyChange = (partyId) => {
-        const party = listData.parties.find(p => p.id === parseInt(partyId));
-        if(party) setFormData(prev => ({ ...prev, party_id: partyId, address: party.address }));
-    };
-
-    const handleProductSelectInGrid = (idx, productId) => {
-        const product = listData.products.find(p => p.id === parseInt(productId));
-        const updated = [...gridRows];
-        updated[idx] = {
-            ...updated[idx],
-            product_id: productId,
-            product_description: product?.product_name || '',
-            packing_type: product?.packing_type || '',
-            packs: product?.no_of_cones_per_pack || 0,
-            rate_per: 'Kg'
-        };
-        setGridRows(runCalculations(updated, formData.invoice_type_id));
-    };
-
-    const handleOrderSelection = (orderNo, type) => {
-        let order = type === 'WITH_ORDER' ? listData.orders.find(o => o.order_no === orderNo) : listData.directOrders.find(o => o.order_no === orderNo);
-        if (!order) return;
-        const details = type === 'WITH_ORDER' ? order.OrderDetails || [] : order.DirectInvoiceDetails || [];
+    const handleOrderSync = (e) => {
+        const val = e.target.value;
+        if (!val) return;
+        const [source, orderNo] = val.split('|');
+        const order = source === 'WITH' ? listData.orders.find(o => o.order_no === orderNo) : listData.directOrders.find(o => o.order_no === orderNo);
+        const config = listData.types.find(t => t.id === parseInt(formData.invoice_type_id));
+        if (!config) return alert("Select Invoice Type first.");
+        const load = listData.loads.find(l => l.id === parseInt(formData.load_id));
+        const details = source === 'WITH' ? order.OrderDetails || [] : order.DirectInvoiceDetails || [];
         const newRows = details.map(d => {
-            const masterProduct = listData.products.find(p => p.id === d.product_id);
+            const broker = listData.brokers.find(b => b.id === order.broker_id);
             return {
-                order_no: orderNo, order_type: type, product_id: d.product_id,
-                broker_code: order.Broker?.broker_code || '', broker_percentage: order.Broker?.commission_pct || 0,
-                product_description: masterProduct?.product_name || '',
-                packs: d.packs || masterProduct?.no_of_cones_per_pack || 0,
-                packing_type: d.packing_type || masterProduct?.packing_type || '',
-                total_kgs: d.qty || d.total_kgs || 0, rate: d.rate_cr || d.rate || 0, rate_per: 'Kg',
-                identification_mark: '', from_no: '', to_no: '', resale: false, convert_to_hank: false, convert_to_cone: false
+                order_no: orderNo, order_type: source === 'WITH' ? 'WITH_ORDER' : 'WITHOUT_ORDER',
+                sales_type_label: source === 'WITH' ? 'Order' : 'Direct', product_id: d.product_id,
+                broker_code: broker?.broker_code || '', broker_percentage: broker?.commission_pct || 0,
+                product_description: d.Product?.product_name || '', packs: load?.no_of_bags || d.packs || 0,
+                packing_type: d.packing_type || d.Product?.packing_type || 'BAGS', total_kgs: d.qty || d.total_kgs || 0,
+                avg_content: d.bag_wt || 0, rate: d.rate_cr || d.rate || 0, rate_per: d.rate_per || d.Product?.rate_per || 'KG', identification_mark: '',
+                from_no: '', to_no: '', resale: 0, convert_to_hank: 0, convert_to_cone: 0,
+                vat_per: config.vat_percentage || 0, cenvat_per: config.cenvat_percentage || 0, duty_per: config.duty_percentage || 0,
+                cess_per: config.cess_percentage || 0, hcess_per: config.hr_sec_cess_percentage || 0,
+                sgst_per: config.sgst_percentage || 0, cgst_per: config.cgst_percentage || 0,
+                igst_per: config.igst_percentage || 0, tcs_per: config.tcs_percentage || 0,
+                discount_percentage: 0, other_amt: 0, freight_amt: 0
             };
         });
-        setGridRows(runCalculations(newRows, formData.invoice_type_id));
+        setGridRows(runCalculations([...gridRows, ...newRows], formData.invoice_type_id));
+        e.target.value = "";
     };
 
     const updateGrid = (idx, field, val) => {
-        const updated = [...gridRows];
-        updated[idx][field] = val;
-        setGridRows(runCalculations(updated, formData.invoice_type_id));
+        setGridRows(prev => {
+            const updated = [...prev];
+            updated[idx] = {
+                ...updated[idx],
+                [field]: val
+            };
+            return runCalculations(updated, formData.invoice_type_id);
+        });
     };
-
     const handleSave = async () => {
-        if (!formData.party_id || !formData.load_id) return alert("Consignee and Load Link required.");
-        setSubmitLoading(true);
-        try {
-            if (formData.id) await transactionsAPI.invoices.update(formData.id, { ...formData, Details: gridRows });
-            else await transactionsAPI.invoices.create({ ...formData, Details: gridRows });
-            setIsModalOpen(false); fetchInitialData();
-        } catch (e) { alert("Deployment Error"); } finally { setSubmitLoading(false); }
-    };
+    setSubmitLoading(true);
 
-    // --- Filtering Logic ---
-    const filteredHistory = useMemo(() => {
-        const data = Array.isArray(listData.history) ? listData.history : [];
-        return data.filter(h => 
-            h.invoice_no?.toLowerCase().includes(searchValue.toLowerCase()) || 
-            h.Party?.account_name?.toLowerCase().includes(searchValue.toLowerCase())
-        ).sort((a, b) => b.id - a.id);
-    }, [listData.history, searchValue]);
+    try {
 
-    const currentItems = filteredHistory.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
-    const totalPages = Math.ceil(filteredHistory.length / itemsPerPage) || 1;
+        const cleanForm = { ...formData };
+
+        // ❗ remove nested sequelize relations
+        delete cleanForm.InvoiceDetails;
+        delete cleanForm.Details;
+        delete cleanForm.Party;
+        delete cleanForm.Transport;
+        delete cleanForm.Broker;
+
+        const payload = {
+            ...cleanForm,
+            Details: gridRows
+        };
+
+        if (formData.id) {
+            await transactionsAPI.invoices.update(formData.id, payload);
+        } else {
+            await transactionsAPI.invoices.create(payload);
+        }
+
+        setIsModalOpen(false);
+        await init();
+        setGridRows([]);
+
+    } catch (e) {
+        console.error("Save error:", e);
+        alert("Error saving invoice");
+    } finally {
+        setSubmitLoading(false);
+    }
+};
+
+    // Cleanup after print
+    useEffect(() => {
+        const afterPrint = () => setPrintData(null);
+        window.addEventListener('afterprint', afterPrint);
+        return () => window.removeEventListener('afterprint', afterPrint);
+    }, []);
 
     return (
-        <div className="min-h-screen bg-slate-50 p-6 font-sans text-slate-900">
-            
-            {/* 1. HEADER SECTION */}
+        <div className="min-h-screen bg-slate-100 p-6 font-sans text-slate-800">
+            {/* Dashboard View */}
             <div className="flex justify-between items-center mb-6">
-                <div>
-                    <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-                        <FileText className="text-blue-600" /> Invoice Preparation
-                    </h1>
-                    <p className="text-sm text-slate-500">Sequential document generation and stock reconciliation registry</p>
-                </div>
-                <div className="flex gap-2">
-                    <button onClick={() => { setIsSelectionMode(!isSelectionMode); setSelectedIds([]); }}
-                        className={`px-5 py-2 border rounded-lg font-semibold transition-all ${isSelectionMode ? 'bg-amber-100 border-amber-300 text-amber-700' : 'bg-white border-slate-200 text-blue-600 hover:bg-slate-50'}`}>
-                        {isSelectionMode ? 'Cancel' : 'Select'}
-                    </button>
-                    <button onClick={handleAddNew} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg font-semibold shadow-sm transition-all active:scale-95">
-                        <Plus size={18} /> New Preparation
-                    </button>
-                    <button onClick={fetchInitialData} className="p-2 border border-slate-200 rounded-lg bg-white text-slate-400 hover:text-blue-600 transition-colors shadow-sm">
-                        <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
-                    </button>
-                </div>
+                <h1 className="text-2xl font-black uppercase tracking-tighter flex items-center gap-3"><FileText className="text-blue-600"/> Dashboard</h1>
+                <button onClick={() => { setFormData({...emptyInvoice, invoice_no: (listData.history.length + 1).toString()}); setGridRows([]); setIsModalOpen(true); }} className="bg-blue-600 text-white px-8 py-2 rounded-xl font-bold shadow-lg hover:bg-blue-700 transition-all uppercase text-xs flex items-center gap-2"><Plus size={18}/> New Invoice</button>
+            </div>
+{/* SEARCH FILTER BAR */}
+<div className="bg-white p-4 rounded-xl border border-slate-300 shadow-sm mb-4">
+    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+
+        {/* FIELD */}
+        <div>
+            <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">
+                Search Field
+            </label>
+            <select
+                value={searchField}
+                onChange={(e) => setSearchField(e.target.value)}
+                className="w-full border border-slate-300 p-2 text-xs font-bold rounded"
+            >
+                <option value="invoice_no">Invoice No</option>
+                <option value="date">Date</option>
+                <option value="party">Party</option>
+                <option value="status">Status</option>
+            </select>
+        </div>
+
+        {/* CONDITION */}
+        <div>
+            <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">
+                Condition
+            </label>
+            <select
+                value={searchCondition}
+                onChange={(e) => setSearchCondition(e.target.value)}
+                className="w-full border border-slate-300 p-2 text-xs font-bold rounded"
+            >
+                <option value="Like">Contains</option>
+                <option value="Equal">Exact</option>
+            </select>
+        </div>
+
+        {/* VALUE */}
+        <div>
+            <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">
+                Search Value
+            </label>
+            <input
+                type="text"
+                placeholder="Search..."
+                value={searchValue}
+                onChange={(e) => setSearchValue(e.target.value)}
+                className="w-full border border-slate-300 p-2 text-xs font-bold rounded"
+            />
+        </div>
+
+        {/* CLEAR */}
+        <div className="flex gap-2">
+            <button
+                onClick={() => setSearchValue('')}
+                className="flex-1 border border-slate-300 py-2 text-xs font-bold rounded hover:bg-gray-50"
+            >
+                Clear
+            </button>
+
+            <div className="flex-1 bg-blue-50 text-blue-700 border border-blue-200 py-2 rounded text-xs font-bold flex items-center justify-center">
+                {filteredInvoices.length} Matches
+            </div>
+        </div>
+
+    </div>
+</div>
+            <div className="bg-white rounded-2xl border border-slate-300 shadow-sm overflow-hidden">
+                <table className="w-full text-left">
+                    <thead className="bg-slate-900 text-white text-[10px] uppercase font-black tracking-widest">
+                        <tr><th className="p-6">Invoice #</th><th className="p-6">Date</th><th className="p-6">Party</th><th className="p-6 text-right">Value</th><th className="p-6 text-center">Status</th></tr>
+                    </thead>
+                    <tbody className="divide-y text-sm font-mono">
+                        {filteredInvoices.map(item => (
+                                <tr 
+                                    key={item.id} 
+                                    className="hover:bg-blue-50 cursor-pointer"
+                                    onClick={async () => {
+    try {
+
+        const res = await transactionsAPI.invoices.getById(item.id);
+        const invoice = res.data.data;
+
+        setFormData(invoice);
+
+        const details =
+            invoice.InvoiceDetails ||
+            invoice.Details ||
+            invoice.details ||
+            [];
+
+        setGridRows(details);
+
+        setIsModalOpen(true);
+
+    } catch (err) {
+        console.error("Error loading invoice:", err);
+    }
+}}
+                                >
+                                    <td className="p-6 font-bold text-blue-600">
+                                        #{item.invoice_no}
+                                    </td>
+
+                                    <td className="p-6">{item.date}</td>
+
+                                    <td className="p-6 font-bold uppercase">
+                                        {item.Party?.account_name}
+                                    </td>
+
+                                    <td className="p-6 text-right font-black">
+                                        ₹{parseFloat(item.net_amount).toLocaleString()}
+                                    </td>
+
+                                    {/* STATUS ONLY (print icon removed) */}
+                                    <td className="p-6 text-center">
+                                        <span
+                                            className={`px-4 py-1 rounded-full text-[9px] font-black ${
+                                                item.is_approved
+                                                    ? 'bg-emerald-100 text-emerald-700'
+                                                    : 'bg-amber-100 text-amber-700'
+                                            }`}
+                                        >
+                                            {item.is_approved ? 'APPROVED' : 'PENDING'}
+                                        </span>
+                                    </td>
+                                </tr>
+                            ))}
+                    </tbody>
+                </table>
             </div>
 
-            {/* 2. FILTER BAR */}
-            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm mb-6 flex flex-col md:flex-row gap-4 items-center">
-                <div className="flex-1 relative w-full">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                    <input type="text" placeholder="Filter by Invoice No or Party Name..." className="w-full border border-slate-200 pl-10 pr-4 py-2 rounded-lg text-sm outline-none focus:ring-1 focus:ring-blue-500 transition-all shadow-inner" value={searchValue} onChange={e => setSearchValue(e.target.value)} />
-                </div>
-                <div className="flex bg-blue-50 text-blue-600 border border-blue-100 px-4 py-2 rounded-lg text-xs font-black uppercase tracking-widest gap-2">
-                    <Filter size={14}/> {filteredHistory.length} Total Invoices
-                </div>
-            </div>
-
-            {/* 3. DATA TABLE */}
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse">
-                        <thead>
-                            <tr className="bg-blue-600 text-white font-mono">
-                                {isSelectionMode && <th className="p-4 w-12 text-center"><Square size={18} className="mx-auto" /></th>}
-                                <th className="p-4 text-sm font-semibold uppercase tracking-wider">Doc #</th>
-                                <th className="p-4 text-sm font-semibold uppercase tracking-wider">Date</th>
-                                <th className="p-4 text-sm font-semibold uppercase tracking-wider">Consignee</th>
-                                <th className="p-4 text-sm font-semibold uppercase tracking-wider text-right">Net Value (₹)</th>
-                                <th className="p-4 text-sm font-semibold uppercase tracking-wider text-center">Status</th>
-                                {!isSelectionMode && <th className="p-4 w-10"></th>}
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100 font-mono">
-                            {loading ? (
-                                <tr><td colSpan={7} className="py-24 text-center"><RefreshCw size={40} className="animate-spin text-blue-500 mx-auto mb-4" /><p className="text-slate-500 font-bold uppercase text-[10px]">Syncing Document Registry...</p></td></tr>
-                            ) : currentItems.length > 0 ? (
-                                currentItems.map((item) => (
-                                    <tr key={item.id} onClick={() => handleRowClick(item)} className={`transition-all cursor-pointer hover:bg-blue-50/50 ${selectedIds.includes(item.id) ? 'bg-blue-50' : ''}`}>
-                                        {isSelectionMode && (
-                                            <td className="p-4 text-center" onClick={(e) => {e.stopPropagation(); handleRowClick(item);}}>
-                                                {selectedIds.includes(item.id) ? <CheckSquare size={18} className="text-blue-600 mx-auto"/> : <Square size={18} className="text-slate-200 mx-auto"/>}
-                                            </td>
-                                        )}
-                                        <td className="p-4 text-sm font-black text-blue-600">#{item.invoice_no}</td>
-                                        <td className="p-4 text-sm text-slate-500 font-sans">{item.date}</td>
-                                        <td className="p-4">
-                                            <div className="text-sm font-bold text-slate-700 uppercase font-sans">{item.Party?.account_name}</div>
-                                            <div className="text-[10px] text-slate-400 font-normal uppercase font-sans">{item.Party?.place}</div>
-                                        </td>
-                                        <td className="p-4 text-sm font-black text-right text-slate-900">₹{parseFloat(item.net_amount).toLocaleString()}</td>
-                                        <td className="p-4 text-center">
-                                            <span className={`px-4 py-1 rounded-full text-[9px] font-black tracking-widest ${item.is_approved ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{item.is_approved ? 'APPROVED' : 'PENDING'}</span>
-                                        </td>
-                                        {!isSelectionMode && <td className="p-4 text-right"><ArrowRightCircle size={18} className="text-slate-300" /></td>}
-                                    </tr>
-                                ))
-                            ) : (
-                                <tr><td colSpan={7} className="py-28 text-center"><div className="flex flex-col items-center opacity-20"><Database size={60}/><p className="mt-4 font-black uppercase tracking-[0.2em]">Registry History Empty</p></div></td></tr>
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-                {/* Pagination */}
-                <div className="p-4 bg-slate-50 border-t flex items-center justify-between">
-                    <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Page {currentPage} of {totalPages}</span>
-                    <div className="flex gap-1">
-                        <button disabled={currentPage === 1} onClick={() => setCurrentPage(prev => prev - 1)} className="p-2 border rounded-lg bg-white disabled:opacity-30"><ChevronLeft size={16}/></button>
-                        <button disabled={currentPage === totalPages} onClick={() => setCurrentPage(prev => prev + 1)} className="p-2 border rounded-lg bg-white disabled:opacity-30"><ChevronRight size={16}/></button>
-                    </div>
-                </div>
-            </div>
-
-            {/* 4. MODAL COCKPIT */}
+            {/* PREPARATION MODAL */}
             {isModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[98vw] overflow-hidden flex flex-col h-[96vh] animate-in zoom-in duration-200">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4">
+                    <div className="bg-[#D9E5F7] rounded-lg shadow-2xl w-full max-w-[1150px] flex flex-col overflow-hidden border border-slate-400 h-[96vh]">
                         
-                        {/* Modal Header */}
-                        <div className="bg-slate-900 p-4 flex justify-between items-center text-white shadow-lg shrink-0">
-                            <div className="flex items-center gap-4">
-                                <div className="p-2 bg-blue-600 rounded-lg shadow-lg"><Calculator size={24}/></div>
-                                <div>
-                                    <h2 className="font-bold uppercase tracking-tight">Invoice Cockpit Registry</h2>
-                                    <p className="text-[10px] font-bold text-slate-400 uppercase">Preparation ID: #{formData.invoice_no}</p>
-                                </div>
-                            </div>
-                            <button onClick={() => setIsModalOpen(false)} className="hover:bg-white/10 p-1 rounded-full"><X size={24}/></button>
+                        <div className="bg-[#FCD166] p-2 border-b border-slate-400 flex justify-between items-center shadow-sm">
+                            <span className="text-sm font-bold text-slate-700 flex items-center gap-2"><Layers size={16}/> Invoice Preparation</span>
+                            <button onClick={() => setIsModalOpen(false)} className="text-white bg-red-500 hover:bg-red-600 px-2 rounded font-bold">×</button>
                         </div>
 
-                        {/* Navigation Tabs */}
-                        <div className="flex bg-slate-50 border-b px-6 shrink-0">
-                            <button onClick={() => setActiveTab('head')} className={`py-4 px-6 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest relative transition-colors ${activeTab === 'head' ? 'text-blue-600' : 'text-slate-400'}`}>
-                                <Box size={14}/> 01. Head Configuration {activeTab === 'head' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-600"/>}
-                            </button>
-                            <button onClick={() => setActiveTab('detail')} className={`py-4 px-6 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest relative transition-colors ${activeTab === 'detail' ? 'text-blue-600' : 'text-slate-400'}`}>
-                                <Layers size={14}/> 02. Itemization Grid {activeTab === 'detail' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-600"/>}
-                            </button>
+                        <div className="bg-[#5A8DEE] p-3 text-white">
+                            <h2 className="text-base font-bold">Invoice</h2>
+                            <p className="text-[11px] opacity-90 uppercase font-bold tracking-widest">To Add, Modify Invoice details.</p>
                         </div>
 
-                        {/* Modal Body */}
-                        <div className="flex-1 overflow-y-auto p-6 flex flex-col lg:flex-row gap-6 bg-slate-50/50">
-                            
-                            {/* LEFT SIDE: Entry Grid */}
-                            <div className="flex-1 space-y-6">
-                                {activeTab === 'head' ? (
-                                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                                        {/* COL 1: Identity */}
-                                        <div className="bg-white p-5 rounded-xl border shadow-sm space-y-4">
-                                            <div className="flex items-center gap-2 mb-2 text-slate-400"><Tag size={14}/><span className="text-[9px] font-black uppercase">Core Identifiers</span></div>
-                                            <InputField label="Sequential Invoice #" value={formData.invoice_no} readOnly icon={Lock} />
-                                            <InputField label="Document Date" type="date" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} />
-                                            <SelectField label="Sales Category" value={formData.sales_type} options={[{value:'GST SALES', label:'GST SALES'},{value:'CST SALES', label:'CST SALES'}]} onChange={e => setFormData({...formData, sales_type: e.target.value})} />
-                                            <SelectField label="Invoice Engine" value={formData.invoice_type_id} options={listData.types.map(t => ({value: t.id, label: t.type_name}))} onChange={e => { setFormData({...formData, invoice_type_id: e.target.value}); setGridRows(runCalculations(gridRows, e.target.value)); }} />
-                                        </div>
+                        <div className="flex bg-[#D9E5F7] pt-2 px-4 gap-1">
+                            {['head', 'detail'].map(t => (
+                                <button key={t} onClick={() => setActiveTab(t)} className={`px-5 py-1.5 text-xs font-bold border border-b-0 rounded-t-md transition-all ${activeTab === t ? 'bg-white text-blue-700 border-slate-400 shadow-sm' : 'bg-[#EBF2FA] text-slate-500 border-slate-300'}`}>
+                                    {t.toUpperCase()}
+                                </button>
+                            ))}
+                        </div>
 
-                                        {/* COL 2: Party */}
-                                        <div className="bg-white p-5 rounded-xl border shadow-sm space-y-4">
-                                            <div className="flex items-center gap-2 mb-2 text-slate-400"><User size={14}/><span className="text-[9px] font-black uppercase">Party Snapshot</span></div>
-                                            <SelectField label="Consignee (Party)" value={formData.party_id} options={listData.parties.map(p => ({value: p.id, label: p.account_name}))} onChange={e => handlePartyChange(e.target.value)} />
-                                            <div className="space-y-1">
-                                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Master Address</label>
-                                                <textarea readOnly value={formData.address} className="w-full h-20 bg-slate-50 border border-slate-200 p-2 rounded-lg text-[10px] font-bold text-slate-500 resize-none outline-none" placeholder="FETCHED FROM MASTER"/>
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-2">
-                                                <InputField label="Credit Days" type="number" value={formData.credit_days} onChange={e => setFormData({...formData, credit_days: e.target.value})} />
-                                                <InputField label="Interest %" type="number" value={formData.interest_percentage} onChange={e => setFormData({...formData, interest_percentage: e.target.value})} />
-                                            </div>
-                                            <SelectField label="Pay Mode" value={formData.pay_mode} options={[{value:'Cash', label:'Cash'},{value:'Credit', label:'Credit'}]} onChange={e => setFormData({...formData, pay_mode: e.target.value})} />
+                        <div className="flex-1 bg-white mx-4 mb-4 border border-slate-400 p-5 overflow-hidden flex flex-col">
+                            {activeTab === 'head' ? (
+                                <div className="grid grid-cols-12 gap-6 h-full overflow-y-auto">
+                                    <div className="col-span-8 space-y-2.5">
+                                        <div className="flex items-center gap-2">
+                                            <RowInput label="Invoice No." value={formData.invoice_no} readOnly width="w-32" color="bg-[#F5F8FA]" />
+                                            <RowSelect label="Load No" value={formData.load_id} options={listData.loads.map(l => ({value: l.id, label: l.load_no}))} onChange={e => handleLoadSync(e.target.value)} width="w-44" />
                                         </div>
-
-                                        {/* COL 3: Logistics */}
-                                        <div className="bg-white p-5 rounded-xl border shadow-sm space-y-4">
-                                            <div className="flex items-center gap-2 mb-2 text-slate-400"><Truck size={14}/><span className="text-[9px] font-black uppercase">Logistics (Locked)</span></div>
-                                            <SelectField label="Load Number Link" value={formData.load_id} options={listData.loads.map(l => ({value: l.id, label: `Load #${l.load_no} | ${l.vehicle_no}`}))} onChange={e => handleLoadChange(e.target.value)} />
-                                            <SelectField label="Carrier" value={formData.transport_id} readOnly options={listData.transports.map(t => ({value: t.id, label: t.transport_name}))} />
-                                            <InputField label="Vehicle Registration" value={formData.vehicle_no} readOnly icon={Lock} />
-                                            <InputField label="Delivery Place" value={formData.delivery} readOnly icon={Lock} />
-                                            <div className="grid grid-cols-2 gap-2">
-                                                <InputField label="LR No" value={formData.lr_no} readOnly icon={Lock} />
-                                                <InputField label="LR Date" type="date" value={formData.lr_date} readOnly icon={Lock} />
-                                            </div>
+                                        <RowInput label="Date" type="date" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} width="w-44" />
+                                        <RowSelect label="Sales Type" value={formData.sales_type} options={[{value:'GST SALES', label:'GST SALES'}, {value:'DEPOT SALES', label:'DEPOT SALES'}, {value:'DIRECT SALES', label:'DIRECT SALES'}]} onChange={e => setFormData({...formData, sales_type: e.target.value})} />
+                                        <RowSelect label="Invoice Type" value={formData.invoice_type_id} options={listData.types.map(t => ({value:t.id, label:t.type_name}))} onChange={e => setFormData({...formData, invoice_type_id: e.target.value})} />
+                                        <RowSelect label="Party name" value={formData.party_id} options={listData.parties.map(p => ({value:p.id, label:p.account_name}))} onChange={e => handleAccountSync(e.target.value)} />
+                                        <div className="flex flex-col gap-1 ml-[120px]">
+                                            <input readOnly value={formData.address} className="border border-slate-300 p-1 text-[11px] bg-[#F5F8FA] font-bold outline-none" />
+                                            <input readOnly value="-" className="border border-slate-300 p-1 text-[11px] bg-[#F5F8FA] font-bold outline-none" />
+                                            <input readOnly value="-" className="border border-slate-300 p-1 text-[11px] bg-[#F5F8FA] font-bold outline-none" />
                                         </div>
-
-                                        {/* COL 4: Regulatory */}
-                                        <div className="bg-white p-5 rounded-xl border shadow-sm space-y-4">
-                                            <div className="flex items-center gap-2 mb-2 text-slate-400"><ShieldCheck size={14}/><span className="text-[9px] font-black uppercase">Regulatory & Remarks</span></div>
-                                            <InputField label="E-Way Bill #" value={formData.ebill_no} onChange={e => setFormData({...formData, ebill_no: e.target.value})} />
-                                            <div className="grid grid-cols-2 gap-2">
-                                                <InputField label="Prep. Time" type="time" value={formData.prepare_time} onChange={e => setFormData({...formData, prepare_time: e.target.value})} />
-                                                <InputField label="Rem. Time" type="time" value={formData.removal_time} onChange={e => setFormData({...formData, removal_time: e.target.value})} />
-                                            </div>
-                                            <InputField label="Sales Against (Form)" value={formData.sales_against} onChange={e => setFormData({...formData, sales_against: e.target.value})} />
-                                            <InputField label="EPCG Reg No" value={formData.epcg_no} onChange={e => setFormData({...formData, epcg_no: e.target.value})} />
-                                            <div className="space-y-1">
-                                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Internal Remarks</label>
-                                                <textarea value={formData.remarks} onChange={e => setFormData({...formData, remarks: e.target.value})} className="w-full h-16 bg-white border border-slate-200 p-2 rounded-lg text-[10px] font-bold outline-none focus:ring-1 focus:ring-blue-500 resize-none shadow-inner"/>
+                                        <div className="flex items-center gap-8 ml-[120px] py-1">
+                                            <div className="flex items-center gap-2"><span className="text-[11px] font-bold text-slate-700">Credit days</span><input type="number" className="border border-slate-300 w-16 p-1 text-xs font-black" value={formData.credit_days} onChange={e => setFormData({...formData, credit_days: e.target.value})} /></div>
+                                            <div className="flex items-center gap-2"><span className="text-[11px] font-bold text-slate-700">Interest %</span><input type="number" className="border border-slate-300 w-16 p-1 text-xs font-black" value={formData.interest_percentage} onChange={e => setFormData({...formData, interest_percentage: e.target.value})} /></div>
+                                        </div>
+                                        <RowSelect
+    label="Broker"
+    value={formData.broker_id}
+    options={listData.brokers.map(b => ({
+        value: b.id,
+        label: b.broker_name
+    }))}
+    onChange={e => setFormData({
+        ...formData,
+        broker_id: e.target.value
+    })}
+/>
+                                        <RowSelect label="Transport" value={formData.transport_id} options={listData.transports.map(t => ({value:t.id, label:t.transport_name}))} onChange={e => setFormData({...formData, transport_id: e.target.value})} />
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <RowInput label="LR No." value={formData.lr_no} onChange={e => setFormData({...formData, lr_no: e.target.value})} />
+                                            <RowInput label="Delivery" value={formData.delivery} readOnly />
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <RowInput label="LR Date" type="date" value={formData.lr_date} onChange={e => setFormData({...formData, lr_date: e.target.value})} />
+                                            <RowInput label="E-Bill" value={formData.ebill_no} onChange={e => setFormData({...formData, ebill_no: e.target.value})} />
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <RowInput label="Vehicle No." value={formData.vehicle_no} readOnly />
+                                            <RowInput label="Remarks" value={formData.remarks} onChange={e => setFormData({...formData, remarks: e.target.value})} />
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <RowInput label="Removal Time" type="time" value={formData.removal_time} onChange={e => setFormData({...formData, removal_time: e.target.value})} />
+                                            <RowSelect label="PayMode" value={formData.pay_mode} options={[{value:'CREDIT', label:'CREDIT'}, {value:'CASH', label:'CASH'}]} onChange={e => setFormData({...formData, pay_mode: e.target.value})} />
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <RowInput label="Prepare Time" type="time" value={formData.prepare_time} onChange={e => setFormData({...formData, prepare_time: e.target.value})} />
+                                            <RowInput label="Form JJ" value={formData.form_j} onChange={e => setFormData({...formData, form_j: e.target.value})} width="w-24" />
+                                        </div>
+                                        <RowInput label="Sales Against" value={formData.sales_against} onChange={e => setFormData({...formData, sales_against: e.target.value})} color="bg-rose-50" />
+                                        <RowInput label="EPCG No" value={formData.epcg_no} onChange={e => setFormData({...formData, epcg_no: e.target.value})} />
+                                    </div>
+                                    <div className="col-span-4 bg-[#F5F8FA] border border-slate-300 p-4 flex flex-col gap-1 rounded shadow-inner">
+                                        <h3 className="text-xs font-black text-slate-500 mb-2 border-b border-slate-300 pb-1 uppercase tracking-tight">Invoice Value</h3>
+                                        <TotalRow label="Assessable Value" value={formData.total_assessable} />
+                                        <TotalRow label="Charity" value={formData.total_charity} />
+                                        <TotalRow label="VAT Tax" value={formData.total_vat} />
+                                        <TotalRow label="Cenvat" value={formData.total_cenvat} />
+                                        <TotalRow label="Duty" value={formData.total_duty} />
+                                        <TotalRow label="Cess" value={formData.total_cess} />
+                                        <TotalRow label="H.S.Cess" value={formData.total_hr_sec_cess} />
+                                        <TotalRow label="TCS" value={formData.total_tcs} />
+                                        <TotalRow label="Freight" value={formData.freight_charges} />
+                                        <TotalRow label="Others" value={formData.total_other} />
+                                        <TotalRow label="GST" value={formData.total_gst} />
+                                        <TotalRow label="IGST" value={formData.total_igst} />
+                                        <div className="mt-auto pt-4 border-t-2 border-slate-400 space-y-1.5">
+                                            <TotalRow label="Sub Total" value={formData.sub_total} />
+                                            <TotalRow label="Round off" value={formData.round_off} />
+                                            <div className="flex justify-between items-center py-2 px-2 bg-white border border-slate-400 mt-2 shadow-sm">
+                                                <span className="text-[11px] font-black uppercase text-slate-700">Invoice Value</span>
+                                                <span className="text-xl font-black font-mono text-blue-700">₹ {parseFloat(formData.net_amount).toLocaleString()}</span>
                                             </div>
                                         </div>
                                     </div>
-                                ) : (
-                                    <div className="flex flex-col h-full space-y-4">
-                                        <div className="bg-blue-600 p-4 rounded-xl text-white flex items-center justify-between shadow-lg">
-                                            <div className="flex items-center gap-3"><ShoppingCart size={18} className="text-blue-200" /><span className="text-[10px] font-black uppercase tracking-widest">Order Sync Registry</span></div>
-                                            <select className="bg-white/10 border-none p-2 rounded-lg text-[10px] font-bold outline-none cursor-pointer" onChange={e => { const [t, n] = e.target.value.split('|'); handleOrderSelection(n, t === 'WITH' ? 'WITH_ORDER' : 'WITHOUT_ORDER'); }}>
-                                                <option value="" className="text-slate-900">Pull from booking registry...</option>
-                                                {listData.orders.map(o => <option className="text-slate-900" key={o.id} value={`WITH|${o.order_no}`}>Sales Order: {o.order_no} | {o.Party?.account_name}</option>)}
-                                                {listData.directOrders.map(o => <option className="text-slate-900" key={o.id} value={`DIRECT|${o.order_no}`}>Direct Bill: {o.order_no}</option>)}
+                                </div>
+                            ) : (
+                                /* TAB 2: DETAIL MATRIX */
+                                <div className="space-y-4 h-full flex flex-col overflow-hidden">
+                                    <div className="bg-[#EBF2FA] p-3 border border-slate-300 flex items-center justify-between rounded shadow-sm">
+                                        <div className="flex items-center gap-3">
+                                            <span className="text-[11px] font-black text-slate-700">Select with order No.</span>
+                                            <select className="border border-slate-300 text-xs p-1 min-w-[180px] font-black outline-none" onChange={handleOrderSync}>
+                                                <option value="">-- Order No --</option>
+                                                {listData.orders.map(o => <option key={o.id} value={`WITH|${o.order_no}`}>{o.order_no}</option>)}
                                             </select>
                                         </div>
-                                        
-                                        <div className="flex-1 overflow-x-auto border rounded-xl bg-white shadow-sm">
-                                            <table className="min-w-[3200px] text-left border-collapse">
-                                                <thead className="bg-slate-900 text-white text-[9px] font-black uppercase tracking-widest sticky top-0 z-10">
-                                                    <tr>
-                                                        <th className="p-4 w-60">Product SKU</th>
-                                                        <th className="p-4 w-28 text-center">Packs</th>
-                                                        <th className="p-4 w-28 text-center">Type</th>
-                                                        <th className="p-4 w-32 text-center">Net Kgs</th>
-                                                        <th className="p-4 w-28 text-center">Avg Cont</th>
-                                                        <th className="p-4 w-28 text-center">Rate</th>
-                                                        <th className="p-4 w-24 text-center">Per</th>
-                                                        <th className="p-4 w-40 text-center">ID Mark</th>
-                                                        <th className="p-4 w-24 text-center">From</th>
-                                                        <th className="p-4 w-24 text-center">To</th>
-                                                        <th className="p-4 w-20 text-center">Hank</th>
-                                                        <th className="p-4 w-20 text-center">Cone</th>
-                                                        <th className="p-4 w-32 text-center bg-blue-950/40">Assessable</th>
-                                                        <th className="p-4 w-28 text-center bg-blue-950/40">Tax (IGST)</th>
-                                                        <th className="p-4 w-40 text-center bg-emerald-950/40 text-emerald-400">Net Row</th>
-                                                        <th className="p-4 w-40 text-center">Broker</th>
-                                                        <th className="p-4 w-24 text-center">Br %</th>
-                                                        <th className="p-4 w-12 sticky right-0 bg-slate-900"></th>
+                                        <div className="flex items-center gap-3">
+                                            <span className="text-[11px] font-black text-slate-700">Select without order No.</span>
+                                            <select className="border border-slate-300 text-xs p-1 min-w-[180px] font-black outline-none" onChange={handleOrderSync}>
+                                                <option value="">-- Direct Doc --</option>
+                                                {listData.directOrders.map(o => <option key={o.id} value={`WITHOUT|${o.order_no}`}>{o.order_no}</option>)}
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex-1 border border-slate-300 overflow-x-auto bg-[#F5F8FA]">
+                                        <table className="min-w-[8500px] text-[11px] border-collapse bg-white">
+                                            <thead className="bg-[#F5F8FA] sticky top-0 z-10 border-b border-slate-300 text-slate-600">
+                                                <tr>
+                                                    <th className="p-3 border-r w-10"></th>
+                                                    <th className="p-3 border-r w-32 text-left">OrderNo</th>
+                                                    <th className="p-3 border-r w-80 text-left">Product</th>
+                                                    <th className="p-3 border-r w-32 text-left">Broker Code</th>
+                                                    <th className="p-3 border-r w-24 text-center">Broker %</th>
+                                                    <th className="p-3 border-r w-24 text-center">Packs</th>
+                                                    <th className="p-3 border-r w-32 text-center">Packing Type</th>
+                                                    <th className="p-3 border-r w-24 text-center">From No</th>
+                                                    <th className="p-3 border-r w-24 text-center">To No</th>
+                                                    <th className="p-3 border-r w-32 text-center">Total Kgs</th>
+                                                    <th className="p-3 border-r w-24 text-center">Avg Content</th>
+                                                    <th className="p-3 border-r w-32 text-center">Rate</th>
+                                                    <th className="p-3 border-r w-24 text-center">Rate Per</th>
+                                                    <th className="p-3 border-r w-36 text-center bg-blue-50 text-blue-800">Base [H]</th>
+                                                    <th className="p-3 border-r w-32 text-center bg-indigo-50 text-indigo-800">Resale (-)</th>
+                                                    <th className="p-3 border-r w-32 text-center bg-indigo-50 text-indigo-800">Hank (+)</th>
+                                                    <th className="p-3 border-r w-32 text-center bg-indigo-50 text-indigo-800">Cone Adjust (-)</th>
+                                                    <th className="p-3 border-r w-40 text-center bg-blue-100 text-blue-900 font-black">Assess [A]</th>
+                                                    <th className="p-3 border-r w-32 text-center">Charity</th>
+                                                    <th className="p-3 border-r w-24 text-center bg-slate-100">VAT%</th><th className="p-3 border-r w-32 text-center bg-slate-50">VAT Amt</th>
+                                                    <th className="p-3 border-r w-24 text-center bg-slate-100">CENVAT%</th><th className="p-3 border-r w-32 text-center bg-slate-50">CENVAT Amt</th>
+                                                    <th className="p-3 border-r w-24 text-center bg-slate-100">DUTY%</th><th className="p-3 border-r w-32 text-center bg-slate-50">DUTY Amt</th>
+                                                    <th className="p-3 border-r w-24 text-center bg-slate-100">CESS%</th><th className="p-3 border-r w-32 text-center bg-slate-50">CESS Amt</th>
+                                                    <th className="p-3 border-r w-24 text-center bg-slate-100">H.CESS%</th><th className="p-3 border-r w-32 text-center bg-slate-50">H.CESS Amt</th>
+                                                    <th className="p-3 border-r w-24 text-center bg-slate-100">SGST%</th><th className="p-3 border-r w-32 text-center bg-slate-50">SGST Amt</th>
+                                                    <th className="p-3 border-r w-24 text-center bg-slate-100">CGST%</th><th className="p-3 border-r w-32 text-center bg-slate-50">CGST Amt</th>
+                                                    <th className="p-3 border-r w-24 text-center bg-slate-100">IGST%</th><th className="p-3 border-r w-32 text-center bg-slate-50">IGST Amt</th>
+                                                    <th className="p-3 border-r w-24 text-center bg-slate-100">TCS%</th><th className="p-3 border-r w-32 text-center bg-slate-50">TCS Amt</th>
+                                                    <th className="p-3 border-r w-24 text-center bg-rose-50 text-rose-800">Disc% (Edit)</th><th className="p-3 border-r w-36 text-center bg-rose-50 text-rose-800">Disc Amt</th>
+                                                    <th className="p-3 border-r w-32 text-center">Other Amt</th>
+                                                    <th className="p-3 border-r w-32 text-center">Freight Amt</th>
+                                                    <th className="p-3 border-r w-80 text-center">ID Mark</th>
+                                                    <th className="p-3 text-center w-24"></th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-200">
+                                                {gridRows.map((r, i) => (
+                                                    <tr key={i} className="hover:bg-blue-50 font-black">
+                                                        <td className="p-2 border-r text-center text-slate-300">▶</td>
+                                                        <td className="p-2 border-r text-blue-700">{r.order_no}</td>
+                                                        <td className="p-2 border-r uppercase text-slate-800">{r.product_description}</td>
+                                                        <td className="p-1 border-r"><input type="text" className="w-full p-2 outline-none" value={r.broker_code} onChange={e => updateGrid(i, 'broker_code', e.target.value)} /></td>
+                                                        <td className="p-1 border-r"><input type="number" className="w-full p-2 text-center outline-none text-amber-600" value={r.broker_percentage} onChange={e => updateGrid(i, 'broker_percentage', e.target.value)} /></td>
+                                                        <td className="p-2 border-r bg-[#FFD1FF] text-center font-black">{r.packs}</td>
+                                                        <td className="p-2 border-r text-center uppercase">{r.packing_type}</td>
+                                                        <td className="p-1 border-r"><input type="text" className="w-full p-2 text-center outline-none" value={r.from_no} onChange={e => updateGrid(i, 'from_no', e.target.value)} /></td>
+                                                        <td className="p-1 border-r"><input type="text" className="w-full p-2 text-center outline-none" value={r.to_no} onChange={e => updateGrid(i, 'to_no', e.target.value)} /></td>
+                                                        <td className="p-2 border-r text-center text-blue-700 font-black">{r.total_kgs}</td>
+                                                        <td className="p-2 border-r text-center">{r.avg_content}</td>
+                                                        <td className="p-2 border-r text-center">₹{r.rate}</td>
+                                                        <td className="p-1 border-r"><input type="text" className="w-full p-2 text-center outline-none" value={r.rate_per} onChange={e => updateGrid(i, 'rate_per', e.target.value)} /></td>
+                                                        <td className="p-2 border-r text-center bg-blue-50 text-blue-600">₹{num(r.base_h).toFixed(2)}</td>
+                                                        
+                                                        <td className="p-1 border-r bg-indigo-50"><input type="number" className="w-full p-2 text-center outline-none bg-white rounded border border-indigo-100" value={r.resale} onChange={e => updateGrid(i, 'resale', parseFloat(e.target.value) || 0)} /></td>
+                                                        <td className="p-1 border-r bg-indigo-50"><input type="number" className="w-full p-2 text-center outline-none bg-white rounded border border-indigo-100" value={r.convert_to_hank} onChange={e => updateGrid(i, 'convert_to_hank', parseFloat(e.target.value) || 0)} /></td>
+                                                        <td className="p-1 border-r bg-indigo-50"><input type="number" className="w-full p-2 text-center outline-none bg-white rounded border border-indigo-100" value={r.convert_to_cone} onChange={e => updateGrid(i, 'convert_to_cone', parseInt(e.target.value) || 0)} /></td>
+
+                                                        <td className="p-2 border-r text-center bg-blue-100 text-blue-900 font-black">₹{num(r.assessable_value).toFixed(2)}</td>
+                                                        <td className="p-2 border-r text-center font-bold text-orange-600">₹{num(r.charity_amt).toFixed(2)}</td>
+
+                                                        {renderPairCell(r, i, 'vat_per', 'vat_amt', false, updateGrid)}
+                                                        {renderPairCell(r, i, 'cenvat_per', 'cenvat_amt', false, updateGrid)}
+                                                        {renderPairCell(r, i, 'duty_per', 'duty_amt', false, updateGrid)}
+                                                        {renderPairCell(r, i, 'cess_per', 'cess_amt', false, updateGrid)}
+                                                        {renderPairCell(r, i, 'hcess_per', 'hr_sec_cess_amt', false, updateGrid)}
+                                                        {renderPairCell(r, i, 'sgst_per', 'sgst_amt', false, updateGrid)}
+                                                        {renderPairCell(r, i, 'cgst_per', 'cgst_amt', false, updateGrid)}
+                                                        {renderPairCell(r, i, 'igst_per', 'igst_amt', false, updateGrid)}
+                                                        {renderPairCell(r, i, 'tcs_per', 'tcs_amt', false, updateGrid)}
+                                                        {renderPairCell(r, i, 'discount_percentage', 'discount_amt', true, updateGrid, "text-rose-600")}
+
+                                                        <td className="p-1 border-r"><input type="number" className="w-full p-2 text-center outline-none" value={r.other_amt} onChange={e => updateGrid(i, 'other_amt', parseFloat(e.target.value) || 0)} /></td>
+                                                        <td className="p-1 border-r"><input type="number" className="w-full p-2 text-center outline-none" value={r.freight_amt} onChange={e => updateGrid(i, 'freight_amt', parseFloat(e.target.value) || 0)} /></td>
+                                                        <td className="p-1 border-r"><input type="text" className="w-full p-2 text-xs border rounded font-black uppercase text-center" value={r.identification_mark} onChange={e => updateGrid(i, 'identification_mark', e.target.value)} /></td>
+                                                        <td className="p-2 text-center"><button onClick={() => setGridRows(gridRows.filter((_, idx) => idx !== i))}><MinusCircle size={22} className="text-red-500 hover:scale-110 transition-transform"/></button></td>
                                                     </tr>
-                                                </thead>
-                                                <tbody className="divide-y divide-slate-100 font-mono">
-                                                    {gridRows.map((row, idx) => (
-                                                        <tr key={idx} className="hover:bg-blue-50/20 transition-colors">
-                                                            <td className="p-2"><select disabled={!!row.order_no} className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-[11px] font-bold outline-none" value={row.product_id} onChange={e => handleProductSelectInGrid(idx, e.target.value)}><option value="">-- Choose SKU --</option>{listData.products.map(p => <option key={p.id} value={p.id}>{p.product_name}</option>)}</select></td>
-                                                            <td className="p-2"><input type="number" className="w-full p-2 text-center text-xs font-bold outline-none" value={row.packs} onChange={e => updateGrid(idx, 'packs', e.target.value)} /></td>
-                                                            <td className="p-2"><input type="text" className="w-full p-2 text-center text-[10px] font-bold uppercase outline-none" value={row.packing_type} onChange={e => updateGrid(idx, 'packing_type', e.target.value)} /></td>
-                                                            <td className="p-2"><input type="number" className="w-full p-2 text-center text-xs font-black text-blue-600 outline-none" value={row.total_kgs} onChange={e => updateGrid(idx, 'total_kgs', e.target.value)} /></td>
-                                                            <td className="p-2"><input type="number" className="w-full p-2 text-center text-xs outline-none" value={row.avg_content} onChange={e => updateGrid(idx, 'avg_content', e.target.value)} /></td>
-                                                            <td className="p-2"><input type="number" className="w-full p-2 text-center text-xs font-black text-blue-600 outline-none" value={row.rate} onChange={e => updateGrid(idx, 'rate', e.target.value)} /></td>
-                                                            <td className="p-2"><input type="text" className="w-full p-2 text-center text-[10px] uppercase outline-none" value={row.rate_per} onChange={e => updateGrid(idx, 'rate_per', e.target.value)} /></td>
-                                                            <td className="p-2"><input type="text" className="w-full p-2 text-center text-[10px] uppercase outline-none" value={row.identification_mark} onChange={e => updateGrid(idx, 'identification_mark', e.target.value)} /></td>
-                                                            <td className="p-2"><input type="text" className="w-full p-2 text-center text-[10px] outline-none" value={row.from_no} onChange={e => updateGrid(idx, 'from_no', e.target.value)} /></td>
-                                                            <td className="p-2"><input type="text" className="w-full p-2 text-center text-[10px] outline-none" value={row.to_no} onChange={e => updateGrid(idx, 'to_no', e.target.value)} /></td>
-                                                            <td className="p-2 text-center"><input type="checkbox" checked={row.convert_to_hank} onChange={e => updateGrid(idx, 'convert_to_hank', e.target.checked)} /></td>
-                                                            <td className="p-2 text-center"><input type="checkbox" checked={row.convert_to_cone} onChange={e => updateGrid(idx, 'convert_to_cone', e.target.checked)} /></td>
-                                                            <td className="p-2 text-center font-bold text-slate-500 bg-slate-50">₹{parseFloat(row.assessable_value || 0).toLocaleString()}</td>
-                                                            <td className="p-2 text-center font-bold text-slate-500 bg-slate-50">₹{parseFloat(row.igst_amt || 0).toLocaleString()}</td>
-                                                            <td className="p-2 text-center font-black text-slate-900 bg-emerald-50 text-base">₹{parseFloat(row.final_value || 0).toLocaleString()}</td>
-                                                            <td className="p-2"><input type="text" className="w-full p-2 text-center text-[10px] outline-none" value={row.broker_code} onChange={e => updateGrid(idx, 'broker_code', e.target.value)} /></td>
-                                                            <td className="p-2"><input type="number" className="w-full p-2 text-center text-[10px] outline-none" value={row.broker_percentage} onChange={e => updateGrid(idx, 'broker_percentage', e.target.value)} /></td>
-                                                            <td className="p-2 sticky right-0 bg-white"><button onClick={() => setGridRows(gridRows.filter((_, i) => i !== idx))} className="text-slate-300 hover:text-red-500"><MinusCircle size={18}/></button></td>
-                                                        </tr>
-                                                    ))}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                        <button onClick={() => setGridRows([...gridRows, { product_id: '', packs: 0, packing_type: '', total_kgs: 0, avg_content: 0, rate: 0, rate_per: 'Kg', identification_mark: '', from_no: '', to_no: '', resale: false, convert_to_hank: false, convert_to_cone: false, assessable_value: 0, charity_amt: 0, igst_amt: 0, final_value: 0 }])} className="w-full p-4 bg-slate-100 text-blue-600 text-[10px] font-black uppercase tracking-widest hover:bg-blue-100 transition-all">+ Add Empty Specification Row</button>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* RIGHT SIDE: Financial Cockpit */}
-                            <div className="w-full lg:w-96 bg-slate-900 rounded-2xl p-6 text-white flex flex-col justify-between shadow-2xl shrink-0">
-                                <div className="space-y-4">
-                                    <div className="text-center mb-6">
-                                        <Activity size={32} className="text-blue-400 mx-auto mb-1" />
-                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Financial Ledger Dashboard</p>
-                                    </div>
-
-                                    <div className="space-y-3">
-                                        <LedgerRow label="Assessable Value" value={formData.total_assessable} />
-                                        <LedgerRow label="Charity Collection" value={formData.total_charity} />
-                                        <LedgerRow label="Taxation (IGST)" value={formData.total_igst} color="text-emerald-400" />
-                                        <div className="space-y-1">
-                                            <label className="text-[8px] font-black text-slate-500 uppercase block tracking-tighter">Manual Round Off</label>
-                                            <input type="number" step="0.01" className="w-full bg-white/5 border border-white/5 rounded-lg p-2 text-right text-xs font-bold font-mono outline-none focus:border-blue-500" value={formData.round_off} onChange={e => setFormData({...formData, round_off: e.target.value})} />
-                                        </div>
-                                        <div className="pt-3 border-t border-white/5">
-                                            <LedgerRow label="Sub Total [I]" value={formData.sub_total} color="text-blue-400" />
-                                        </div>
+                                                ))}
+                                            </tbody>
+                                        </table>
                                     </div>
                                 </div>
-
-                                <div className="mt-8 p-6 bg-blue-600/10 rounded-3xl border border-blue-500/20 text-center relative overflow-hidden group">
-                                    <Database className="absolute -right-2 -bottom-2 text-white/5 group-hover:scale-110 transition-transform" size={80} />
-                                    <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-1 relative z-10">Net Document Value</p>
-                                    <h3 className="text-3xl font-black text-white font-mono relative z-10">₹ {parseFloat(formData.net_amount).toLocaleString()}</h3>
-                                </div>
-                            </div>
+                            )}
                         </div>
 
                         {/* Modal Footer */}
-                        <div className="p-6 bg-slate-50 border-t flex justify-end items-center gap-4 shrink-0">
-                            <button onClick={() => setIsModalOpen(false)} className="px-8 py-3 font-bold text-slate-400 hover:text-slate-600 text-xs tracking-widest uppercase transition-colors">Discard</button>
-                            <button onClick={handleSave} disabled={submitLoading || gridRows.length === 0} className="bg-blue-600 hover:bg-blue-700 text-white px-10 py-3 rounded-xl font-black shadow-xl flex items-center gap-2 active:scale-95 transition-all text-xs tracking-widest uppercase">
-                                <Save size={18}/> {submitLoading ? 'DEPLOYING...' : 'FINALIZE & POST'}
-                            </button>
+                        <div className="bg-[#D9E5F7] p-4 border-t border-slate-400 flex justify-between items-center shadow-lg">
+                            <div className="flex items-center gap-2">
+                                <input type="checkbox" checked={formData.is_approved} onChange={e => setFormData({...formData, is_approved: e.target.checked})} className="w-4 h-4" />
+                                <span className="text-xs font-black text-blue-800">Approval</span>
+                            </div>
+                            <div className="flex gap-1.5">
+                                <FooterBtn icon={<FileText size={14}/>} label="Form JJ" />
+                                <FooterBtn icon={<Layers size={14}/>} label="GC" />
+                                <FooterBtn icon={<Activity size={14}/>} label="Lap Yarn" />
+                                <FooterBtn icon={<Hash size={14}/>} label="GST" />
+                                <FooterBtn icon={<Database size={14}/>} label="A4" />
+                                <FooterBtn icon={<Printer size={14}/>} label="Report [A80]" />
+                                <FooterBtn icon={<Calculator size={14}/>} label="JSON" />
+                            </div>
+                            <div className="flex gap-3">
+
+    {/* EXPORT PDF BUTTON */}
+    <button
+        onClick={exportToPDF}
+        disabled={gridRows.length === 0}
+        className="bg-emerald-600 text-white border border-emerald-700 px-6 py-2 text-xs font-black uppercase hover:bg-emerald-700 shadow-md transition-all rounded flex items-center gap-2"
+    >
+        <FileText size={16}/> Download Professional TAX INVOICE
+    </button>
+
+    {/* UPDATE BUTTON */}
+    <button
+        onClick={handleSave}
+        disabled={submitLoading}
+        className="bg-white border border-slate-400 px-10 py-2 text-xs font-black flex items-center gap-2 hover:bg-green-50 shadow-sm transition-all rounded"
+    >
+        <Save size={16} className="text-blue-700"/>
+        {submitLoading ? 'Saving...' : 'Update'}
+    </button>
+
+    {/* CANCEL BUTTON */}
+    <button
+        onClick={() => setIsModalOpen(false)}
+        className="bg-white border border-slate-400 px-10 py-2 text-xs font-black flex items-center gap-2 hover:bg-red-50 shadow-sm transition-all rounded"
+    >
+        <X size={16} className="text-red-600"/> Cancel
+    </button>
+
+</div>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* Hidden Print Template */}
-            <div style={{ position: "absolute", top: "-9999px" }}>
-                <TaxInvoiceTemplate ref={printRef} data={printData} />
-            </div>
+            {/* PRINT CONTAINER - OFF-SCREEN BUT VISIBLE TO PRINTER (FIXES WHITE SHEET) */}
+            {printData && (
+                <div id="printable-invoice-wrapper">   
+                    <ModernPrintView data={printData} listData={listData} getHSN={getHSN} />
+                </div>
+            )}
 
-            <style jsx>{`
-                input[type='number']::-webkit-inner-spin-button, 
-                input[type='number']::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
-                ::-webkit-scrollbar { width: 5px; height: 5px; }
-                ::-webkit-scrollbar-track { background: transparent; }
-                ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
-                .overflow-x-auto::-webkit-scrollbar { height: 12px; }
+            {/* PRINT STYLES - CLEAN A4 BILL ONLY */}
+            <style>{`
+                @media print {
+
+  body * {
+      display: none !important;
+  }
+
+  #printable-invoice-wrapper,
+  #printable-invoice-wrapper * {
+      display: block !important;
+  }
+
+  #printable-invoice-wrapper {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      background: white;
+  }
+
+  @page {
+      size: A4;
+      margin: 10mm;
+  }
+
+}
             `}</style>
         </div>
     );
 };
 
-// HELPER COMPONENTS
-const SectionHeader = ({ icon: Icon, title }) => (
-    <h4 className="text-blue-600 font-black text-[11px] uppercase tracking-[0.2em] border-b border-blue-50 pb-2 flex items-center gap-2">
-        <Icon size={14}/> {title}
-    </h4>
-);
-
-const LedgerRow = ({ label, value, color = "text-slate-400" }) => (
-    <div className="flex justify-between items-center border-b border-white/5 pb-2">
-        <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{label}</span>
-        <span className={`font-mono text-sm font-bold ${color}`}>₹{parseFloat(value || 0).toLocaleString()}</span>
+// ==========================================
+// ERP HELPER COMPONENTS
+// ==========================================
+const RowInput = ({ label, width = "w-full", color = "bg-white", ...props }) => (
+    <div className="flex items-center">
+        <label className="w-[120px] text-[11px] font-black text-slate-700">{label}</label>
+        <input {...props} className={`border border-slate-300 p-1 text-[11px] font-black outline-none focus:border-blue-500 shadow-inner ${width} ${color}`} />
     </div>
 );
 
-const InputField = ({ label, icon: Icon, className = "", ...props }) => (
-    <div className={`space-y-1 ${className}`}>
-        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">{label}</label>
-        <div className="relative">
-            <input {...props} className="w-full bg-white border border-slate-200 p-2 rounded-lg text-xs font-bold outline-none focus:ring-1 focus:ring-blue-500 shadow-inner" />
-            {Icon && <Icon className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300" size={14}/>}
-        </div>
-    </div>
-);
-
-const SelectField = ({ label, options, ...props }) => (
-    <div className="space-y-1">
-        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">{label}</label>
-        <select {...props} className="w-full bg-white border border-slate-200 p-2 rounded-lg text-xs font-bold outline-none shadow-inner cursor-pointer hover:border-blue-300 transition-colors">
-            <option value="">-- SELECTION --</option>
+const RowSelect = ({ label, options, width = "w-full", ...props }) => (
+    <div className="flex items-center">
+        <label className="w-[120px] text-[11px] font-black text-slate-700">{label}</label>
+        <select {...props} className={`border border-slate-300 p-1 text-[11px] font-black outline-none focus:border-blue-500 ${width}`}>
+            <option value="">-- Select --</option>
             {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
     </div>
+);
+const TotalRow = ({ label, value }) => {
+
+    const displayValue =
+        value === '' || value === null || value === undefined
+            ? ''
+            : Number(value).toLocaleString(undefined, {
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0
+            });
+
+    return (
+        <div className="flex justify-between items-center text-[11px] py-0.5 px-1 hover:bg-white rounded">
+            <span className="font-black text-slate-500 uppercase tracking-tighter">
+                {label}
+            </span>
+            <input
+                readOnly
+                value={displayValue}
+                className="w-28 border border-slate-300 text-right p-0.5 font-mono bg-white outline-none font-black shadow-inner"
+            />
+        </div>
+    );
+};
+
+const FooterBtn = ({ label, icon }) => (
+    <button className="bg-white border border-slate-400 px-3 py-1.5 text-[10px] font-black flex items-center gap-1.5 hover:bg-slate-50 shadow-sm transition-colors">
+        <span className="text-blue-700">{icon}</span> {label}
+    </button>
+);
+
+const renderPairCell = (row, idx, perKey, amtKey, isEditable, updateGrid, color = "text-blue-600") => (
+    <>
+        <td className="p-1 border-r text-slate-400">
+            <input 
+                type="number" step="0.01" 
+                disabled={!isEditable}
+                className={`w-full p-2 text-center font-black border rounded bg-white outline-none focus:border-blue-500 ${color} disabled:bg-slate-50 disabled:border-none`} 
+                value={row[perKey] || 0} 
+                onChange={(e) => updateGrid(idx, perKey, e.target.value)} 
+            />
+        </td>
+        <td className={`p-2 border-r text-center font-black bg-slate-50 ${color}`}>
+            {parseFloat(row[amtKey] || 0).toFixed(2)}
+        </td>
+    </>
 );
 
 export default InvoicePreparation;

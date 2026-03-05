@@ -125,7 +125,7 @@ const Account = sequelize.define('Account', {
   timestamps: true
 });
 
-module.exports = Account;
+// module.exports = Account;
 
 // models/Product.js
 
@@ -223,7 +223,7 @@ const Product = sequelize.define('Product', {
   timestamps: true
 });
 
-module.exports = Product;
+// module.exports = Product;
 
 /**
  * ==========================================
@@ -284,6 +284,10 @@ const InvoiceHeader = sequelize.define('InvoiceHeader', {
     type: DataTypes.INTEGER, 
     allowNull: false 
   },
+  broker_id: {
+  type: DataTypes.INTEGER,
+  allowNull: true
+},
 
   transport_id: { 
     type: DataTypes.INTEGER 
@@ -516,6 +520,7 @@ const InvoiceDetail = sequelize.define('InvoiceDetail', {
   identification_mark: {
     type: DataTypes.STRING
   },
+  
 
   from_no: {
     type: DataTypes.STRING
@@ -526,20 +531,19 @@ const InvoiceDetail = sequelize.define('InvoiceDetail', {
   },
 
   resale: {
-    type: DataTypes.BOOLEAN,
-    defaultValue: false
+    type: DataTypes.DECIMAL(12,2), 
+    defaultValue: 0 
   },
 
   convert_to_hank: {
-    type: DataTypes.BOOLEAN,
-    defaultValue: false
+    type: DataTypes.DECIMAL(12,2), 
+    defaultValue: 0 
   },
 
   convert_to_cone: {
     type: DataTypes.BOOLEAN,
     defaultValue: false
   },
-
   // =============================
   // CALCULATED VALUES
   // =============================
@@ -557,6 +561,8 @@ const InvoiceDetail = sequelize.define('InvoiceDetail', {
   igst_amt: { type: DataTypes.DECIMAL(15,2), defaultValue: 0 },
 
   tcs_amt: { type: DataTypes.DECIMAL(15,2), defaultValue: 0 },
+  discount_percentage: { type: DataTypes.DECIMAL(10,2), defaultValue: 0 },
+discount_amt: { type: DataTypes.DECIMAL(15,2), defaultValue: 0 },
   other_amt: { type: DataTypes.DECIMAL(15,2), defaultValue: 0 },
 
   freight_amt: { type: DataTypes.DECIMAL(15,2), defaultValue: 0 },
@@ -626,52 +632,462 @@ const DepotReceived = sequelize.define('DepotReceived', {
   remarks: { type: DataTypes.STRING }
 }, { tableName: 'tbl_DepotReceived' });
 
+/**
+ * ==========================================
+ * DEPOT SALES HEADER MODEL
+ * ==========================================
+ */
 const DepotSalesHeader = sequelize.define('DepotSalesHeader', {
-  invoice_no: { type: DataTypes.STRING, unique: true },
-  date: { type: DataTypes.DATEONLY },
-  sales_type: { type: DataTypes.STRING, defaultValue: 'DEPOT SALES' },
-  invoice_type: { type: DataTypes.STRING },
-  depot_id: { type: DataTypes.INTEGER }, 
-  party_id: { type: DataTypes.INTEGER },
-  address: { type: DataTypes.TEXT },
-  credit_days: { type: DataTypes.INTEGER, defaultValue: 0 },
-  interest_pct: { type: DataTypes.DECIMAL(5,2), defaultValue: 0 },
-  transport_id: { type: DataTypes.INTEGER },
-  lr_no: { type: DataTypes.STRING },
-  lr_date: { type: DataTypes.DATEONLY },
-  vehicle_no: { type: DataTypes.STRING },
-  removal_time: { type: DataTypes.DATE },
-  agent_name: { type: DataTypes.STRING },
-  pay_mode: { type: DataTypes.STRING },
-  remarks: { type: DataTypes.TEXT },
-  assessable_value: { type: DataTypes.DECIMAL(15,2), defaultValue: 0 },
-  charity: { type: DataTypes.DECIMAL(15,2), defaultValue: 0 },
-  vat_tax: { type: DataTypes.DECIMAL(15,2), defaultValue: 0 },
-  cenvat: { type: DataTypes.DECIMAL(15,2), defaultValue: 0 },
-  duty: { type: DataTypes.DECIMAL(15,2), defaultValue: 0 },
-  cess: { type: DataTypes.DECIMAL(15,2), defaultValue: 0 },
-  hs_cess: { type: DataTypes.DECIMAL(15,2), defaultValue: 0 },
-  tcs: { type: DataTypes.DECIMAL(15,2), defaultValue: 0 },
-  discount: { type: DataTypes.DECIMAL(15,2), defaultValue: 0 },
-  pf_amount: { type: DataTypes.DECIMAL(15,2), defaultValue: 0 },
-  freight: { type: DataTypes.DECIMAL(15,2), defaultValue: 0 },
-  gst: { type: DataTypes.DECIMAL(15,2), defaultValue: 0 },
-  igst: { type: DataTypes.DECIMAL(15,2), defaultValue: 0 },
-  sub_total: { type: DataTypes.DECIMAL(15,2), defaultValue: 0 },
-  round_off: { type: DataTypes.DECIMAL(15,2), defaultValue: 0 },
-  final_invoice_value: { type: DataTypes.DECIMAL(15,2), defaultValue: 0 }
-}, { tableName: 'tbl_DepotSalesHeaders' });
 
+  invoice_no: { 
+    type: DataTypes.STRING, 
+    unique: true 
+  },
+
+  date: { 
+    type: DataTypes.DATEONLY 
+  },
+
+  sales_type: { 
+    type: DataTypes.STRING, 
+    defaultValue: 'DEPOT SALES' 
+  },
+
+  invoice_type_id: { 
+    type: DataTypes.INTEGER 
+  },
+
+  invoice_type: {
+    type: DataTypes.STRING
+  },
+
+  depot_id: { 
+    type: DataTypes.INTEGER 
+  },
+
+  party_id: { 
+    type: DataTypes.INTEGER 
+  },
+  broker_id: { 
+  type: DataTypes.INTEGER 
+},
+
+  address: { 
+    type: DataTypes.TEXT 
+  },
+
+  credit_days: { 
+    type: DataTypes.INTEGER, 
+    defaultValue: 0 
+  },
+
+  interest_pct: { 
+    type: DataTypes.DECIMAL(5,2), 
+    defaultValue: 0 
+  },
+
+  transport_id: { 
+    type: DataTypes.INTEGER 
+  },
+
+  lr_no: { 
+    type: DataTypes.STRING 
+  },
+
+  lr_date: { 
+    type: DataTypes.DATEONLY 
+  },
+
+  vehicle_no: { 
+    type: DataTypes.STRING 
+  },
+
+  removal_time: {
+    type: DataTypes.DATE
+  },
+
+  agent_name: { 
+    type: DataTypes.STRING 
+  },
+
+  pay_mode: { 
+    type: DataTypes.STRING 
+  },
+
+  remarks: { 
+    type: DataTypes.TEXT 
+  },
+
+  country: {
+    type: DataTypes.STRING
+  },
+
+  are_no: {
+    type: DataTypes.STRING
+  },
+
+  form_jj: {
+    type: DataTypes.STRING
+  },
+
+  // =============================
+  // TAX & VALUE FIELDS
+  // =============================
+
+  assessable_value: { 
+    type: DataTypes.DECIMAL(15,2), 
+    defaultValue: 0 
+  },
+
+  charity: { 
+    type: DataTypes.DECIMAL(15,2), 
+    defaultValue: 0 
+  },
+
+  vat_tax: { 
+    type: DataTypes.DECIMAL(15,2), 
+    defaultValue: 0 
+  },
+
+  cenvat: { 
+    type: DataTypes.DECIMAL(15,2), 
+    defaultValue: 0 
+  },
+
+  duty: { 
+    type: DataTypes.DECIMAL(15,2), 
+    defaultValue: 0 
+  },
+
+  cess: { 
+    type: DataTypes.DECIMAL(15,2), 
+    defaultValue: 0 
+  },
+
+  hs_cess: { 
+    type: DataTypes.DECIMAL(15,2), 
+    defaultValue: 0 
+  },
+
+  tcs: { 
+    type: DataTypes.DECIMAL(15,2), 
+    defaultValue: 0 
+  },
+
+  discount: { 
+    type: DataTypes.DECIMAL(15,2), 
+    defaultValue: 0 
+  },
+
+  gst: { 
+    type: DataTypes.DECIMAL(15,2), 
+    defaultValue: 0 
+  },
+
+  igst: { 
+    type: DataTypes.DECIMAL(15,2), 
+    defaultValue: 0 
+  },
+
+  pf_amount: { 
+    type: DataTypes.DECIMAL(15,2), 
+    defaultValue: 0 
+  },
+
+  freight: { 
+    type: DataTypes.DECIMAL(15,2), 
+    defaultValue: 0 
+  },
+
+  sub_total: { 
+    type: DataTypes.DECIMAL(15,2), 
+    defaultValue: 0 
+  },
+
+  round_off: { 
+    type: DataTypes.DECIMAL(15,2), 
+    defaultValue: 0 
+  },
+
+  final_invoice_value: { 
+    type: DataTypes.DECIMAL(15,2), 
+    defaultValue: 0 
+  },
+
+  // =============================
+  // TOTALS
+  // =============================
+
+  total_charity: { 
+    type: DataTypes.DECIMAL(15,2), 
+    defaultValue: 0 
+  },
+
+  total_vat: { 
+    type: DataTypes.DECIMAL(15,2), 
+    defaultValue: 0 
+  },
+
+  total_cenvat: { 
+    type: DataTypes.DECIMAL(15,2), 
+    defaultValue: 0 
+  },
+
+  total_duty: { 
+    type: DataTypes.DECIMAL(15,2), 
+    defaultValue: 0 
+  },
+
+  total_cess: { 
+    type: DataTypes.DECIMAL(15,2), 
+    defaultValue: 0 
+  },
+
+  total_hr_sec_cess: { 
+    type: DataTypes.DECIMAL(15,2), 
+    defaultValue: 0 
+  },
+
+  total_tcs: { 
+    type: DataTypes.DECIMAL(15,2), 
+    defaultValue: 0 
+  },
+
+  total_sgst: { 
+    type: DataTypes.DECIMAL(15,2), 
+    defaultValue: 0 
+  },
+
+  total_cgst: { 
+    type: DataTypes.DECIMAL(15,2), 
+    defaultValue: 0 
+  },
+
+  total_igst: { 
+    type: DataTypes.DECIMAL(15,2), 
+    defaultValue: 0 
+  },
+
+  total_discount: { 
+    type: DataTypes.DECIMAL(15,2), 
+    defaultValue: 0 
+  },
+
+  total_other: { 
+    type: DataTypes.DECIMAL(15,2), 
+    defaultValue: 0 
+  }
+
+}, {
+  tableName: 'tbl_DepotSalesHeaders',
+  timestamps: true
+});
+/**
+ * ==========================================
+ * DEPOT SALES DETAIL MODEL (MODIFIED)
+ * ==========================================
+ */
 const DepotSalesDetail = sequelize.define('DepotSalesDetail', {
-  depot_sales_id: { type: DataTypes.INTEGER },
-  order_no: { type: DataTypes.STRING },
-  product_id: { type: DataTypes.INTEGER },
-  packs: { type: DataTypes.DECIMAL(10,2) },
-  packing_type: { type: DataTypes.STRING },
-  total_kgs: { type: DataTypes.DECIMAL(15,3) },
-  avg_content: { type: DataTypes.DECIMAL(10,2) }
-}, { tableName: 'tbl_DepotSalesDetails' });
 
+  depot_sales_id: { type: DataTypes.INTEGER },
+
+  order_no: { type: DataTypes.STRING },
+
+  order_type: { 
+    type: DataTypes.STRING,
+    defaultValue: 'WITH_ORDER'
+  },
+
+  product_id: { type: DataTypes.INTEGER },
+
+  packs: { 
+    type: DataTypes.DECIMAL(10,2),
+    defaultValue: 0
+  },
+
+  packing_type: { type: DataTypes.STRING },
+
+  total_kgs: { 
+    type: DataTypes.DECIMAL(15,3),
+    defaultValue: 0
+  },
+
+  avg_content: { 
+    type: DataTypes.DECIMAL(10,2),
+    defaultValue: 0
+  },
+
+  broker_code: { type: DataTypes.STRING },
+
+  broker_percentage: { 
+    type: DataTypes.DECIMAL(10,2),
+    defaultValue: 0
+  },
+
+  product_description: { type: DataTypes.STRING },
+
+  rate_per: { type: DataTypes.STRING },
+
+  identification_mark: { type: DataTypes.STRING },
+
+  from_no: { type: DataTypes.STRING },
+
+  to_no: { type: DataTypes.STRING },
+
+  resale: { 
+    type: DataTypes.DECIMAL(12,2),
+    defaultValue: 0
+  },
+
+  convert_to_hank: { 
+    type: DataTypes.DECIMAL(12,2),
+    defaultValue: 0
+  },
+
+  convert_to_cone: { 
+    type: DataTypes.BOOLEAN,
+    defaultValue: false
+  },
+
+  assessable_value: { 
+    type: DataTypes.DECIMAL(15,2),
+    defaultValue: 0
+  },
+
+  charity_amt: { 
+    type: DataTypes.DECIMAL(15,2),
+    defaultValue: 0
+  },
+
+  vat_per: { 
+    type: DataTypes.DECIMAL(10,2),
+    defaultValue: 0
+  },
+
+  vat_amt: { 
+    type: DataTypes.DECIMAL(15,2),
+    defaultValue: 0
+  },
+
+  cenvat_per: { 
+    type: DataTypes.DECIMAL(10,2),
+    defaultValue: 0
+  },
+
+  cenvat_amt: { 
+    type: DataTypes.DECIMAL(15,2),
+    defaultValue: 0
+  },
+
+  duty_per: { 
+    type: DataTypes.DECIMAL(10,2),
+    defaultValue: 0
+  },
+
+  duty_amt: { 
+    type: DataTypes.DECIMAL(15,2),
+    defaultValue: 0
+  },
+
+  cess_per: { 
+    type: DataTypes.DECIMAL(10,2),
+    defaultValue: 0
+  },
+
+  cess_amt: { 
+    type: DataTypes.DECIMAL(15,2),
+    defaultValue: 0
+  },
+
+  hcess_per: { 
+    type: DataTypes.DECIMAL(10,2),
+    defaultValue: 0
+  },
+
+  hcess_amt: { 
+    type: DataTypes.DECIMAL(15,2),
+    defaultValue: 0
+  },
+
+  sgst_per: { 
+    type: DataTypes.DECIMAL(10,2),
+    defaultValue: 0
+  },
+
+  sgst_amt: { 
+    type: DataTypes.DECIMAL(15,2),
+    defaultValue: 0
+  },
+
+  cgst_per: { 
+    type: DataTypes.DECIMAL(10,2),
+    defaultValue: 0
+  },
+
+  cgst_amt: { 
+    type: DataTypes.DECIMAL(15,2),
+    defaultValue: 0
+  },
+
+  igst_per: { 
+    type: DataTypes.DECIMAL(10,2),
+    defaultValue: 0
+  },
+
+  igst_amt: { 
+    type: DataTypes.DECIMAL(15,2),
+    defaultValue: 0
+  },
+
+  tcs_per: { 
+    type: DataTypes.DECIMAL(10,2),
+    defaultValue: 0
+  },
+
+  tcs_amt: { 
+    type: DataTypes.DECIMAL(15,2),
+    defaultValue: 0
+  },
+
+  discount_percentage: { 
+    type: DataTypes.DECIMAL(10,2),
+    defaultValue: 0
+  },
+
+  discount_amt: { 
+    type: DataTypes.DECIMAL(15,2),
+    defaultValue: 0
+  },
+
+  other_amt: { 
+    type: DataTypes.DECIMAL(15,2),
+    defaultValue: 0
+  },
+
+  freight_amt: { 
+    type: DataTypes.DECIMAL(15,2),
+    defaultValue: 0
+  },
+
+  sub_total: { 
+    type: DataTypes.DECIMAL(15,2),
+    defaultValue: 0
+  },
+
+  rounded_off: { 
+    type: DataTypes.DECIMAL(15,2),
+    defaultValue: 0
+  },
+
+  final_value: { 
+    type: DataTypes.DECIMAL(15,2),
+    defaultValue: 0
+  }
+
+}, {
+  tableName: 'tbl_DepotSalesDetails',
+  timestamps: true
+});
 /**
  * ==========================================
  * 5. OTHER MODELS
@@ -992,7 +1408,7 @@ const InvoiceType = sequelize.define("InvoiceType", {
   timestamps: true
 });
 
-module.exports = InvoiceType;
+// module.exports = InvoiceType;
 
 // models/DespatchEntry.js
 const DespatchEntry = sequelize.define('DespatchEntry', {
@@ -1062,7 +1478,10 @@ const DespatchEntry = sequelize.define('DespatchEntry', {
  */
 
 // Product -> Tariff
-Product.belongsTo(TariffSubHead, { foreignKey: 'tariff_id' });
+Product.belongsTo(TariffSubHead, { 
+  foreignKey: 'tariff_sub_head',
+  targetKey: 'tariff_code'
+});
 
 // Depot Received Associations (Opening Stock & Inward Logs)
 DepotReceived.belongsTo(Account, { foreignKey: 'depot_id', as: 'Depot' });
@@ -1072,9 +1491,8 @@ DepotReceived.belongsTo(Product, { foreignKey: 'product_id', as: 'Product' }); /
 DepotSalesHeader.belongsTo(Account, { foreignKey: 'party_id', as: 'Party' });
 DepotSalesHeader.belongsTo(Account, { foreignKey: 'depot_id', as: 'Depot' });
 DepotSalesHeader.belongsTo(Transport, { foreignKey: 'transport_id' });
-DepotSalesHeader.hasMany(DepotSalesDetail, { foreignKey: 'depot_sales_id', onDelete: 'CASCADE' });
-DepotSalesDetail.belongsTo(Product, { foreignKey: 'product_id' });
-
+DepotSalesHeader.hasMany(DepotSalesDetail, { foreignKey: 'depot_sales_id',as: 'DepotSalesDetails', onDelete: 'CASCADE' });
+DepotSalesDetail.belongsTo(Product, { foreignKey: 'product_id',as: 'Product'});
 // Order Associations
 OrderHeader.belongsTo(Account, { foreignKey: 'party_id', as: 'Party' });
 OrderHeader.belongsTo(Broker, { foreignKey: 'broker_id', as: 'Broker' });
@@ -1111,6 +1529,7 @@ RG1Production.belongsTo(PackingType, { foreignKey: 'packing_type_id' });
 // Despatch
 DespatchEntry.belongsTo(Transport, { foreignKey: 'transport_id' });
 
+
 // InvoiceHeader.belongsTo(InvoiceType, { foreignKey: 'invoice_type_id', as: 'TypeConfig' });
 // InvoiceHeader.hasMany(InvoiceDetail, { foreignKey: 'invoice_id', onDelete: 'CASCADE' });
 // InvoiceDetail.belongsTo(InvoiceHeader, { foreignKey: 'invoice_id' });
@@ -1141,13 +1560,20 @@ InvoiceHeader.hasMany(InvoiceDetail, {
   foreignKey: 'invoice_id',
   onDelete: 'CASCADE'
 });
-
+InvoiceHeader.belongsTo(Broker, {
+  foreignKey: 'broker_id',
+  as: 'Broker'
+});
 InvoiceDetail.belongsTo(InvoiceHeader, { 
   foreignKey: 'invoice_id'
 });
 
 InvoiceDetail.belongsTo(Product, { 
   foreignKey: 'product_id'
+});
+DepotSalesHeader.belongsTo(Broker, {
+  foreignKey: 'broker_id',
+  as: 'Broker'
 });
 DirectInvoiceHeader.belongsTo(Account, { foreignKey: 'party_id', as: 'Party' }); 
 

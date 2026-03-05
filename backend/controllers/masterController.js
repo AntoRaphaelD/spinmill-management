@@ -7,7 +7,7 @@ const {
     DepotSalesHeader, DepotSalesDetail
 } = require('../models');
 const { Op } = require('sequelize');
-
+const num = (v) => isNaN(parseFloat(v)) ? 0 : parseFloat(v);
 /**
  * CORE MATH ENGINE
  * Evaluates formulas from Invoice Type Master (e.g., "[H]*0.05")
@@ -121,87 +121,84 @@ const createMasterController = (Model, includeModels = []) => ({
 });
 
 // --- 2. CALCULATED INVOICE LOGIC (Standard Sales) ---
+// --- 2. CALCULATED INVOICE LOGIC (Standard Sales) ---
+
+// FIRST: Initialize the base controller so it has getAll, update, delete, etc.
 const invoiceCtrl = createMasterController(InvoiceHeader, [
-    { model: Account, as: 'Party' }, { model: Transport },
+    { model: Account, as: 'Party' }, 
+    { model: Broker, as: 'Broker' },  
+    { model: Transport },
     { model: InvoiceDetail, include: [{ model: Product }] }
 ]);
 
+// SECOND: Overwrite the .create method with the dynamic formula logic
 invoiceCtrl.create = async (req, res) => {
     const t = await sequelize.transaction();
     try {
         const { Details, invoice_type_id, freight_charges, ...headerData } = req.body;
 
         const config = await InvoiceType.findByPk(invoice_type_id);
-        if (!config) throw new Error("Invoice Type configuration not found.");
+        if (!config) throw new Error("Invoice Type logic not found.");
 
-        let hTotals = { assess: 0, charity: 0, igst: 0, sgst: 0, cgst: 0, vat: 0, duty: 0, cess: 0, hcess: 0, tcs: 0, sub: 0, net: 0 };
+        let hTotals = { 
+            assess: 0, charity: 0, igst: 0, sgst: 0, cgst: 0, disc: 0, brok: 0, net: 0 
+        };
+        
         const processedRows = [];
 
         for (const item of Details) {
             const product = await Product.findByPk(item.product_id);
             
-            // Step 1: Initialize Context with Base Values
+            // 1. BASE H
+            const H = (parseFloat(item.rate) || 0) * (parseFloat(item.total_kgs) || 0);
+
+            // 2. ASSESS A = H - Resale + Hank - Cone
+            const A = H - parseFloat(item.resale || 0) + parseFloat(item.convert_to_hank || 0) - parseFloat(item.convert_to_cone || 0);
+
             let ctx = {
-                "Rate / Kg": parseFloat(item.rate) || 0,
-                "Total Kgs": parseFloat(item.total_kgs) || 0,
-                "H": (parseFloat(item.rate) || 0) * (parseFloat(item.total_kgs) || 0),
-                "CharityRs": product ? parseFloat(product.charity_rs || 0) : 0,
-                "Lorryfright": parseFloat(freight_charges || 0),
-                "igstper": parseFloat(config.igst_percentage || 0),
-                "sgstper": parseFloat(config.sgst_percentage || 0),
-                "cgstper": parseFloat(config.cgst_percentage || 0),
-                "vatper": parseFloat(config.vat_percentage || 0),
-                "dutyper": parseFloat(config.duty_percentage || 0),
-                "cessper": parseFloat(config.cess_percentage || 0),
-                "hcessper": parseFloat(config.hr_sec_cess_percentage || 0),
-                "tcsper": parseFloat(config.tcs_percentage || 0),
-                // Initialize calculated placeholders as 0 to prevent "undefined" errors
-                "A": 0, "I": 0, "igstamt": 0, "sgstamt": 0, "cgstamt": 0, "Charity": 0,
-                "vatamt": 0, "dutyamt": 0, "cessamt": 0, "hcessamt": 0, "tcsamt": 0
+                "H": H, "A": A,
+                "CharityRs": parseFloat(product?.charity_rs || 0),
+                "igstper": parseFloat(item.igst_per || config.igst_percentage || 0),
+                "sgstper": parseFloat(item.sgst_per || config.sgst_percentage || 0),
+                "cgstper": parseFloat(item.cgst_per || config.cgst_percentage || 0)
             };
 
-            // Step 2: Calculate Taxes first
-            ctx["Charity"] = config.charity_checked ? evaluateFormula(config.charity_formula, ctx) : 0;
-            ctx["igstamt"] = config.igst_checked ? evaluateFormula(config.igst_formula, ctx) : 0;
-            ctx["sgstamt"] = config.gst_checked ? evaluateFormula(config.sgst_formula, ctx) : 0;
-            ctx["cgstamt"] = config.gst_checked ? evaluateFormula(config.cgst_formula, ctx) : 0;
-            ctx["vatamt"] = config.vat_checked ? evaluateFormula(config.vat_formula, ctx) : 0;
-            ctx["dutyamt"] = config.duty_checked ? evaluateFormula(config.duty_formula, ctx) : 0;
-            ctx["cessamt"] = config.cess_checked ? evaluateFormula(config.cess_formula, ctx) : 0;
-            ctx["hcessamt"] = config.hr_sec_cess_checked ? evaluateFormula(config.hr_sec_cess_formula, ctx) : 0;
-            ctx["tcsamt"] = config.tcs_checked ? evaluateFormula(config.tcs_formula, ctx) : 0;
+            // 3. TAXES ON A
+            const charity = config.charity_checked ? evaluateFormula(config.charity_formula, ctx) : 0;
+            const igst    = config.igst_checked ? (ctx.igstper * A / 100) : 0;
+            const sgst    = config.gst_checked ? (ctx.sgstper * A / 100) : 0;
+            const cgst    = config.gst_checked ? (ctx.cgstper * A / 100) : 0;
 
-            // Step 3: Calculate Assessable [A] using the taxes above
-            ctx["A"] = evaluateFormula(config.assess_formula, ctx);
+            // 4. DEDUCTIONS ON (A + TAX)
+            const postTaxBasis = A + igst + sgst + cgst + charity;
+            const discAmt = (parseFloat(item.discount_per || 0) * postTaxBasis / 100);
+            const brokAmt = (parseFloat(item.broker_per || 0) * postTaxBasis / 100);
 
-            // Step 4: Calculate Sub Total [I] using [A] and taxes
-            ctx["I"] = evaluateFormula(config.sub_total_formula, ctx);
+            // 5. ROW FINAL
+            const rowFinal = postTaxBasis - discAmt - brokAmt;
 
-            // Step 5: Calculate Final Row Value
-            const finalRowVal = evaluateFormula(config.total_value_formula, ctx);
-
-            // Accumulate Header Totals
-            hTotals.assess += ctx["A"]; 
-            hTotals.charity += ctx["Charity"];
-            hTotals.igst += ctx["igstamt"];
-            hTotals.sgst += ctx["sgstamt"];
-            hTotals.cgst += ctx["cgstamt"];
-            hTotals.sub += ctx["I"];
-            hTotals.net += finalRowVal;
+            hTotals.assess  += A; 
+            hTotals.charity += charity;
+            hTotals.igst    += igst;
+            hTotals.sgst    += sgst;
+            hTotals.cgst    += cgst;
+            hTotals.disc    += discAmt;
+            hTotals.brok    += brokAmt;
+            hTotals.net     += rowFinal;
 
             processedRows.push({
-                ...item,
-                assessable_value: ctx["A"],
-                charity_amt: ctx["Charity"],
-                igst_amt: ctx["igstamt"],
-                sgst_amt: ctx["sgstamt"],
-                cgst_amt: ctx["cgstamt"],
-                sub_total: ctx["I"],
-                final_value: finalRowVal
+                ...sanitizeData(item),
+                assessable_value: A,
+                charity_amt: charity,
+                igst_amt: igst,
+                sgst_amt: sgst,
+                cgst_amt: cgst,
+                discount_amt: discAmt,
+                broker_amt: brokAmt,
+                final_value: rowFinal
             });
         }
 
-        // Create Header (Including all aggregate fields)
         const header = await InvoiceHeader.create({
             ...sanitizeData(headerData),
             invoice_type_id,
@@ -210,37 +207,25 @@ invoiceCtrl.create = async (req, res) => {
             total_igst: hTotals.igst,
             total_sgst: hTotals.sgst,
             total_cgst: hTotals.cgst,
-            sub_total: hTotals.sub,
-            net_amount: hTotals.net
+            total_discount: hTotals.disc,
+            total_broker: hTotals.brok,
+            freight_charges: parseFloat(freight_charges || 0),
+            net_amount: Math.round(hTotals.net + parseFloat(freight_charges || 0))
         }, { transaction: t });
 
-        // Save Details and Update Product Stock
-        // Save Details and Update Product Stock
-for (const row of processedRows) {
-    // 🔥 SANITIZE THE ROW DATA BEFORE SAVING
-    const sanitizedRow = sanitizeData(row);
-    
-    await InvoiceDetail.create({ 
-        ...sanitizedRow, 
-        invoice_id: header.id 
-    }, { transaction: t });
-
-    await Product.decrement('mill_stock', { 
-        by: sanitizedRow.total_kgs, 
-        where: { id: sanitizedRow.product_id }, 
-        transaction: t 
-    });
-}
+        for (const row of processedRows) {
+            await InvoiceDetail.create({ ...row, invoice_id: header.id }, { transaction: t });
+            await Product.decrement('mill_stock', { by: row.total_kgs, where: { id: row.product_id }, transaction: t });
+        }
 
         await t.commit();
         res.status(201).json({ success: true, data: header });
     } catch (err) {
         if (t) await t.rollback();
-        console.error("CREATE INVOICE ERROR:", err);
         res.status(500).json({ success: false, error: err.message });
     }
 };
-
+// Add these to make sure approve/reject are not undefined
 invoiceCtrl.approve = async (req, res) => {
     try {
         await InvoiceHeader.update({ is_approved: true }, { where: { id: req.params.id } });
@@ -260,7 +245,6 @@ invoiceCtrl.reject = async (req, res) => {
         res.json({ success: true });
     } catch (err) { if (t) await t.rollback(); res.status(500).json({ error: err.message }); }
 };
-
 // --- 3. RG1 PRODUCTION LOGIC ---
 const productionCtrl = createMasterController(RG1Production, [{ model: Product }, { model: PackingType }]);
 
@@ -303,25 +287,50 @@ productionCtrl.create = async (req, res) => {
 // --- 4. DEPOT STORAGE LOGIC ---
 const getDepotInventory = async (req, res) => {
     try {
+
         const { depotId } = req.params;
-        const products = await Product.findAll({ include: [{ model: TariffSubHead }] });
+
+        const products = await Product.findAll({
+            include: [{ model: TariffSubHead }]
+        });
 
         const data = await Promise.all(products.map(async (p) => {
-            const opening = await DepotReceived.sum('total_kgs', { where: { product_id: p.id, depot_id: depotId, type: 'OPENING' } }) || 0;
-            const inward = await InvoiceDetail.sum('total_kgs', {
-                include: [{ model: InvoiceHeader, where: { depot_id: depotId, is_depot_inwarded: true }, attributes: [] }],
-                where: { product_id: p.id }
+
+            // inward stock for that depot
+            const inward = await DepotReceived.sum('total_kgs', {
+                where: {
+                    depot_id: depotId,
+                    product_id: p.id,
+                    type: 'INWARD'
+                }
             }) || 0;
+
+            // sales from that depot
             const outward = await DepotSalesDetail.sum('total_kgs', {
-                include: [{ model: DepotSalesHeader, where: { depot_id: depotId }, attributes: [] }],
+                include: [{
+                    model: DepotSalesHeader,
+                    attributes: [],
+                    required: true,
+                    where: { depot_id: depotId }
+                }],
                 where: { product_id: p.id }
             }) || 0;
 
-            const stock = (parseFloat(opening) + parseFloat(inward)) - parseFloat(outward);
-            return { ...p.toJSON(), depot_stock: stock > 0 ? stock : 0 };
+            const stock = inward - outward;
+
+            return {
+                ...p.toJSON(),
+                depot_stock: stock > 0 ? stock : 0
+            };
+
         }));
+
         res.json({ success: true, data });
-    } catch (err) { res.status(500).json({ error: err.message }); }
+
+    } catch (err) {
+        console.error("DEPOT INVENTORY ERROR:", err);
+        res.status(500).json({ error: err.message });
+    }
 };
 // --- masterController.js ---
 
@@ -488,7 +497,188 @@ directInvoiceCtrl.update = async (req, res) => {
         res.status(500).json({ success: false, error: err.message });
     }
 };
+// --- DEPOT SALES CONTROLLER OVERRIDE ---
+const depotSalesCtrl = createMasterController(DepotSalesHeader, [
+    { model: Account, as: 'Party' }, 
+    { model: Account, as: 'Depot' },
+    { model: Broker, as: 'Broker' },  
+    { 
+        model: DepotSalesDetail, 
+        as: 'DepotSalesDetails',
+        include: [{ model: Product, as: 'Product' }]
+    }
+]);
+
+// --- DEPOT SALES / TRANSFER CONTROLLER ---
+depotSalesCtrl.create = async (req, res) => {
+    const t = await sequelize.transaction();
+    try {
+        const { Details, invoice_type_id, ...headerData } = req.body;
+        const isTransfer = headerData.sales_type === 'DEPOT TRANSFER';
+        
+        // 1. Existing Math Logic...
+        let hTotals = { assess: 0, charity: 0, vat: 0, gst: 0, igst: 0, disc: 0, net: 0 };
+        const processedRows = [];
+        const config = invoice_type_id ? await InvoiceType.findByPk(invoice_type_id) : null;
+
+        for (const item of Details) {
+            const product = await Product.findByPk(item.product_id);
+            const itemKgs = num(item.total_kgs || item.qty);
+            
+            // Simplified calculation for Transfer
+            const rowFinal = isTransfer ? 0 : (num(item.rate) * itemKgs); 
+
+            processedRows.push({
+                ...sanitizeData(item),
+                total_kgs: itemKgs,
+                final_value: rowFinal,
+                order_type: isTransfer ? 'TRANSFER' : 'DIRECT'
+            });
+            
+            hTotals.net += rowFinal;
+        }
+
+        // 2. Create the Header (This deducts from Sender)
+       const header = await DepotSalesHeader.create({
+    ...sanitizeData(headerData),
+    invoice_type_id,
+    broker_id: headerData.broker_id,   // ⭐ ADD
+    final_invoice_value: Math.round(hTotals.net + num(headerData.freight))
+}, { transaction: t });
+        // 3. Create Details and HANDLE RECEIVER STOCK
+        for (const row of processedRows) {
+            await DepotSalesDetail.create({ ...row, depot_sales_id: header.id }, { transaction: t });
+
+            // 🔥 CRITICAL ADDITION: If it's a transfer, create an INWARD entry for the receiver
+            if (isTransfer) {
+                await DepotReceived.create({
+                    date: headerData.date || new Date(),
+                    depot_id: headerData.party_id, // The 'Party' in a transfer is the Receiver Depot
+                    product_id: row.product_id,
+                    invoice_no: header.invoice_no,
+                    total_kgs: row.total_kgs,
+                    type: 'INWARD', // This ensures it shows up in Receiver's inventory
+                    remarks: `TRANSFERRED FROM DEPOT ID: ${headerData.depot_id}`
+                }, { transaction: t });
+            }
+        }
+
+        await t.commit();
+        res.status(201).json({ success: true, data: header });
+    } catch (err) {
+        if (t) await t.rollback();
+        res.status(500).json({ success: false, error: err.message });
+    }
+};
+depotSalesCtrl.update = async (req, res) => {
+    const t = await sequelize.transaction();
+    try {
+        const { id } = req.params;
+        const { Details, invoice_type_id, ...headerData } = req.body;
+
+        // 1. Delete old details
+        await DepotSalesDetail.destroy({ where: { depot_sales_id: id }, transaction: t });
+
+        // 2. Perform same math logic as 'create' (Re-calculate)
+        const config = await InvoiceType.findByPk(invoice_type_id);
+        let hTotals = { assess: 0, charity: 0, vat: 0, gst: 0, igst: 0, disc: 0, net: 0 };
+        const processedRows = [];
+
+        for (const item of Details) {
+            const product = await Product.findByPk(item.product_id);
+            const H = num(item.rate) * num(item.total_kgs);
+            const A = H - num(item.resale) + num(item.convert_to_hank) - (item.convert_to_cone ? num(item.rate) : 0);
+            
+            const charity = config.charity_checked ? (num(product?.charity_rs) * num(item.total_kgs)) : 0;
+            const vat     = config.vat_checked ? (num(item.vat_per) * A / 100) : 0;
+            const sgst    = config.gst_checked ? (num(item.sgst_per) * A / 100) : 0;
+            const cgst    = config.gst_checked ? (num(item.cgst_per) * A / 100) : 0;
+            const igst    = config.igst_checked ? (num(item.igst_per) * A / 100) : 0;
+
+            const basis = A + sgst + cgst + igst + vat + charity + num(item.other_amt) + num(item.freight_amt);
+            const discAmt = (num(item.discount_percentage) * basis / 100);
+            const rowFinal = basis - discAmt;
+
+            hTotals.assess += A; hTotals.charity += charity; hTotals.vat += vat;
+            hTotals.gst += (sgst + cgst); hTotals.igst += igst; hTotals.disc += discAmt;
+            hTotals.net += rowFinal;
+
+            processedRows.push({
+                ...sanitizeData(item),
+                depot_sales_id: id,
+                assessable_value: A, charity_amt: charity, vat_amt: vat,
+                sgst_amt: sgst, cgst_amt: cgst, igst_amt: igst,
+                discount_amt: discAmt, final_value: rowFinal
+            });
+        }
+
+        // 3. Update Header
+            await DepotSalesHeader.update({
+    ...sanitizeData(headerData),
+    broker_id: headerData.broker_id,    
+            invoice_type_id,
+            total_assessable: hTotals.assess,
+            total_charity: hTotals.charity,
+            total_vat: hTotals.vat,
+            total_sgst: hTotals.gst / 2,
+            total_cgst: hTotals.gst / 2,
+            total_igst: hTotals.igst,
+            total_discount: hTotals.disc,
+            final_invoice_value: Math.round(hTotals.net + num(headerData.freight) + num(headerData.pf_amount))
+        }, { where: { id }, transaction: t });
+
+        // 4. Bulk insert new details
+        await DepotSalesDetail.bulkCreate(processedRows, { transaction: t });
+
+        await t.commit();
+        res.json({ success: true });
+    } catch (err) {
+        if (t) await t.rollback();
+        res.status(500).json({ error: err.message });
+    }
+};
+depotSalesCtrl.getAll = async (req, res) => {
+    console.log("DEBUG: Received request to fetch Depot Sales...");
+    try {
+        const data = await DepotSalesHeader.findAll({ 
+            include: [
+                { model: Account, as: 'Party' }, 
+                { model: Account, as: 'Depot' },
+                { 
+                    model: DepotSalesDetail, 
+                    as: 'DepotSalesDetails',
+                    include: [{ model: Product, as: 'Product' }] 
+                }
+            ] 
+        });
+        
+        console.log(`DEBUG: Successfully fetched ${data.length} records.`);
+        res.json({ success: true, data });
+    } catch (err) {
+        console.error("❌ CRITICAL ERROR in DepotSales.getAll:");
+        console.error("Message:", err.message);
+        
+        // This will tell us if a column name is wrong
+        if (err.name === 'SequelizeDatabaseError') {
+            console.error("SQL Error Code:", err.parent.code);
+            console.error("Full SQL Query:", err.sql);
+        }
+        
+        // This will tell us if an association (Party/Depot) is wrong
+        if (err.name === 'SequelizeEagerLoadingError') {
+            console.error("Association Error: The 'as' alias likely doesn't match the model file.");
+        }
+
+        res.status(500).json({ 
+            success: false, 
+            error: err.message,
+            stack: process.env.NODE_ENV === 'development' ? err.stack : undefined 
+        });
+    }
+};
 // --- 5. EXPORTS ---
+// --- masterController.js (Bottom of file) ---
+
 module.exports = {
     account: createMasterController(Account),
     broker: createMasterController(Broker),
@@ -497,46 +687,374 @@ module.exports = {
     packing: createMasterController(PackingType),
     product: createMasterController(Product, [{ model: TariffSubHead }]),
     invoiceType: createMasterController(InvoiceType),
-    
-    // order: createMasterController(OrderHeader, [
-    //     { model: OrderDetail, as: 'OrderDetails', include: [{ model: Product }] },
-    //     { model: Account, as: 'Party' }, { model: Broker, as: 'Broker' }
-    // ]),
-     order: orderCtrl,
+    order: orderCtrl,
     production: productionCtrl,
     invoice: invoiceCtrl,
-    
     directInvoice: directInvoiceCtrl,
+
+    // Change the key name here to match what masterRoutes.js expects
+    depotSales: depotSalesCtrl, 
 
     depotInward: {
         create: async (req, res) => {
-            const t = await sequelize.transaction();
-            try {
-                const { invoice_no, depot_id } = req.body;
-                await InvoiceHeader.update({ is_depot_inwarded: true, depot_id }, { where: { invoice_no }, transaction: t });
-                await DepotReceived.create({ date: new Date(), depot_id, invoice_no, type: 'INWARD' }, { transaction: t });
-                await t.commit(); res.json({ success: true });
-            } catch (err) { if (t) await t.rollback(); res.status(500).json({ error: err.message }); }
-        }
-    },
+    const t = await sequelize.transaction();
+    try {
 
+        const { invoice_no, depot_id } = req.body;
+
+        const header = await InvoiceHeader.findOne({
+            where: { invoice_no },
+            include: [{ model: InvoiceDetail }]
+        });
+
+        if (!header) throw new Error("Invoice not found");
+
+        for (const item of header.InvoiceDetails) {
+
+            await DepotReceived.create({
+                date: new Date(),
+                depot_id,
+                invoice_no,
+                product_id: item.product_id,
+                total_kgs: item.total_kgs,
+                type: 'INWARD'
+            }, { transaction: t });
+
+        }
+
+        await InvoiceHeader.update(
+            { is_depot_inwarded: true, depot_id },
+            { where: { invoice_no }, transaction: t }
+        );
+
+        await t.commit();
+
+        res.json({ success: true });
+
+    } catch (err) {
+
+        await t.rollback();
+        res.status(500).json({ error: err.message });
+
+    }
+}
+    },
+    
     getDepotInventory,
     depotReceived: createMasterController(DepotReceived, [{ model: Account, as: 'Depot' }, { model: Product, as: 'Product' }]),
-    
-    depotSales: createMasterController(DepotSalesHeader, [
-        { model: Account, as: 'Party' }, { model: DepotSalesDetail, include: [{ model: Product }] }
-    ]),
-
     despatch: createMasterController(DespatchEntry, [{ model: Transport }]),
     
     reports: {
         getReportData: async (req, res) => {
-            const { start, end } = req.query;
-            let where = {};
-            if (start && end) where.date = { [Op.between]: [start, end] };
-            const data = await InvoiceHeader.findAll({ where, include: [{ model: Account, as: 'Party' }, { model: InvoiceDetail, include: [Product] }] });
-            res.json({ success: true, data });
-        },
+  try {
+
+    const { reportId } = req.params;
+    const { from, to } = req.query;
+
+    let data = [];
+
+    switch (reportId) {
+
+      // ================================
+      // SALES WITH ORDER
+      // ================================
+      case "orders":
+
+        data = await OrderHeader.findAll({
+          where: {
+            date: { [Op.between]: [from, to] }
+          },
+          include: [
+            {
+              model: Account,
+              as: "Party",
+              attributes: ["id", "account_name"]
+            },
+            {
+              model: Broker,
+              as: "Broker",
+              attributes: ["id", "broker_name"]
+            },
+            {
+              model: OrderDetail,
+              as: "OrderDetails",
+              include: [
+                {
+                  model: Product,
+                  attributes: ["id", "product_name"]
+                }
+              ]
+            }
+          ],
+          order: [["date", "DESC"]]
+        });
+
+        break;
+
+
+
+      // ================================
+      // SALES WITHOUT ORDER
+      // ================================
+      case "direct-invoices":
+
+        data = await DirectInvoiceHeader.findAll({
+          where: {
+            date: { [Op.between]: [from, to] }
+          },
+          attributes: [
+            "id",
+            "order_no",
+            "date",
+            "final_invoice_value"
+          ],
+          include: [
+            {
+              model: Account,
+              as: "Party",
+              attributes: ["account_name"]
+            },
+            {
+              model: Broker,
+              as: "Broker",
+              attributes: ["broker_name"]
+            },
+            {
+              model: DirectInvoiceDetail,
+              as: "DirectInvoiceDetails",
+              attributes: ["qty", "rate_cr", "rate_imm"],
+              include: [
+                {
+                  model: Product,
+                  as: "Product",
+                  attributes: ["product_name"]
+                }
+              ]
+            }
+          ],
+          order: [["date", "DESC"]]
+        });
+
+        break;
+
+
+
+      // ================================
+      // PRODUCTION
+      // ================================
+      case "production":
+
+        data = await RG1Production.findAll({
+          where: {
+            date: { [Op.between]: [from, to] }
+          },
+          include: [
+            {
+              model: Product,
+              attributes: ["product_name"]
+            },
+            {
+              model: PackingType,
+              attributes: ["packing_type"]
+            }
+          ],
+          order: [["date", "DESC"]]
+        });
+
+        break;
+
+
+
+      // ================================
+      // DESPATCH
+      // IMPORTANT: uses load_date
+      // ================================
+      case "despatch":
+
+        data = await DespatchEntry.findAll({
+          where: {
+            load_date: { [Op.between]: [from, to] }
+          },
+          attributes: [
+            "id",
+            "load_no",
+            "load_date",
+            "vehicle_no",
+            "freight",
+            "no_of_bags"
+          ],
+          include: [
+            {
+              model: Transport,
+              attributes: ["transport_name"]
+            }
+          ],
+          order: [["load_date", "DESC"]]
+        });
+
+        break;
+
+
+
+      // ================================
+      // INVOICE REGISTER
+      // ================================
+      case "invoices":
+
+        data = await InvoiceHeader.findAll({
+          where: {
+            date: { [Op.between]: [from, to] }
+          },
+          attributes: [
+            "id",
+            "invoice_no",
+            "date",
+            "net_amount"
+          ],
+          include: [
+            {
+              model: Account,
+              as: "Party",
+              attributes: ["account_name"]
+            },
+            {
+              model: Transport,
+              attributes: ["transport_name"]
+            },
+            {
+              model: InvoiceDetail,
+              attributes: [
+                "total_kgs",
+                "rate",
+                "final_value"
+              ],
+              include: [
+                {
+                  model: Product,
+                  attributes: ["product_name"]
+                }
+              ]
+            }
+          ],
+          order: [["date", "DESC"]]
+        });
+
+        break;
+
+
+
+      // ================================
+      // DEPOT SALES
+      // ================================
+      case "depot-sales":
+
+        data = await DepotSalesHeader.findAll({
+          where: {
+            date: { [Op.between]: [from, to] }
+          },
+          attributes: [
+            "id",
+            "invoice_no",
+            "date",
+            "final_invoice_value"
+          ],
+          include: [
+            {
+              model: Account,
+              as: "Party",
+              attributes: ["account_name"]
+            },
+            {
+              model: Account,
+              as: "Depot",
+              attributes: ["account_name"]
+            },
+            {
+              model: Transport,
+              attributes: ["transport_name"]
+            },
+            {
+              model: DepotSalesDetail,
+              as: "DepotSalesDetails",
+              attributes: [
+                "total_kgs",
+                "rate_per",
+                "final_value"
+              ],
+              include: [
+                {
+                  model: Product,
+                  as: "Product",
+                  attributes: ["product_name"]
+                }
+              ]
+            }
+          ],
+          order: [["date", "DESC"]]
+        });
+
+        break;
+
+
+
+      // ================================
+      // DEPOT RECEIVED
+      // ================================
+      case "depot-received":
+
+        data = await DepotReceived.findAll({
+          where: {
+            date: { [Op.between]: [from, to] }
+          },
+          attributes: [
+            "invoice_no",
+            "date",
+            "total_kgs",
+            "total_bags"
+          ],
+          include: [
+            {
+              model: Account,
+              as: "Depot",
+              attributes: ["account_name"]
+            },
+            {
+              model: Product,
+              as: "Product",
+              attributes: ["product_name"]
+            }
+          ],
+          order: [["date", "DESC"]]
+        });
+
+        break;
+
+
+      default:
+
+        return res.status(400).json({
+          success: false,
+          message: "Invalid report type"
+        });
+
+    }
+
+    res.json({
+      success: true,
+      data
+    });
+
+  } catch (err) {
+
+    console.error("REPORT ERROR:", err);
+
+    res.status(500).json({
+      success: false,
+      error: err.message
+    });
+
+  }
+},
         getInvoicePrintData: async (req, res) => {
             const data = await InvoiceHeader.findOne({
                 where: { invoice_no: req.params.invoiceNo },

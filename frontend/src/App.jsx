@@ -169,21 +169,21 @@ export default function App() {
               <SidebarLink to="/packing" label="Packing Types" icon={Box} colorClass="text-blue-500" />
             </SidebarSection>
 
-            <SidebarSection title="Factory Operations">
-              <SidebarLink to="/order-with" label="Sales (With Order)" icon={ClipboardCheck} colorClass="text-rose-500" />
-              <SidebarLink to="/order-without" label="Sales (Direct)" icon={Zap} colorClass="text-rose-500" />
-              <SidebarLink to="/production" label="RG1 Production" icon={Factory} colorClass="text-rose-500" />
-              <SidebarLink to="/despatch" label="Despatch Entry" icon={Truck} colorClass="text-rose-500" />
-              <SidebarLink to="/invoice-prep" label="Invoice Gen" icon={FileText} colorClass="text-rose-500" />
-              <SidebarLink to="/invoice-approval" label="Approvals" icon={CheckSquare} colorClass="text-rose-500" />
-            </SidebarSection>
+              <SidebarSection title="Factory Operations">
+                <SidebarLink to="/order-with" label="Sales With Order" icon={ClipboardCheck} colorClass="text-rose-500" />
+                <SidebarLink to="/order-without" label="Sales WithOut Order" icon={Zap} colorClass="text-rose-500" />
+                <SidebarLink to="/production" label="RG1 Production" icon={Factory} colorClass="text-rose-500" />
+                <SidebarLink to="/despatch" label="Despatch Entry" icon={Truck} colorClass="text-rose-500" />
+                <SidebarLink to="/invoice-prep" label="Invoice Gen" icon={FileText} colorClass="text-rose-500" />
+                <SidebarLink to="/invoice-approval" label="Approvals" icon={CheckSquare} colorClass="text-rose-500" />
+              </SidebarSection>
 
-            <SidebarSection title="Depot Management">
-              <SidebarLink to="/depot-sales" label="Depot Sales" icon={ShoppingBag} colorClass="text-emerald-500" />
-              <SidebarLink to="/depot-received" label="Stock Inward" icon={Landmark} colorClass="text-emerald-500" />
-              <SidebarLink to="/depot-transfer" label="Inter-Transfer" icon={ArrowLeftRight} colorClass="text-emerald-500" />
-              <SidebarLink to="/depot-inventory" label="Live Inventory" icon={Box} colorClass="text-emerald-500" />
-            </SidebarSection>
+              <SidebarSection title="Depot Management">
+                <SidebarLink to="/depot-sales" label="Depot Sales" icon={ShoppingBag} colorClass="text-emerald-500" />
+                <SidebarLink to="/depot-received" label="Stock Inward" icon={Landmark} colorClass="text-emerald-500" />
+                <SidebarLink to="/depot-transfer" label="Inter-Transfer" icon={ArrowLeftRight} colorClass="text-emerald-500" />
+                <SidebarLink to="/depot-inventory" label="Live Inventory" icon={Box} colorClass="text-emerald-500" />
+              </SidebarSection>
 
             <SidebarSection title="Intelligence">
               <SidebarLink to="/reports" label="Analytics" icon={BarChart3} colorClass="text-slate-500" />

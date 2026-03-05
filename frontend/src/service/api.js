@@ -93,6 +93,7 @@ export const transactionsAPI = {
   invoices: {
     getAll: () => api.get('/invoices'),
     create: (data) => api.post('/invoices', data),
+    getById: (id) => api.get(`/invoices/${id}`),
     update: (id, data) => api.put(`/invoices/${id}`, data),
     approve: (id) => api.put(`/invoices/approve/${id}`),
     reject: (id) => api.put(`/invoices/reject/${id}`), 

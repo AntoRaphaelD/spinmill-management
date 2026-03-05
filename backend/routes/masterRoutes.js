@@ -56,6 +56,7 @@
     // Invoices (Sales WITH Order)
     router.post('/invoices', validate(ctrl.invoice.create));
     router.get('/invoices', validate(ctrl.invoice.getAll));
+    router.get('/invoices/:id', validate(ctrl.invoice.getOne));
     router.put('/invoices/:id', validate(ctrl.invoice.update));
     router.delete('/invoices/:id', validate(ctrl.invoice.delete));
     router.put('/invoices/approve/:id', validate(ctrl.invoice.approve));

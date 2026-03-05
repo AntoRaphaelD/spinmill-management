@@ -8,7 +8,7 @@ import {
     Edit, MapPin, Package, Clock, ShieldCheck,
     Percent, DollarSign, Info, Filter, Database, 
     Calendar, Activity, ArrowRightCircle, AlertCircle,
-    Navigation, Hash, Timer
+    Navigation, Hash, Timer, Map
 } from 'lucide-react';
 
 const DespatchEntry = () => {

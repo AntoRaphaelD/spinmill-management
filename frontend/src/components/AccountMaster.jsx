@@ -344,8 +344,6 @@
                                                         <option value="DEBTORS - OTHERS">DEBTORS - OTHERS</option>
                                                         <option value="DEBTORS - DEPOT - SALES">DEBTORS - DEPOT - SALES</option>
                                                         <option value="DEBTOR - YARN - SALES">DEBTOR - YARN - SALES</option>
-                                                        <option value="CREDITORS - OTHERS">CREDITORS - OTHERS</option>
-                                                        <option value="DEPOT">DEPOT</option>
                                                     </select>
                                                 </div>
                                             </div>
