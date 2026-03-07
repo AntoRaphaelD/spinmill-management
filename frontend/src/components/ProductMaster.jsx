@@ -93,12 +93,12 @@ useEffect(() => {
     };
 
     // --- Logic Handlers ---
-    const handleTariffChange = (tariffName) => {
-        const selected = tariffs.find(t => t.tariff_name === tariffName);
+    const handleTariffChange = (tariffCode) => {
+        const selected = tariffs.find(t => t.tariff_code === tariffCode);
         if (selected) {
             setFormData(prev => ({
                 ...prev,
-                tariff_sub_head: selected.tariff_name,
+                tariff_sub_head: selected.tariff_code,
                 printing_tariff_sub_head_no: selected.tariff_no, 
                 product_type: selected.product_type,
                 fibre: selected.fibre,
@@ -343,7 +343,7 @@ useEffect(() => {
                                                 <label className="text-[10px] font-bold text-slate-400 uppercase">Tariff Sub Head (Master)</label>
                                                 <select value={formData.tariff_sub_head} onChange={e => handleTariffChange(e.target.value)} className="w-full bg-white border border-slate-200 p-2 rounded-lg text-sm font-bold">
                                                     <option value="">-- Choose Tariff --</option>
-                                                    {tariffs.map(t => <option key={t.id} value={t.tariff_name}>{t.tariff_name}</option>)}
+                                                    {tariffs.map(t => <option key={t.id} value={t.tariff_code}>{t.tariff_name}</option>)}
                                                 </select>
                                             </div>
                                         </div>
