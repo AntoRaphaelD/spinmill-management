@@ -266,148 +266,178 @@ const TariffMaster = () => {
             </div>
 
             {/* Modal – font sizes aligned */}
-            {isModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
-                    <div className="bg-[#cfe2ff] w-full max-w-[680px] rounded shadow-2xl overflow-hidden border border-white animate-in zoom-in duration-200">
-                        <div className="bg-[#6495ed] p-5 flex justify-between items-center text-white border-b border-white/20">
-                            <div>
-                                <h2 className="text-xl font-medium tracking-wide">Tariff Sub Head Master</h2>
-                                <p className="text-blue-50 text-base mt-1">Add / Modify Tariff details</p>
-                            </div>
-                            <button onClick={() => setIsModalOpen(false)} className="hover:bg-white/10 p-1 rounded-full"><X size={24}/></button>
+           {isModalOpen && (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
+        <div className="bg-white w-full max-w-[680px] rounded-xl shadow-2xl border border-slate-300 flex flex-col max-h-[90vh] overflow-hidden">
+            
+            {/* Header */}
+            <div className="bg-blue-700 text-white px-5 py-3.5 flex justify-between items-center">
+                <div>
+                    <h2 className="text-lg font-bold uppercase tracking-wide">Tariff Sub Head Master</h2>
+                    <p className="text-blue-100 text-xs mt-0.5">Add / Modify Tariff</p>
+                </div>
+                <button 
+                    onClick={() => setIsModalOpen(false)}
+                    className="p-1.5 hover:bg-red-600 rounded transition-colors"
+                >
+                    <X size={22} strokeWidth={3} />
+                </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-6 overflow-y-auto flex-1">
+                <form onSubmit={handleSave} className="space-y-4">
+                    <div className="grid grid-cols-12 gap-x-4 gap-y-3 text-sm">
+
+                        {/* Tariff Code */}
+                        <div className="col-span-4 flex justify-end items-center">
+                            <FormLabel>Tariff Code</FormLabel>
+                        </div>
+                        <div className="col-span-8">
+                            <input 
+                                readOnly 
+                                className="w-44 p-2 bg-gray-800 text-white font-bold font-mono rounded border border-gray-600 outline-none cursor-default text-sm"
+                                value={formData.tariff_code} 
+                            />
                         </div>
 
-                        <div className="p-8">
-                            <form onSubmit={handleSave} className="space-y-2 max-w-2xl mx-auto">
-                                <div className="grid grid-cols-12 items-center">
-                                    <div className="col-span-4 flex justify-end"><FormLabel>Tariff Code</FormLabel></div>
-                                    <div className="col-span-8">
-                                        <input 
-                                            type="text" 
-                                            readOnly 
-                                            className="w-40 p-1 border border-gray-400 bg-black text-white font-bold outline-none cursor-default font-mono text-base" 
-                                            value={formData.tariff_code} 
-                                        />
-                                    </div>
-                                </div>
+                        {/* Tariff Name */}
+                        <div className="col-span-4 flex justify-end items-center">
+                            <FormLabel>Tariff Name</FormLabel>
+                        </div>
+                        <div className="col-span-8">
+                            <input 
+                                required 
+                                className="w-full p-2 border border-gray-400 rounded text-sm font-semibold uppercase focus:border-blue-500 focus:ring-1 focus:ring-blue-400"
+                                value={formData.tariff_name} 
+                                onChange={e => setFormData({...formData, tariff_name: e.target.value.toUpperCase()})} 
+                            />
+                        </div>
 
-                                <div className="grid grid-cols-12 items-center">
-                                    <div className="col-span-4 flex justify-end"><FormLabel>Tariff Name</FormLabel></div>
-                                    <div className="col-span-8">
-                                        <input 
-                                            type="text" 
-                                            required 
-                                            className="w-full p-1 border border-gray-400 bg-white uppercase text-base font-semibold outline-none focus:border-blue-500" 
-                                            value={formData.tariff_name} 
-                                            onChange={e => setFormData({...formData, tariff_name: e.target.value.toUpperCase()})} 
-                                        />
-                                    </div>
-                                </div>
+                        {/* Tariff No */}
+                        <div className="col-span-4 flex justify-end items-center">
+                            <FormLabel>Tariff No.</FormLabel>
+                        </div>
+                        <div className="col-span-8">
+                            <input 
+                                required 
+                                className="w-full p-2 border border-gray-400 rounded text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-400"
+                                value={formData.tariff_no} 
+                                onChange={e => setFormData({...formData, tariff_no: e.target.value})} 
+                            />
+                        </div>
 
-                                <div className="grid grid-cols-12 items-center">
-                                    <div className="col-span-4 flex justify-end"><FormLabel>Tariff No.</FormLabel></div>
-                                    <div className="col-span-8">
-                                        <input 
-                                            type="text" 
-                                            required 
-                                            className="w-full p-1 border border-gray-400 bg-white text-base outline-none focus:border-blue-500" 
-                                            value={formData.tariff_no} 
-                                            onChange={e => setFormData({...formData, tariff_no: e.target.value})} 
-                                        />
-                                    </div>
-                                </div>
+                        {/* Product Type */}
+                        <div className="col-span-4 flex justify-end items-center">
+                            <FormLabel>Product Type</FormLabel>
+                        </div>
+                        <div className="col-span-8">
+                            <select 
+                                className="w-52 p-2 border border-gray-400 rounded text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-400 bg-white"
+                                value={formData.product_type} 
+                                onChange={e => setFormData({...formData, product_type: e.target.value})}
+                            >
+                                <option value="CONE">CONE</option>
+                                <option value="HANK">HANK</option>
+                                <option value="CHEESE">CHEESE</option>
+                            </select>
+                        </div>
 
-                                <div className="grid grid-cols-12 items-center">
-                                    <div className="col-span-4 flex justify-end"><FormLabel>Product Type</FormLabel></div>
-                                    <div className="col-span-8">
-                                        <select 
-                                            className="w-40 p-1 border border-gray-400 bg-white text-base outline-none focus:border-blue-500" 
-                                            value={formData.product_type} 
-                                            onChange={e => setFormData({...formData, product_type: e.target.value})}
-                                        >
-                                            <option value="CONE">CONE</option>
-                                            <option value="HANK">HANK</option>
-                                            <option value="CHEESE">CHEESE</option>
-                                        </select>
-                                    </div>
-                                </div>
+                        {/* Commodity */}
+                        <div className="col-span-4 flex justify-end items-center">
+                            <FormLabel>Commodity</FormLabel>
+                        </div>
+                        <div className="col-span-8">
+                            <select 
+                                className="w-52 p-2 border border-gray-400 rounded text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-400 bg-white"
+                                value={formData.commodity} 
+                                onChange={e => setFormData({...formData, commodity: e.target.value})}
+                            >
+                                <option value="COTTON">COTTON</option>
+                                <option value="POLYESTER">POLYESTER</option>
+                                <option value="VISCOSE">VISCOSE</option>
+                            </select>
+                        </div>
 
-                                <div className="grid grid-cols-12 items-center">
-                                    <div className="col-span-4 flex justify-end"><FormLabel>Commodity</FormLabel></div>
-                                    <div className="col-span-8">
-                                        <select 
-                                            className="w-48 p-1 border border-gray-400 bg-white text-base outline-none focus:border-blue-500" 
-                                            value={formData.commodity} 
-                                            onChange={e => setFormData({...formData, commodity: e.target.value})}
-                                        >
-                                            <option value="COTTON">COTTON</option>
-                                            <option value="POLYESTER">POLYESTER</option>
-                                            <option value="VISCOSE">VISCOSE</option>
-                                        </select>
-                                    </div>
-                                </div>
+                        {/* Fibre */}
+                        <div className="col-span-4 flex justify-end items-center">
+                            <FormLabel>Fibre</FormLabel>
+                        </div>
+                        <div className="col-span-8">
+                            <select 
+                                className="w-52 p-2 border border-gray-400 rounded text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-400 bg-white"
+                                value={formData.fibre} 
+                                onChange={e => setFormData({...formData, fibre: e.target.value})}
+                            >
+                                <option value="COTTON">COTTON</option>
+                                <option value="WASTE COTTON">WASTE COTTON</option>
+                                <option value="YARN">YARN</option>
+                            </select>
+                        </div>
 
-                                <div className="grid grid-cols-12 items-center">
-                                    <div className="col-span-4 flex justify-end"><FormLabel>Fibre</FormLabel></div>
-                                    <div className="col-span-8">
-                                        <select 
-                                            className="w-48 p-1 border border-gray-400 bg-white text-base outline-none focus:border-blue-500" 
-                                            value={formData.fibre} 
-                                            onChange={e => setFormData({...formData, fibre: e.target.value})}
-                                        >
-                                            <option value="COTTON">COTTON</option>
-                                            <option value="COMBED">COMBED</option>
-                                            <option value="CARDED">CARDED</option>
-                                        </select>
-                                    </div>
-                                </div>
+                        {/* Yarn Type */}
+                        <div className="col-span-4 flex justify-end items-center">
+                            <FormLabel>Yarn Type</FormLabel>
+                        </div>
+                        <div className="col-span-8">
+                            <select 
+                                className="w-52 p-2 border border-gray-400 rounded text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-400 bg-white"
+                                value={formData.yarn_type} 
+                                onChange={e => setFormData({...formData, yarn_type: e.target.value})}
+                            >
+                                <option value="SINGLE">SINGLE</option>
+                                <option value="DOUBLE">DOUBLE</option>
+                            </select>
+                        </div>
 
-                                <div className="grid grid-cols-12 items-center">
-                                    <div className="col-span-4 flex justify-end"><FormLabel>Yarn Type</FormLabel></div>
-                                    <div className="col-span-8">
-                                        <select 
-                                            className="w-48 p-1 border border-gray-400 bg-white text-base outline-none focus:border-blue-500" 
-                                            value={formData.yarn_type} 
-                                            onChange={e => setFormData({...formData, yarn_type: e.target.value})}
-                                        >
-                                            <option value="SINGLE">SINGLE</option>
-                                            <option value="DOUBLE">DOUBLE</option>
-                                            <option value="MULTIFOLD">MULTIFOLD</option>
-                                        </select>
-                                    </div>
-                                </div>
+                    </div>
 
-                                <div className="flex justify-end gap-4 pt-8">
-                                    {formData.id && (
-                                        <button 
-                                            type="button" 
-                                            onClick={handleDeleteSingle}
-                                            className="mr-auto text-red-600 text-base font-bold hover:bg-red-50 px-4 py-2 rounded transition-all"
-                                        >
-                                            Purge Record
-                                        </button>
-                                    )}
-                                    <button 
-                                        type="submit" 
-                                        disabled={submitLoading} 
-                                        className="flex items-center gap-2 bg-slate-50 border border-slate-400 px-10 py-2 text-base font-bold shadow-sm hover:bg-white active:scale-95 transition-all"
-                                    >
-                                        <span className="text-blue-700 p-1 border border-blue-100 bg-white rounded"><Save size={16}/></span> 
-                                        {formData.id ? 'Update' : 'Save'}
-                                    </button>
-                                    <button 
-                                        type="button" 
-                                        onClick={() => setIsModalOpen(false)} 
-                                        className="flex items-center gap-2 bg-slate-50 border border-slate-400 px-10 py-2 text-base font-bold shadow-sm hover:bg-white active:scale-95 transition-all"
-                                    >
-                                        <span className="text-red-600 font-black p-1 border border-red-100 bg-white rounded">X</span> Cancel
-                                    </button>
-                                </div>
-                            </form>
+                    {/* Footer */}
+                    <div className="flex items-center justify-between pt-6 border-t mt-4">
+                        <div>
+                            {formData.id && (
+                                <button
+                                    type="button"
+                                    onClick={handleDeleteSingle}
+                                    className="text-red-600 hover:text-red-700 text-sm font-medium underline hover:no-underline px-3 py-1.5 rounded hover:bg-red-50 transition-colors"
+                                >
+                                    Purge Record
+                                </button>
+                            )}
+                        </div>
+
+                        <div className="flex gap-3">
+                            <button
+                                type="submit"
+                                disabled={submitLoading}
+                                className={`px-8 py-2 rounded text-sm font-bold flex items-center gap-2 min-w-[110px] justify-center ${
+                                    submitLoading
+                                        ? 'bg-gray-400 text-gray-100 cursor-not-allowed'
+                                        : 'bg-blue-600 hover:bg-blue-700 text-white'
+                                }`}
+                            >
+                                {submitLoading ? (
+                                    <RefreshCw className="animate-spin" size={16} />
+                                ) : (
+                                    <Save size={16} />
+                                )}
+                                {submitLoading ? 'Saving...' : formData.id ? 'Update' : 'Save'}
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => setIsModalOpen(false)}
+                                className="px-8 py-2 border border-slate-500 rounded text-sm font-bold hover:bg-slate-50"
+                            >
+                                Cancel
+                            </button>
                         </div>
                     </div>
-                </div>
-            )}
+                </form>
+            </div>
+        </div>
+    </div>
+)}
         </div>
     );
 };

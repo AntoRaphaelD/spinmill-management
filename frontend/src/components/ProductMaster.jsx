@@ -289,182 +289,300 @@ const ProductMaster = () => {
 
             {/* Modal */}
             {isModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
-                    <div className="bg-[#cfe2ff] w-full max-w-[1000px] rounded shadow-2xl overflow-hidden border border-white animate-in zoom-in duration-200">
-                        
-                        <div className="bg-[#6495ed] p-5 flex justify-between items-center text-white border-b border-white/20">
-                            <div>
-                                <h2 className="text-xl font-medium tracking-wide">Product Master</h2>
-                                <p className="text-blue-50 text-base mt-1">Add / Modify Product details</p>
-                            </div>
-                            <button onClick={() => setIsModalOpen(false)} className="hover:bg-white/10 p-1 rounded-full"><X size={24}/></button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 backdrop-blur-sm p-3">
+        <div className="bg-white w-full max-w-[940px] rounded-xl shadow-2xl border border-slate-400 flex flex-col max-h-[90vh] overflow-hidden">
+            
+            {/* Header */}
+            <div className="bg-blue-700 text-white px-4 py-2.5 flex justify-between items-center">
+                <div>
+                    <h2 className="text-base font-bold uppercase tracking-wide">Product Master</h2>
+                    <p className="text-blue-100 text-xs mt-0.5">Add / Edit Product</p>
+                </div>
+                <button 
+                    onClick={() => setIsModalOpen(false)}
+                    className="p-1 hover:bg-red-600 rounded transition-colors"
+                >
+                    <X size={20} strokeWidth={3} />
+                </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-4 overflow-y-auto flex-1">
+                <form onSubmit={handleSave} className="space-y-3">
+                    <div className="grid grid-cols-12 gap-x-4 gap-y-1.5 text-sm">
+
+                        {/* Row 1: Code + Roundoff */}
+                        <div className="col-span-3 flex justify-end items-center">
+                            <FormLabel>Product Code</FormLabel>
+                        </div>
+                        <div className="col-span-3">
+                            <input 
+                                readOnly 
+                                className="w-full p-1 bg-gray-100 border border-gray-400 rounded text-sm font-mono font-bold" 
+                                value={formData.product_code} 
+                            />
+                        </div>
+                        <div className="col-span-6 flex items-center gap-2 pl-2">
+                            <input 
+                                type="checkbox" 
+                                id="roundoff" 
+                                checked={formData.roundoff} 
+                                onChange={e => setFormData({...formData, roundoff: e.target.checked})} 
+                                className="w-4 h-4 accent-blue-600 mt-0.5" 
+                            />
+                            <label htmlFor="roundoff" className="text-sm font-medium text-slate-700">Roundoff</label>
                         </div>
 
-                        <div className="p-8">
-                            <form onSubmit={handleSave} className="space-y-2">
-                                <div className="grid grid-cols-12 gap-x-6 gap-y-2">
+                        {/* Row 2 – Product Name takes more space */}
+                        <div className="col-span-3 flex justify-end items-center"><FormLabel>Product Name</FormLabel></div>
+                        <div className="col-span-6">
+                            <input 
+                                required 
+                                className="w-full p-1 border border-gray-400 rounded text-sm font-semibold uppercase focus:border-blue-500" 
+                                value={formData.product_name} 
+                                onChange={e => setFormData({...formData, product_name: e.target.value.toUpperCase()})} 
+                            />
+                        </div>
+                        <div className="col-span-3 flex items-center gap-3 pl-2">
+                            <div className="flex items-center gap-2">
+                                {/* <input 
+                                    type="checkbox" 
+                                    id="roundoff" 
+                                    checked={formData.roundoff} 
+                                    onChange={e => setFormData({...formData, roundoff: e.target.checked})} 
+                                    className="w-4 h-4 accent-blue-600" 
+                                /> */}
+                                {/* <label htmlFor="roundoff" className="text-sm font-medium text-slate-700">Roundoff</label> */}
+                            </div>
+                        </div>
 
-                                    {/* Row 1 */}
-                                    <div className="col-span-3 flex justify-end items-center"><FormLabel>Product Code</FormLabel></div>
-                                    <div className="col-span-3">
-                                        <input type="text" readOnly className="w-32 p-1 border border-gray-400 bg-black text-white font-bold outline-none cursor-default font-mono text-base" value={formData.product_code} />
-                                    </div>
-                                    <div className="col-span-6 flex items-center gap-3 pl-4">
-                                        <input type="checkbox" id="rnd" checked={formData.roundoff} onChange={e => setFormData({...formData, roundoff: e.target.checked})} className="w-5 h-5 accent-blue-600" />
-                                        <label htmlFor="rnd" className="text-base font-medium text-slate-700">Roundoff</label>
-                                    </div>
+                        {/* Row 3 – Short Desc + Commodity + Code squeezed less */}
+                        <div className="col-span-3 flex justify-end items-center"><FormLabel>Short Desc</FormLabel></div>
+                        <div className="col-span-5">
+                            <input 
+                                className="w-full p-1 border border-gray-400 rounded text-sm uppercase" 
+                                value={formData.short_description} 
+                                onChange={e => setFormData({...formData, short_description: e.target.value.toUpperCase()})} 
+                            />
+                        </div>
+                        <div className="col-span-4 grid grid-cols-4 gap-2">
+                            <div className="col-span-2">
+                                <label className="block text-xs text-slate-600 mb-0.5">Commodity</label>
+                                <select 
+                                    className="w-full p-1 border border-gray-400 rounded text-xs focus:border-blue-500" 
+                                    value={formData.commodity} 
+                                    onChange={e => setFormData({...formData, commodity: e.target.value})}
+                                >
+                                    <option value="">--</option>
+                                    <option>COTTON</option>
+                                    <option>CORN YARN</option>
+                                    <option>WASTE COTTON</option>
+                                </select>
+                            </div>
+                            <div className="col-span-2">
+                                <label className="block text-xs text-slate-600 mb-0.5">Comm. Code</label>
+                                <input 
+                                    className="w-full p-1 border border-gray-400 rounded text-xs" 
+                                    value={formData.commodity_code} 
+                                    onChange={e => setFormData({...formData, commodity_code: e.target.value})} 
+                                />
+                            </div>
+                        </div>
+                        {/* Row 4: Packing + Fibre */}
+                        <div className="col-span-3 flex justify-end items-center"><FormLabel>Packing Type</FormLabel></div>
+                        <div className="col-span-5">
+                            <select 
+                                className="w-full p-1 border border-gray-400 rounded text-sm focus:border-blue-500" 
+                                value={formData.packing_type} 
+                                onChange={e => setFormData({...formData, packing_type: e.target.value})}
+                            >
+                                <option value="">--</option>
+                                {packingTypes.map(p => <option key={p.id} value={p.packing_type}>{p.packing_type}</option>)}
+                            </select>
+                        </div>
+                        <div className="col-span-1 flex justify-end items-center"><FormLabel>Fibre</FormLabel></div>
+                        <div className="col-span-3">
+                            <select 
+                                className="w-full p-1 border border-gray-400 rounded text-sm focus:border-blue-500" 
+                                value={formData.fibre} 
+                                onChange={e => setFormData({...formData, fibre: e.target.value})}
+                            >
+                                <option value="">--</option>
+                                <option>COTTON</option>
+                                <option>POLYESTER</option>
+                            </select>
+                        </div>
 
-                                    {/* Row 2 */}
-                                    <div className="col-span-3 flex justify-end"><FormLabel>Product Name</FormLabel></div>
-                                    <div className="col-span-5">
-                                        <input type="text" required className="w-full p-1 border border-gray-400 bg-white uppercase text-base font-semibold outline-none focus:border-blue-500" value={formData.product_name} onChange={e => setFormData({...formData, product_name: e.target.value.toUpperCase()})} />
-                                    </div>
-                                    <div className="col-span-1 flex justify-end"><FormLabel>Commodity</FormLabel></div>
-                                    <div className="col-span-3">
-                                        <select className="w-full p-1 border border-gray-400 bg-white text-base outline-none focus:border-blue-500" value={formData.commodity} onChange={e => setFormData({...formData, commodity: e.target.value})}>
-                                            <option value="">-- Choose --</option>
-                                            <option value="CONE YARN">CONE YARN</option>
-                                            <option value="BEAM">BEAM</option>
-                                        </select>
-                                    </div>
+                        {/* Row 5: Wt per Cone + Charity */}
+                        <div className="col-span-3 flex justify-end items-center"><FormLabel>Wt per Cone</FormLabel></div>
+                        <div className="col-span-5">
+                            <input 
+                                type="number" step="0.001" 
+                                className="w-32 p-1 border border-gray-400 rounded text-sm text-right" 
+                                value={formData.wt_per_cone} 
+                                onChange={e => setFormData({...formData, wt_per_cone: e.target.value})} 
+                            />
+                        </div>
+                        <div className="col-span-1 flex justify-end items-center"><FormLabel>Charity ₹</FormLabel></div>
+                        <div className="col-span-3">
+                            <input 
+                                type="number" 
+                                className="w-full p-1 border border-gray-400 rounded text-sm text-right" 
+                                value={formData.charity_rs} 
+                                onChange={e => setFormData({...formData, charity_rs: e.target.value})} 
+                            />
+                        </div>
 
-                                    {/* Row 3 */}
-                                    <div className="col-span-3 flex justify-end"><FormLabel>Short Description</FormLabel></div>
-                                    <div className="col-span-5">
-                                        <input type="text" className="w-full p-1 border border-gray-400 bg-white uppercase text-base outline-none focus:border-blue-500" value={formData.short_description} onChange={e => setFormData({...formData, short_description: e.target.value.toUpperCase()})} />
-                                    </div>
-                                    <div className="col-span-1 flex justify-end"><FormLabel>Commodity Code</FormLabel></div>
-                                    <div className="col-span-3">
-                                        <input type="text" className="w-full p-1 border border-gray-400 bg-white text-base outline-none focus:border-blue-500" value={formData.commodity_code} onChange={e => setFormData({...formData, commodity_code: e.target.value})} />
-                                    </div>
+                        {/* Row 6: Cones/Pack + Other Receipt */}
+                        <div className="col-span-3 flex justify-end items-center"><FormLabel>Cones / Pack</FormLabel></div>
+                        <div className="col-span-5">
+                            <input 
+                                type="number" 
+                                className="w-32 p-1 border border-gray-400 rounded text-sm text-right" 
+                                value={formData.no_of_cones_per_pack} 
+                                onChange={e => setFormData({...formData, no_of_cones_per_pack: e.target.value})} 
+                            />
+                        </div>
+                        <div className="col-span-1 flex justify-end items-center"><FormLabel>Other Receipt</FormLabel></div>
+                        <div className="col-span-3">
+                            <input 
+                                type="number" 
+                                className="w-full p-1 border border-gray-400 rounded text-sm text-right" 
+                                value={formData.other_receipt} 
+                                onChange={e => setFormData({...formData, other_receipt: e.target.value})} 
+                            />
+                        </div>
 
-                                    {/* Row 4 */}
-                                    <div className="col-span-3 flex justify-end"><FormLabel>Packing Type</FormLabel></div>
-                                    <div className="col-span-5">
-                                        <select className="w-full p-1 border border-gray-400 bg-white text-base outline-none focus:border-blue-500" value={formData.packing_type} onChange={e => setFormData({...formData, packing_type: e.target.value})}>
-                                            <option value="">-- Select --</option>
-                                            {packingTypes.map(p => <option key={p.id} value={p.packing_type}>{p.packing_type}</option>)}
-                                        </select>
-                                    </div>
-                                    <div className="col-span-1 flex justify-end"><FormLabel>Fibre</FormLabel></div>
-                                    <div className="col-span-3">
-                                        <select className="w-full p-1 border border-gray-400 bg-white text-base outline-none focus:border-blue-500" value={formData.fibre} onChange={e => setFormData({...formData, fibre: e.target.value})}>
-                                            <option value="">-- Choose --</option>
-                                            <option value="COTTON">COTTON</option>
-                                            <option value="POLYESTER">POLYESTER</option>
-                                        </select>
-                                    </div>
+                        {/* Row 7: Pack Nett Wt */}
+                        <div className="col-span-3 flex justify-end items-center"><FormLabel>Pack Nett Wt</FormLabel></div>
+                        <div className="col-span-9">
+                            <input 
+                                readOnly 
+                                className="w-28 p-1 bg-gray-100 border border-gray-400 rounded text-sm font-mono text-right" 
+                                value={formData.pack_nett_wt} 
+                            />
+                        </div>
 
-                                    {/* Row 5 */}
-                                    <div className="col-span-3 flex justify-end"><FormLabel>Wt. per Cone / Bundle</FormLabel></div>
-                                    <div className="col-span-5">
-                                        <input type="number" step="0.001" className="w-32 p-1 border border-gray-400 bg-white text-base text-right outline-none focus:border-blue-500" value={formData.wt_per_cone} onChange={e => setFormData({...formData, wt_per_cone: e.target.value})} />
-                                    </div>
-                                    <div className="col-span-1 flex justify-end"><FormLabel>Charity Rs.</FormLabel></div>
-                                    <div className="col-span-3">
-                                        <input type="number" className="w-full p-1 border border-gray-400 bg-white text-base text-right outline-none focus:border-blue-500" value={formData.charity_rs} onChange={e => setFormData({...formData, charity_rs: e.target.value})} />
-                                    </div>
+                        {/* Tariff rows – kept compact */}
+                        <div className="col-span-3 flex justify-end items-center"><FormLabel>Tariff Sub Head</FormLabel></div>
+                        <div className="col-span-9 flex gap-1.5">
+                            <input 
+                                className="w-24 p-1 border border-gray-400 rounded text-sm font-mono" 
+                                value={formData.tariff_sub_head} 
+                                onChange={e => handleTariffChange(e.target.value)} 
+                            />
+                            <select 
+                                className="flex-1 p-1 border border-gray-400 rounded text-sm focus:border-blue-500" 
+                                value={formData.tariff_sub_head} 
+                                onChange={e => handleTariffChange(e.target.value)}
+                            >
+                                <option value="">-- Select --</option>
+                                {tariffs.map(t => <option key={t.id} value={t.tariff_code}>{t.tariff_name}</option>)}
+                            </select>
+                        </div>
 
-                                    {/* Row 6 */}
-                                    <div className="col-span-3 flex justify-end"><FormLabel>No. of Cones / Pack</FormLabel></div>
-                                    <div className="col-span-5">
-                                        <input type="number" className="w-32 p-1 border border-gray-400 bg-white text-base text-right outline-none focus:border-blue-500" value={formData.no_of_cones_per_pack} onChange={e => setFormData({...formData, no_of_cones_per_pack: e.target.value})} />
-                                    </div>
-                                    <div className="col-span-1 flex justify-end"><FormLabel>Other Receipt</FormLabel></div>
-                                    <div className="col-span-3">
-                                        <input type="number" className="w-full p-1 border border-gray-400 bg-white text-base text-right outline-none focus:border-blue-500" value={formData.other_receipt} onChange={e => setFormData({...formData, other_receipt: e.target.value})} />
-                                    </div>
+                        <div className="col-span-3 flex justify-end items-center"><FormLabel>Printing Tariff No.</FormLabel></div>
+                        <div className="col-span-9 flex gap-1.5">
+                            <input 
+                                className="w-24 p-1 border border-gray-400 rounded text-sm" 
+                                value={formData.printing_tariff_sub_head_no} 
+                                onChange={e => setFormData({...formData, printing_tariff_sub_head_no: e.target.value})} 
+                            />
+                            <input 
+                                className="flex-1 p-1 border border-gray-400 rounded text-sm" 
+                                value={formData.printing_tariff_desc} 
+                                onChange={e => setFormData({...formData, printing_tariff_desc: e.target.value})} 
+                            />
+                        </div>
 
-                                    {/* Row 7 */}
-                                    <div className="col-span-3 flex justify-end"><FormLabel>Pack Nett Wt.</FormLabel></div>
-                                    <div className="col-span-9">
-                                        <input type="text" readOnly className="w-32 p-1 border border-gray-400 bg-gray-100 text-base font-mono outline-none cursor-default" value={formData.pack_nett_wt} />
-                                    </div>
+                        {/* Remaining fields – tight */}
+                        <div className="col-span-3 flex justify-end items-center"><FormLabel>Product Type</FormLabel></div>
+                        <div className="col-span-9">
+                            <input 
+                                className="w-full p-1 border border-gray-400 rounded text-sm uppercase" 
+                                value={formData.product_type} 
+                                onChange={e => setFormData({...formData, product_type: e.target.value.toUpperCase()})} 
+                            />
+                        </div>
 
-                                    {/* Row 8 - Tariff */}
-                                    <div className="col-span-3 flex justify-end"><FormLabel>Tariff Sub Head</FormLabel></div>
-                                    <div className="col-span-9 flex gap-2">
-                                        <input type="text" className="w-32 p-1 border border-gray-400 bg-white text-base outline-none focus:border-blue-500 font-mono" value={formData.tariff_sub_head} onChange={e => handleTariffChange(e.target.value)} />
-                                        <select className="flex-1 p-1 border border-gray-400 bg-white text-base outline-none focus:border-blue-500" value={formData.tariff_sub_head} onChange={e => handleTariffChange(e.target.value)}>
-                                            <option value="">-- Choose from master --</option>
-                                            {tariffs.map(t => <option key={t.id} value={t.tariff_code}>{t.tariff_name}</option>)}
-                                        </select>
-                                    </div>
+                        <div className="col-span-3 flex justify-end items-center"><FormLabel>Spinning Count</FormLabel></div>
+                        <div className="col-span-9">
+                            <input 
+                                className="w-full p-1 border border-gray-400 rounded text-sm uppercase" 
+                                value={formData.spinning_count_name} 
+                                onChange={e => setFormData({...formData, spinning_count_name: e.target.value.toUpperCase()})} 
+                            />
+                        </div>
 
-                                    {/* Row 9 - Printing Tariff */}
-                                    <div className="col-span-3 flex justify-end"><FormLabel>Printing Tariff No.</FormLabel></div>
-                                    <div className="col-span-9 flex gap-2">
-                                        <input type="text" className="w-32 p-1 border border-gray-400 bg-white text-base outline-none focus:border-blue-500" value={formData.printing_tariff_sub_head_no} onChange={e => setFormData({...formData, printing_tariff_sub_head_no: e.target.value})} />
-                                        <input type="text" className="flex-1 p-1 border border-gray-400 bg-white text-base outline-none focus:border-blue-500" value={formData.printing_tariff_desc} onChange={e => setFormData({...formData, printing_tariff_desc: e.target.value})} />
-                                    </div>
+                        <div className="col-span-3 flex justify-end items-center"><FormLabel>40's Conv. Factor</FormLabel></div>
+                        <div className="col-span-9">
+                            <input 
+                                type="number" step="0.001" 
+                                className="w-24 p-1 border border-gray-400 rounded text-sm text-right" 
+                                value={formData.converted_factor_40s} 
+                                onChange={e => setFormData({...formData, converted_factor_40s: e.target.value})} 
+                            />
+                        </div>
 
-                                    {/* Row 10 */}
-                                    <div className="col-span-3 flex justify-end"><FormLabel>Product Type</FormLabel></div>
-                                    <div className="col-span-9">
-                                        <input type="text" className="w-48 p-1 border border-gray-400 bg-white uppercase text-base outline-none focus:border-blue-500" value={formData.product_type} onChange={e => setFormData({...formData, product_type: e.target.value.toUpperCase()})} />
-                                    </div>
+                        <div className="col-span-3 flex justify-end items-center"><FormLabel>Actual Count</FormLabel></div>
+                        <div className="col-span-9">
+                            <input 
+                                className="w-24 p-1 border border-gray-400 rounded text-sm font-mono" 
+                                value={formData.actual_count} 
+                                onChange={e => setFormData({...formData, actual_count: e.target.value})} 
+                            />
+                        </div>
 
-                                    {/* Row 11 */}
-                                    <div className="col-span-3 flex justify-end"><FormLabel>Spinning Count Name</FormLabel></div>
-                                    <div className="col-span-9">
-                                        <input type="text" className="w-full p-1 border border-gray-400 bg-white uppercase text-base outline-none focus:border-blue-500" value={formData.spinning_count_name} onChange={e => setFormData({...formData, spinning_count_name: e.target.value.toUpperCase()})} />
-                                    </div>
+                    </div>
 
-                                    {/* Row 12 */}
-                                    <div className="col-span-3 flex justify-end"><FormLabel>40's Converted Factor</FormLabel></div>
-                                    <div className="col-span-9">
-                                        <input type="number" step="0.001" className="w-32 p-1 border border-gray-400 bg-white text-base text-right outline-none focus:border-blue-500" value={formData.converted_factor_40s} onChange={e => setFormData({...formData, converted_factor_40s: e.target.value})} />
-                                    </div>
+                    {/* Footer */}
+                    <div className="flex justify-between items-center pt-4 border-t mt-3">
+                        <div>
+                            {formData.id && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        if (window.confirm("Purge this product permanently?")) {
+                                            mastersAPI.products.delete(formData.id)
+                                                .then(fetchRecords)
+                                                .then(() => setIsModalOpen(false));
+                                        }
+                                    }}
+                                    className="text-red-600 hover:text-red-700 text-xs font-medium underline"
+                                >
+                                    Purge Record
+                                </button>
+                            )}
+                        </div>
 
-                                    {/* Row 13 */}
-                                    <div className="col-span-3 flex justify-end"><FormLabel>Actual Count</FormLabel></div>
-                                    <div className="col-span-9">
-                                        <input type="text" className="w-32 p-1 border border-gray-400 bg-white text-base outline-none focus:border-blue-500 font-mono" value={formData.actual_count} onChange={e => setFormData({...formData, actual_count: e.target.value})} />
-                                    </div>
-                                </div>
+                        <div className="flex gap-2.5">
+                            <button
+                                type="submit"
+                                disabled={submitLoading}
+                                className={`px-7 py-1.5 rounded text-sm font-bold flex items-center gap-1.5 ${
+                                    submitLoading 
+                                        ? 'bg-gray-400 text-gray-100 cursor-not-allowed' 
+                                        : 'bg-blue-600 hover:bg-blue-700 text-white'
+                                }`}
+                            >
+                                {submitLoading ? <RefreshCw className="animate-spin" size={14} /> : <Save size={14} />}
+                                {submitLoading ? 'Saving...' : formData.id ? 'Update' : 'Save'}
+                            </button>
 
-                                {/* Footer Buttons */}
-                                <div className="flex justify-between items-center pt-8">
-                                    <div>
-                                        {formData.id && (
-                                            <button 
-                                                type="button"
-                                                onClick={() => {
-                                                    if (window.confirm("Purge this product record permanently?")) {
-                                                        mastersAPI.products.delete(formData.id)
-                                                            .then(fetchRecords)
-                                                            .then(() => setIsModalOpen(false));
-                                                    }
-                                                }}
-                                                className="text-rose-600 hover:text-rose-700 text-base font-semibold underline hover:no-underline"
-                                            >
-                                                Purge Record
-                                            </button>
-                                        )}
-                                    </div>
-                                    <div className="flex gap-4">
-                                        <button 
-                                            type="submit" 
-                                            disabled={submitLoading}
-                                            className="flex items-center gap-2 bg-slate-50 border border-slate-400 px-10 py-2 text-base font-bold shadow-sm hover:bg-white active:scale-95 transition-all"
-                                        >
-                                            <span className="text-blue-700 p-1 border border-blue-100 bg-white rounded"><Save size={16}/></span>
-                                            {formData.id ? 'Update' : 'Save'}
-                                        </button>
-                                        <button 
-                                            type="button" 
-                                            onClick={() => setIsModalOpen(false)}
-                                            className="flex items-center gap-2 bg-slate-50 border border-slate-400 px-10 py-2 text-base font-bold shadow-sm hover:bg-white active:scale-95 transition-all"
-                                        >
-                                            <span className="text-red-600 font-black p-1 border border-red-100 bg-white rounded">X</span> Cancel
-                                        </button>
-                                    </div>
-                                </div>
-                            </form>
+                            <button
+                                type="button"
+                                onClick={() => setIsModalOpen(false)}
+                                className="px-7 py-1.5 border border-slate-500 rounded text-sm font-bold hover:bg-slate-50"
+                            >
+                                Cancel
+                            </button>
                         </div>
                     </div>
-                </div>
-            )}
+                </form>
+            </div>
+        </div>
+    </div>
+)}
         </div>
     );
 };

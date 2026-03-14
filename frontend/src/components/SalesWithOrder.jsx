@@ -3,7 +3,7 @@ import { mastersAPI, transactionsAPI } from '../service/api';
 import { 
     Plus, Edit, Trash2, X, ChevronLeft, 
     ChevronRight, RefreshCw, Save, ShoppingCart, Search, Filter, 
-    Square, CheckSquare, MinusCircle
+    Square, CheckSquare, MinusCircle, FileSignature, Loader2    
 } from 'lucide-react';
 
 const SalesWithOrder = () => {
@@ -296,231 +296,288 @@ const SalesWithOrder = () => {
 
             {/* Modal */}
             {isModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
-                    <div className="bg-[#cfe2ff] w-full max-w-[1100px] rounded-xl shadow-2xl overflow-hidden border border-white animate-in zoom-in duration-200">
-                        <div className="bg-[#6495ed] p-5 flex justify-between items-center text-white border-b border-white/20">
-                            <div>
-                                <h2 className="text-xl font-medium tracking-wide">Sales Booking Master</h2>
-                                <p className="text-blue-50 text-base mt-1">Add / Modify Sales Order</p>
-                            </div>
-                            <button onClick={() => setIsModalOpen(false)} className="hover:bg-white/20 p-1 rounded-full transition-colors">
-                                <X size={28} />
-                            </button>
-                        </div>
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/65 backdrop-blur-md p-4">
+    <div className="relative bg-white w-full max-w-5xl rounded-2xl shadow-2xl overflow-hidden border border-slate-200/80 animate-in zoom-in-95 duration-200 flex flex-col max-h-[94vh]">
+      
+      {/* Header */}
+      <div className="bg-gradient-to-r from-blue-700 to-indigo-700 px-6 py-5 flex justify-between items-center text-white shadow-md">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 bg-white/20 rounded-lg">
+            <FileSignature size={24} />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold tracking-tight">Sales Booking Master</h2>
+            <p className="text-blue-100/90 text-sm font-medium mt-0.5 uppercase tracking-wide">
+              {formData.id ? 'Edit Sales Order' : 'Create New Sales Order'}
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={() => setIsModalOpen(false)}
+          className="p-2.5 rounded-xl hover:bg-white/20 transition-all active:scale-95"
+        >
+          <X size={24} strokeWidth={3} />
+        </button>
+      </div>
 
-                        {/* Tabs */}
-                        <div className="flex bg-[#e8f1ff] border-b border-blue-200">
-                            <button 
-                                onClick={() => setActiveTab('head')} 
-                                className={`flex-1 py-3 text-base font-semibold transition-all ${activeTab === 'head' ? 'bg-[#cfe2ff] text-blue-900 border-b-4 border-blue-600' : 'text-black hover:bg-white/60'}`}
-                            >
-                                Order Header
-                            </button>
-                            <button 
-                                onClick={() => setActiveTab('detail')} 
-                                className={`flex-1 py-3 text-base font-semibold transition-all ${activeTab === 'detail' ? 'bg-[#cfe2ff] text-blue-900 border-b-4 border-blue-600' : 'text-black hover:bg-white/60'}`}
-                            >
-                                Order Details
-                            </button>
-                        </div>
+      {/* Tabs */}
+      <div className="flex border-b border-slate-200 bg-slate-50">
+        <button
+          onClick={() => setActiveTab('head')}
+          className={`flex-1 py-3.5 px-6 text-base font-semibold transition-all ${
+            activeTab === 'head'
+              ? 'bg-white text-blue-700 border-b-4 border-blue-600 shadow-sm'
+              : 'text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          Order Header
+        </button>
+        <button
+          onClick={() => setActiveTab('detail')}
+          className={`flex-1 py-3.5 px-6 text-base font-semibold transition-all ${
+            activeTab === 'detail'
+              ? 'bg-white text-blue-700 border-b-4 border-blue-600 shadow-sm'
+              : 'text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          Order Details
+        </button>
+      </div>
 
-                        <div className="p-8 bg-[#cfe2ff]">
-                            {activeTab === 'head' ? (
-                                <div className="space-y-4 max-w-4xl mx-auto bg-white p-6 rounded-lg shadow-sm">
-                                    <div className="grid grid-cols-12 items-center gap-4">
-                                        <div className="col-span-3 flex justify-end"><FormLabel>Order No.</FormLabel></div>
-                                        <div className="col-span-4">
-                                            <input 
-                                                type="text" 
-                                                readOnly 
-                                                className="w-full p-2 border border-gray-400 bg-black text-white font-bold font-mono text-base outline-none cursor-default" 
-                                                value={formData.order_no} 
-                                            />
-                                        </div>
-                                        <div className="col-span-5 flex items-center gap-6">
-                                            <FormLabel>Date</FormLabel>
-                                            <input 
-                                                type="date" 
-                                                className="w-44 p-2 border border-gray-400 bg-white text-base outline-none focus:border-blue-500" 
-                                                value={formData.date} 
-                                                onChange={e => setFormData({...formData, date: e.target.value})} 
-                                            />
-                                        </div>
-                                    </div>
-
-                                    <div className="grid grid-cols-12 items-center gap-4">
-                                        <div className="col-span-3 flex justify-end"><FormLabel>Party</FormLabel></div>
-                                        <div className="col-span-9">
-                                            <select 
-                                                className="w-full p-2 border border-gray-400 bg-white uppercase text-base outline-none focus:border-blue-500" 
-                                                value={formData.party_id} 
-                                                onChange={e => setFormData({...formData, party_id: e.target.value})}
-                                            >
-                                                <option value="">— Select Customer —</option>
-                                                {parties.map(p => (
-                                                    <option key={p.id} value={p.id}>{p.account_name}</option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                    </div>
-
-                                    <div className="grid grid-cols-12 items-center gap-4">
-                                        <div className="col-span-3 flex justify-end"><FormLabel>Broker</FormLabel></div>
-                                        <div className="col-span-5">
-                                            <select 
-                                                className="w-full p-2 border border-gray-400 bg-white uppercase text-base outline-none focus:border-blue-500" 
-                                                value={formData.broker_id} 
-                                                onChange={e => setFormData({...formData, broker_id: e.target.value})}
-                                            >
-                                                <option value="">— Direct / No Broker —</option>
-                                                {brokers.map(b => (
-                                                    <option key={b.id} value={b.id}>{b.broker_name}</option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                        <div className="col-span-4 flex items-center gap-4 justify-end">
-                                            <input 
-                                                type="checkbox" 
-                                                id="cancelled" 
-                                                checked={formData.is_cancelled} 
-                                                onChange={e => setFormData({...formData, is_cancelled: e.target.checked})} 
-                                                className="w-5 h-5 accent-red-600" 
-                                            />
-                                            <label htmlFor="cancelled" className="text-base font-medium text-red-700">Cancelled</label>
-                                        </div>
-                                    </div>
-
-                                    <div className="grid grid-cols-12 items-center gap-4">
-                                        <div className="col-span-3 flex justify-end"><FormLabel>Place</FormLabel></div>
-                                        <div className="col-span-9">
-                                            <input 
-                                                type="text" 
-                                                className="w-full p-2 border border-gray-400 bg-white uppercase text-base outline-none focus:border-blue-500" 
-                                                value={formData.place} 
-                                                onChange={e => setFormData({...formData, place: e.target.value.toUpperCase()})} 
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="bg-white rounded-lg shadow-sm border border-slate-300 overflow-hidden">
-                                    <div className="overflow-x-auto max-h-[500px]">
-                                        <table className="w-full border-collapse">
-                                            <thead className="bg-blue-700 text-white sticky top-0 z-10">
-                                                <tr>
-                                                    <th className="p-3 text-left w-10"></th>
-                                                    <th className="p-3 text-left min-w-[320px]">Product</th>
-                                                    <th className="p-3 text-center w-32">Packing</th>
-                                                    <th className="p-3 text-right w-28">Rate Cr</th>
-                                                    <th className="p-3 text-right w-28">Rate Imm</th>
-                                                    <th className="p-3 text-center w-20">Per</th>
-                                                    <th className="p-3 text-right w-28">Qty</th>
-                                                    <th className="p-3 text-right w-28">Bag Wt</th>
-                                                    <th className="p-3 text-center w-12"></th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-slate-200">
-                                                {gridRows.map((row, idx) => (
-                                                    <tr key={idx} className="hover:bg-blue-50/50">
-                                                        <td className="p-3 text-center text-blue-500 font-bold">{idx + 1}</td>
-                                                        <td className="p-2">
-                                                            <select 
-                                                                value={row.product_id} 
-                                                                onChange={e => updateGrid(idx, 'product_id', e.target.value)} 
-                                                                className="w-full p-2 border border-gray-300 rounded text-base outline-none focus:border-blue-500"
-                                                            >
-                                                                <option value="">— Select Product —</option>
-                                                                {products.map(p => (
-                                                                    <option key={p.id} value={p.id}>{p.product_name}</option>
-                                                                ))}
-                                                            </select>
-                                                        </td>
-                                                        <td className="p-3 text-center text-base font-medium text-black">
-                                                            {row.packing_type || '—'}
-                                                        </td>
-                                                        <td className="p-2">
-                                                            <input 
-                                                                type="number" 
-                                                                step="0.01" 
-                                                                value={row.rate_cr} 
-                                                                onChange={e => updateGrid(idx, 'rate_cr', e.target.value)} 
-                                                                className="w-full p-2 text-right border border-gray-300 rounded text-base focus:border-blue-500" 
-                                                            />
-                                                        </td>
-                                                        <td className="p-2">
-                                                            <input 
-                                                                type="number" 
-                                                                step="0.01" 
-                                                                value={row.rate_imm} 
-                                                                onChange={e => updateGrid(idx, 'rate_imm', e.target.value)} 
-                                                                className="w-full p-2 text-right border border-gray-300 rounded text-base focus:border-blue-500" 
-                                                            />
-                                                        </td>
-                                                        <td className="p-2">
-                                                            <input 
-                                                                type="text" 
-                                                                value={row.rate_per} 
-                                                                onChange={e => updateGrid(idx, 'rate_per', e.target.value)} 
-                                                                className="w-full p-2 text-center border border-gray-300 rounded text-base uppercase focus:border-blue-500" 
-                                                            />
-                                                        </td>
-                                                        <td className="p-2">
-                                                            <input 
-                                                                type="number" 
-                                                                value={row.qty} 
-                                                                onChange={e => updateGrid(idx, 'qty', e.target.value)} 
-                                                                className="w-full p-2 text-right border border-gray-300 rounded text-base font-bold text-emerald-700 focus:border-blue-500" 
-                                                            />
-                                                        </td>
-                                                        <td className="p-3 text-right text-base font-medium text-black">
-                                                            {row.bag_wt || '0.000'}
-                                                        </td>
-                                                        <td className="p-2 text-center">
-                                                            <button 
-                                                                onClick={() => removeRow(idx)} 
-                                                                disabled={gridRows.length === 1}
-                                                                className="text-red-500 hover:text-red-700 disabled:opacity-40 transition-colors"
-                                                            >
-                                                                <MinusCircle size={20} />
-                                                            </button>
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-
-                                    <button 
-                                        onClick={addNewRow} 
-                                        className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white text-base font-bold transition-colors flex items-center justify-center gap-2"
-                                    >
-                                        <Plus size={18} /> Add New Product Row
-                                    </button>
-                                </div>
-                            )}
-
-                            {/* Footer Actions */}
-                            <div className="flex justify-end gap-4 mt-10">
-                                <button 
-                                    type="submit" 
-                                    onClick={handleSave} 
-                                    disabled={submitLoading} 
-                                    className="flex items-center gap-2 bg-slate-50 border border-slate-400 px-10 py-2.5 text-base font-bold shadow-sm hover:bg-white active:scale-95 transition-all"
-                                >
-                                    <span className="text-blue-700 p-1 border border-blue-100 bg-white rounded"><Save size={16}/></span>
-                                    {formData.id ? 'Update Order' : 'Create Order'}
-                                </button>
-                                <button 
-                                    onClick={() => setIsModalOpen(false)} 
-                                    className="flex items-center gap-2 bg-slate-50 border border-slate-400 px-10 py-2.5 text-base font-bold shadow-sm hover:bg-white active:scale-95 transition-all"
-                                >
-                                    <span className="text-red-600 font-black p-1 border border-red-100 bg-white rounded">X</span> Cancel
-                                </button>
-                            </div>
-                        </div>
-                    </div>
+      {/* Content */}
+      <div className="p-6 overflow-y-auto flex-1 bg-slate-50/60">
+        {activeTab === 'head' ? (
+          <div className="space-y-5 max-w-4xl mx-auto">
+            {/* Header fields - card style */}
+            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-5">
+              <div className="grid grid-cols-12 gap-5 items-center">
+                <div className="col-span-3 flex justify-end">
+                  <FormLabel>Order No.</FormLabel>
                 </div>
+                <div className="col-span-4">
+                  <input
+                    readOnly
+                    className="w-full p-3 bg-slate-800 text-white font-mono font-bold rounded-lg border border-slate-700 cursor-not-allowed shadow-inner"
+                    value={formData.order_no || 'New'}
+                  />
+                </div>
+                <div className="col-span-5 flex items-center gap-5">
+                  <FormLabel>Date</FormLabel>
+                  <input
+                    type="date"
+                    className="p-3 border border-slate-300 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-400/30"
+                    value={formData.date || ''}
+                    onChange={e => setFormData({ ...formData, date: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-12 gap-5 items-center">
+                <div className="col-span-3 flex justify-end">
+                  <FormLabel>Party</FormLabel>
+                </div>
+                <div className="col-span-9">
+                  <select
+                    className="w-full p-3 border border-slate-300 rounded-lg uppercase focus:border-blue-500 focus:ring-1 focus:ring-blue-400/30"
+                    value={formData.party_id || ''}
+                    onChange={e => setFormData({ ...formData, party_id: e.target.value })}
+                  >
+                    <option value="">— Select Customer —</option>
+                    {parties.map(p => (
+                      <option key={p.id} value={p.id}>
+                        {p.account_name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-12 gap-5 items-center">
+                <div className="col-span-3 flex justify-end">
+                  <FormLabel>Broker</FormLabel>
+                </div>
+                <div className="col-span-5">
+                  <select
+                    className="w-full p-3 border border-slate-300 rounded-lg uppercase focus:border-blue-500 focus:ring-1 focus:ring-blue-400/30"
+                    value={formData.broker_id || ''}
+                    onChange={e => setFormData({ ...formData, broker_id: e.target.value })}
+                  >
+                    <option value="">— Direct / No Broker —</option>
+                    {brokers.map(b => (
+                      <option key={b.id} value={b.id}>
+                        {b.broker_name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="col-span-4 flex items-center justify-end gap-4">
+                  <input
+                    type="checkbox"
+                    id="cancelled"
+                    checked={formData.is_cancelled}
+                    onChange={e => setFormData({ ...formData, is_cancelled: e.target.checked })}
+                    className="w-5 h-5 accent-red-600"
+                  />
+                  <label htmlFor="cancelled" className="text-base font-medium text-red-700">
+                    Cancelled
+                  </label>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-12 gap-5 items-center">
+                <div className="col-span-3 flex justify-end">
+                  <FormLabel>Place</FormLabel>
+                </div>
+                <div className="col-span-9">
+                  <input
+                    className="w-full p-3 border border-slate-300 rounded-lg uppercase focus:border-blue-500 focus:ring-1 focus:ring-blue-400/30"
+                    value={formData.place || ''}
+                    onChange={e => setFormData({ ...formData, place: e.target.value.toUpperCase() })}
+                    placeholder="Delivery / Billing place"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse">
+                <thead className="bg-blue-700 text-white sticky top-0 z-10 shadow-sm">
+                  <tr>
+                    <th className="p-4 text-left w-10 font-semibold">#</th>
+                    <th className="p-4 text-left min-w-[340px] font-semibold">Product</th>
+                    <th className="p-4 text-center w-32 font-semibold">Packing</th>
+                    <th className="p-4 text-right w-32 font-semibold">Rate Cr</th>
+                    <th className="p-4 text-right w-32 font-semibold">Rate Imm</th>
+                    <th className="p-4 text-center w-24 font-semibold">Per</th>
+                    <th className="p-4 text-right w-32 font-semibold">Qty</th>
+                    <th className="p-4 text-right w-32 font-semibold">Bag Wt</th>
+                    <th className="p-4 text-center w-14 font-semibold"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {gridRows.map((row, idx) => (
+                    <tr key={idx} className="hover:bg-blue-50/40 transition-colors">
+                      <td className="p-4 text-center text-blue-600 font-bold">{idx + 1}</td>
+                      <td className="p-3">
+                        <select
+                          value={row.product_id || ''}
+                          onChange={e => updateGrid(idx, 'product_id', e.target.value)}
+                          className="w-full p-2.5 border border-slate-300 rounded-lg focus:border-blue-500 focus:ring-1"
+                        >
+                          <option value="">— Select Product —</option>
+                          {products.map(p => (
+                            <option key={p.id} value={p.id}>
+                              {p.product_name}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="p-4 text-center text-slate-700 font-medium">
+                        {row.packing_type || '—'}
+                      </td>
+                      <td className="p-3">
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={row.rate_cr ?? ''}
+                          onChange={e => updateGrid(idx, 'rate_cr', e.target.value)}
+                          className="w-full p-2.5 text-right border border-slate-300 rounded-lg focus:border-blue-500 focus:ring-1"
+                        />
+                      </td>
+                      <td className="p-3">
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={row.rate_imm ?? ''}
+                          onChange={e => updateGrid(idx, 'rate_imm', e.target.value)}
+                          className="w-full p-2.5 text-right border border-slate-300 rounded-lg focus:border-blue-500 focus:ring-1"
+                        />
+                      </td>
+                      <td className="p-3">
+                        <input
+                          type="text"
+                          value={row.rate_per || ''}
+                          onChange={e => updateGrid(idx, 'rate_per', e.target.value)}
+                          className="w-full p-2.5 text-center border border-slate-300 rounded-lg uppercase focus:border-blue-500 focus:ring-1"
+                          placeholder="Kg / Bag"
+                        />
+                      </td>
+                      <td className="p-3">
+                        <input
+                          type="number"
+                          value={row.qty ?? ''}
+                          onChange={e => updateGrid(idx, 'qty', e.target.value)}
+                          className="w-full p-2.5 text-right border border-slate-300 rounded-lg font-bold text-emerald-700 focus:border-blue-500 focus:ring-1"
+                        />
+                      </td>
+                      <td className="p-4 text-right text-slate-700 font-medium">
+                        {row.bag_wt || '0.000'}
+                      </td>
+                      <td className="p-3 text-center">
+                        <button
+                          onClick={() => removeRow(idx)}
+                          disabled={gridRows.length === 1}
+                          className="text-red-500 hover:text-red-700 disabled:opacity-40 transition-colors p-1 rounded hover:bg-red-50"
+                        >
+                          <MinusCircle size={20} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <button
+              onClick={addNewRow}
+              className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold transition-colors flex items-center justify-center gap-2 shadow-md"
+            >
+              <Plus size={20} /> Add Product Line
+            </button>
+          </div>
+        )}
+
+        {/* Footer Actions */}
+        <div className="flex justify-end gap-4 pt-8 border-t border-slate-200 mt-6">
+          <button
+            type="button"
+            onClick={() => setIsModalOpen(false)}
+            className="px-8 py-3 border border-slate-400 rounded-xl text-slate-700 font-semibold hover:bg-slate-50 transition-colors flex items-center gap-2"
+          >
+            Cancel
+          </button>
+
+          <button
+            type="submit"
+            onClick={handleSave}
+            disabled={submitLoading}
+            className={`
+              px-10 py-3 rounded-xl font-semibold shadow-lg flex items-center gap-2 min-w-[160px] justify-center transition-all
+              ${submitLoading
+                ? 'bg-slate-400 text-white cursor-not-allowed'
+                : 'bg-blue-600 hover:bg-blue-700 text-white hover:shadow-blue-300 active:scale-[0.98]'
+              }
+            `}
+          >
+            {submitLoading ? (
+              <>
+                <Loader2 className="animate-spin" size={20} />
+                Processing...
+              </>
+            ) : (
+              <>
+                <Save size={20} />
+                {formData.id ? 'Update Order' : 'Create Order'}
+              </>
             )}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
         </div>
     );
 };

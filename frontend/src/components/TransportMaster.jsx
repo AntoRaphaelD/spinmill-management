@@ -3,7 +3,7 @@ import { mastersAPI } from '../service/api';
 import { 
     Plus, Edit, Trash2, X, ChevronLeft, 
     ChevronRight, RefreshCw, Save, Truck, Search, Filter, 
-    Square, CheckSquare
+    Square, CheckSquare, Hash, Briefcase, MapPin, Loader2
 } from 'lucide-react';
 
 const TransportMaster = () => {
@@ -250,89 +250,141 @@ const TransportMaster = () => {
 
             {/* Modal */}
             {isModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
-                    <div className="bg-[#cfe2ff] w-full max-w-[680px] rounded shadow-2xl overflow-hidden border border-white animate-in zoom-in duration-200">
-                        <div className="bg-[#6495ed] p-5 flex justify-between items-center text-white border-b border-white/20">
-                            <div>
-                                <h2 className="text-xl font-medium tracking-wide">Transport Master</h2>
-                                <p className="text-blue-50 text-base mt-1">Add / Modify Transport details</p>
-                            </div>
-                            <button onClick={() => setIsModalOpen(false)} className="hover:bg-white/10 p-1 rounded-full"><X size={24}/></button>
-                        </div>
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4">
+    <div className="relative bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden border border-slate-200/70 animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
+      
+      {/* Header */}
+      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-5 flex justify-between items-center text-white shadow-md">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-white/15 rounded-lg">
+            <Truck size={22} /> {/* assuming you have Truck icon imported */}
+          </div>
+          <div>
+            <h2 className="text-lg font-bold tracking-tight">Transport Master</h2>
+            <p className="text-blue-100/90 text-xs font-medium mt-0.5 uppercase tracking-wide">
+              {formData.id ? 'Edit Transport' : 'New Transport'}
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={() => setIsModalOpen(false)}
+          className="p-2 rounded-lg hover:bg-white/20 transition-colors active:scale-95"
+        >
+          <X size={20} strokeWidth={3} />
+        </button>
+      </div>
 
-                        <div className="p-8">
-                            <form onSubmit={handleSave} className="space-y-2 max-w-2xl mx-auto">
-                                <div className="grid grid-cols-12 items-center">
-                                    <div className="col-span-4 flex justify-end"><FormLabel>Transport Code</FormLabel></div>
-                                    <div className="col-span-8">
-                                        <input 
-                                            type="text" 
-                                            readOnly 
-                                            className="w-32 p-1 border border-gray-400 bg-black text-white font-bold outline-none cursor-default font-mono text-base" 
-                                            value={formData.transport_code} 
-                                        />
-                                    </div>
-                                </div>
+      {/* Body */}
+      <div className="p-6 overflow-y-auto flex-1 bg-gradient-to-b from-slate-50 to-white">
+        <form onSubmit={handleSave} className="space-y-4.5">
 
-                                <div className="grid grid-cols-12 items-center">
-                                    <div className="col-span-4 flex justify-end"><FormLabel>Transport Name</FormLabel></div>
-                                    <div className="col-span-8">
-                                        <input 
-                                            type="text" 
-                                            required 
-                                            className="w-full p-1 border border-gray-400 bg-white uppercase text-base font-semibold outline-none focus:border-blue-500" 
-                                            value={formData.transport_name} 
-                                            onChange={e => setFormData({...formData, transport_name: e.target.value.toUpperCase()})} 
-                                        />
-                                    </div>
-                                </div>
+          {/* Transport Code */}
+          <div className="grid grid-cols-12 items-center gap-4">
+            <label className="col-span-4 text-right text-sm font-semibold text-slate-600 uppercase tracking-wide">
+              Transport Code
+            </label>
+            <div className="col-span-8">
+              <div className="relative">
+                <Hash size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                <input
+                  readOnly
+                  className="w-44 pl-10 pr-4 py-2.5 bg-slate-100 border border-slate-300 rounded-lg font-mono font-bold text-slate-700 cursor-not-allowed shadow-inner"
+                  value={formData.transport_code}
+                />
+              </div>
+            </div>
+          </div>
 
-                                <div className="grid grid-cols-12 items-center">
-                                    <div className="col-span-4 flex justify-end"><FormLabel>Place</FormLabel></div>
-                                    <div className="col-span-8">
-                                        <input 
-                                            type="text" 
-                                            className="w-48 p-1 border border-gray-400 bg-white uppercase text-base outline-none focus:border-blue-500" 
-                                            value={formData.place} 
-                                            onChange={e => setFormData({...formData, place: e.target.value.toUpperCase()})} 
-                                        />
-                                    </div>
-                                </div>
+          {/* Transport Name */}
+          <div className="grid grid-cols-12 items-center gap-4">
+            <label className="col-span-4 text-right text-sm font-semibold text-slate-700 uppercase tracking-wide">
+              Transport Name <span className="text-red-500">*</span>
+            </label>
+            <div className="col-span-8 relative">
+              <Briefcase size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              <input
+                required
+                className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-xl text-slate-800 font-semibold uppercase focus:border-blue-500 focus:ring-2 focus:ring-blue-400/30 outline-none transition-all"
+                value={formData.transport_name}
+                onChange={e => setFormData({ ...formData, transport_name: e.target.value.toUpperCase() })}
+                placeholder="e.g. ABC TRANSPORTS"
+              />
+            </div>
+          </div>
 
-                                <div className="grid grid-cols-12 items-start">
-                                    <div className="col-span-4 flex justify-end pt-1"><FormLabel>Address</FormLabel></div>
-                                    <div className="col-span-8">
-                                        <textarea 
-                                            rows={4} 
-                                            className="w-full p-1.5 border border-gray-400 bg-white uppercase text-base outline-none focus:border-blue-500 resize-none" 
-                                            value={formData.address} 
-                                            onChange={e => setFormData({...formData, address: e.target.value.toUpperCase()})} 
-                                        />
-                                    </div>
-                                </div>
+          {/* Place */}
+          <div className="grid grid-cols-12 items-center gap-4">
+            <label className="col-span-4 text-right text-sm font-semibold text-slate-700 uppercase tracking-wide">
+              Place
+            </label>
+            <div className="col-span-8 relative">
+              <MapPin size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              <input
+                className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-xl text-slate-700 uppercase focus:border-blue-500 focus:ring-2 focus:ring-blue-400/30 outline-none transition-all"
+                value={formData.place || ''}
+                onChange={e => setFormData({ ...formData, place: e.target.value.toUpperCase() })}
+                placeholder="e.g. COIMBATORE"
+              />
+            </div>
+          </div>
 
-                                <div className="flex justify-end gap-4 pt-8">
-                                    <button 
-                                        type="submit" 
-                                        disabled={submitLoading} 
-                                        className="flex items-center gap-2 bg-slate-50 border border-slate-400 px-10 py-2 text-base font-bold shadow-sm hover:bg-white active:scale-95 transition-all"
-                                    >
-                                        <span className="text-blue-700 p-1 border border-blue-100 bg-white rounded"><Save size={16}/></span> 
-                                        {formData.id ? 'Update' : 'Save'}
-                                    </button>
-                                    <button 
-                                        type="button" 
-                                        onClick={() => setIsModalOpen(false)} 
-                                        className="flex items-center gap-2 bg-slate-50 border border-slate-400 px-10 py-2 text-base font-bold shadow-sm hover:bg-white active:scale-95 transition-all"
-                                    >
-                                        <span className="text-red-600 font-black p-1 border border-red-100 bg-white rounded">X</span> Cancel
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-            )}
+          {/* Address */}
+          <div className="grid grid-cols-12 gap-4">
+            <label className="col-span-4 text-right pt-2 text-sm font-semibold text-slate-700 uppercase tracking-wide">
+              Address
+            </label>
+            <div className="col-span-8 relative">
+              <MapPin size={18} className="absolute left-3 top-3 text-slate-400 pointer-events-none" />
+              <textarea
+                rows={4}
+                className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-xl text-slate-700 resize-none focus:border-blue-500 focus:ring-2 focus:ring-blue-400/30 outline-none transition-all"
+                value={formData.address || ''}
+                onChange={e => setFormData({ ...formData, address: e.target.value.toUpperCase() })}
+                placeholder="Full address including pincode..."
+              />
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="flex justify-end gap-3 pt-5 border-t border-slate-200 mt-3">
+            <button
+              type="button"
+              onClick={() => setIsModalOpen(false)}
+              className="px-6 py-2.5 text-slate-600 font-medium rounded-xl hover:bg-slate-100 transition-colors flex items-center gap-2"
+            >
+              Cancel
+            </button>
+
+            <button
+              type="submit"
+              disabled={submitLoading}
+              className={`
+                min-w-[140px] px-7 py-2.5 rounded-xl font-semibold shadow-md flex items-center justify-center gap-2 transition-all
+                ${submitLoading
+                  ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                  : 'bg-blue-600 hover:bg-blue-700 text-white hover:shadow-blue-300 active:scale-[0.98]'
+                }
+              `}
+            >
+              {submitLoading ? (
+                <>
+                  <Loader2 size={18} className="animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save size={18} />
+                  {formData.id ? 'Update' : 'Save'}
+                </>
+              )}
+            </button>
+          </div>
+
+        </form>
+      </div>
+    </div>
+  </div>
+)}
         </div>
     );
 };

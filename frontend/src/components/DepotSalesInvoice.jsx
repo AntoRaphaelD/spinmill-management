@@ -8,6 +8,25 @@ import {
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { evaluate } from "mathjs";
+
+const evaluateFormula = (formula, ctx) => {
+
+    let processed = formula;
+
+    Object.keys(ctx).forEach(key => {
+        const regex = new RegExp(`\\[${key}\\]`, 'gi');
+        processed = processed.replace(regex, ctx[key]);
+    });
+
+    processed = processed.replace(/\[.*?\]/g, '0');
+
+    processed = processed
+        .replace(/Round\(/gi, "round(")
+        .replace(/Abs\(/gi, "abs(");
+
+    return evaluate(processed);
+};
 // ==========================================
 // HELPERS & FORMATTING
 // ==========================================
@@ -39,13 +58,68 @@ const DepotSalesInvoice = () => {
     // 1. INITIAL STATES
     // ==========================================
     const emptyInvoice = {
-        id: null, invoice_no: '', date: new Date().toISOString().split('T')[0],
-        sales_type: 'DEPOT SALES', invoice_type_id: '', depot_id: '', party_id: '', address: '',
-        credit_days: 0, interest_pct: 0, transport_id: '', lr_no: '', lr_date: new Date().toISOString().split('T')[0],
-        vehicle_no: '', remarks: '', pay_mode: 'CREDIT', broker_id: '',
-        total_assessable: 0, total_charity: 0, total_vat: 0, total_sgst: 0, total_cgst: 0,
-        total_igst: 0, total_discount: 0, total_other: 0, pf_amount: 0, freight: 0,
-        sub_total: 0, round_off: 0, final_invoice_value: 0
+
+        id: null,
+        invoice_no: '',
+        date: new Date().toISOString().split('T')[0],
+
+        sales_type: 'DEPOT SALES',
+        invoice_type_id: '',
+
+        depot_id: '',
+        party_id: '',
+        addr1: '',
+        addr2: '',
+        addr3: '',
+
+        del1: '',
+        del2: '',
+        del3: '',
+
+        credit_days: 0,
+        interest_pct: 0,
+
+        transport_id: '',
+        lr_no: '',
+        lr_date: new Date().toISOString().split('T')[0],
+
+        vehicle_no: '',
+        remarks: '',
+
+        broker_id: '',
+        pay_mode: 'CREDIT',
+
+        // ⭐ NEW FIELDS
+        country: '',
+        are_no: '',
+        removal_time: '',
+        agent_name: '',
+        form_jj: '',
+
+        // totals
+        total_assessable: 0,
+        total_charity: 0,
+
+        total_vat: 0,
+        total_cenvat: 0,
+        total_duty: 0,
+        total_cess: 0,
+        total_hr_sec_cess: 0,
+
+        total_sgst: 0,
+        total_cgst: 0,
+        total_igst: 0,
+        total_tcs: 0,
+
+        total_discount: 0,
+        total_other: 0,
+
+        pf_amount: 0,
+        freight: 0,
+
+        sub_total: 0,
+        round_off: 0,
+        final_invoice_value: 0
     };
     const [listData, setListData] = useState({
         types: [], parties: [], depots: [], transports: [],
@@ -57,10 +131,29 @@ const DepotSalesInvoice = () => {
     const [submitLoading, setSubmitLoading] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [activeTab, setActiveTab] = useState('head');
-   
+
     const [searchField, setSearchField] = useState('invoice_no');
     const [searchCondition, setSearchCondition] = useState('Like');
     const [searchValue, setSearchValue] = useState('');
+
+    useEffect(() => {
+
+        if (!formData.invoice_type_id) return;
+
+        setGridRows(prev =>
+            runCalculations(prev, formData.invoice_type_id)
+        );
+
+    }, [formData.invoice_type_id]);
+    useEffect(() => {
+
+        if (gridRows.length === 0) return;
+
+        setGridRows(prev =>
+            runCalculations(prev, formData.invoice_type_id)
+        );
+
+    }, []);
     // ==========================================
     // 2. MATH ENGINE - FREIGHT NOW SYNCED FROM DETAILS
     // ==========================================
@@ -69,30 +162,96 @@ const DepotSalesInvoice = () => {
         const config = listData.types.find(t => t.id === parseInt(typeId));
         if (!config) return rows;
         let hTotals = {
-            assess: 0, charity: 0, vat: 0, sgst: 0, cgst: 0, igst: 0,
-            disc: 0, other: 0, net: 0
+            assess: 0,
+            charity: 0,
+
+            vat: 0,
+            cenvat: 0,
+            duty: 0,
+            cess: 0,
+            hcess: 0,
+
+            sgst: 0,
+            cgst: 0,
+            igst: 0,
+            tcs: 0,
+
+            disc: 0,
+            other: 0,
+            pf: 0,
+            net: 0
         };
         const updatedRows = rows.map((item) => {
+
+            item.total_kgs = num(item.total_kgs);
+            item.rate = num(item.rate);
+            item.resale = num(item.resale);
+            item.convert_to_hank = num(item.convert_to_hank);
+            item.convert_to_cone = num(item.convert_to_cone);
             const product = listData.products.find(p => p.id === parseInt(item.product_id));
             const H = num(item.rate) * num(item.total_kgs);
             const avgContent = num(item.packs) > 0 ? num(item.total_kgs) / num(item.packs) : 0;
             const A = H - num(item.resale) + num(item.convert_to_hank) - num(item.convert_to_cone);
             const charity = config.charity_checked ? num(product?.charity_rs) * num(item.total_kgs) : 0;
             const vat = num(item.vat_per) * A / 100;
+
+            const cenvat = num(item.cenvat_per) * A / 100;
+            const duty = num(item.duty_per) * A / 100;
+            const cess = num(item.cess_per) * A / 100;
+            const hcess = num(item.hcess_per) * A / 100;
+
             const sgst = num(item.sgst_per) * A / 100;
             const cgst = num(item.cgst_per) * A / 100;
-            const igst = num(item.igst_per) * A / 100;
-            const basis = A + sgst + cgst + igst + vat + charity + num(item.other_amt) + num(item.freight_amt);
+            const tcs = num(item.tcs_per) * A / 100;
+            let igst = 0;
+
+            if (config?.igst_formula) {
+
+                const ctx = {
+                    H,
+                    A,
+                    "Total Kgs": num(item.total_kgs),
+                    Rate: num(item.rate),
+                    igstper: num(item.igst_per),
+                    round_digits: config.round_off_digits
+                };
+
+                igst = evaluateFormula(config.igst_formula, ctx);
+            }
+            const basis =
+                A +
+                vat +
+                cenvat +
+                duty +
+                cess +
+                hcess +
+                sgst +
+                cgst +
+                igst +
+                tcs +
+                charity +
+                num(item.other_amt) +
+                num(item.freight_amt);
             const discAmt = num(item.discount_percentage) * basis / 100;
             const rowTotal = basis - discAmt;
-            hTotals.assess += A; hTotals.charity += charity; hTotals.vat += vat;
-            hTotals.sgst += sgst; hTotals.cgst += cgst; hTotals.igst += igst;
-            hTotals.disc += discAmt; hTotals.other += num(item.other_amt); hTotals.net += rowTotal;
+            hTotals.assess += A; hTotals.charity += charity;
+            hTotals.vat += vat;
+            hTotals.cenvat += cenvat;
+            hTotals.duty += duty;
+            hTotals.cess += cess;
+            hTotals.hcess += hcess;
+
+            hTotals.sgst += sgst;
+            hTotals.cgst += cgst;
+            hTotals.igst += igst;
+            hTotals.tcs += tcs;
+            hTotals.disc += discAmt; hTotals.other += num(item.other_amt); hTotals.pf += num(formData.pf_amount); hTotals.net += rowTotal;
             return {
                 ...item,
                 avg_content: avgContent.toFixed(3),
-                base_h: H, assessable_value: A, charity_amt: charity,
-                vat_amt: vat, sgst_amt: sgst, cgst_amt: cgst, igst_amt: igst,
+                base_h: H,
+                assessable_value: A, charity_amt: charity, vat_amt: vat, cenvat_amt: cenvat, duty_amt: duty, cess_amt: cess,
+                hcess_amt: hcess, sgst_amt: sgst, cgst_amt: cgst, igst_amt: igst, tcs_amt: tcs,
                 discount_amt: discAmt, sub_total: basis, final_value: rowTotal
             };
         });
@@ -103,13 +262,20 @@ const DepotSalesInvoice = () => {
         const finalNetTotal = Math.round(finalRawTotal);
         setFormData(prev => ({
             ...prev,
-            freight: money(totalFreightFromRows), // ← THIS IS THE FIX
+
             total_assessable: money(hTotals.assess),
             total_charity: money(hTotals.charity),
+
             total_vat: money(hTotals.vat),
+            total_cenvat: money(hTotals.cenvat),
+            total_duty: money(hTotals.duty),
+            total_cess: money(hTotals.cess),
+            total_hr_sec_cess: money(hTotals.hcess),
+
             total_sgst: money(hTotals.sgst),
             total_cgst: money(hTotals.cgst),
             total_igst: money(hTotals.igst),
+            total_tcs: money(hTotals.tcs),
             total_discount: money(hTotals.disc),
             total_other: money(hTotals.other),
             sub_total: money(finalRawTotal),
@@ -139,7 +305,9 @@ const DepotSalesInvoice = () => {
         doc.text("Bill To:", margin, 60);
         doc.setFont("helvetica", "normal");
         doc.text(data.Party?.account_name || "N/A", margin, 65);
-        doc.text(data.address || "", margin, 70, { maxWidth: 80 });
+        doc.text(`${data.addr1 || ''}`, margin, 70);
+        doc.text(`${data.addr2 || ''}`, margin, 75);
+        doc.text(`${data.addr3 || ''}`, margin, 80);
         doc.text(`Invoice No: #${data.invoice_no}`, pageWidth - margin - 50, 60);
         doc.text(`Date: ${data.date}`, pageWidth - margin - 50, 65);
         doc.text(`Depot: ${data.Depot?.account_name || "N/A"}`, pageWidth - margin - 50, 70);
@@ -163,7 +331,7 @@ const DepotSalesInvoice = () => {
         doc.setFont("helvetica", "bold");
         doc.text("Assessable Total:", pageWidth - 90, finalY);
         doc.text(`Rs. ${num(data.total_assessable).toLocaleString()}`, pageWidth - margin, finalY, { align: "right" });
-       
+
         doc.text("Tax Total (GST):", pageWidth - 90, finalY + 7);
         const gst = num(data.total_sgst) + num(data.total_cgst) + num(data.total_igst);
         doc.text(`Rs. ${gst.toLocaleString()}`, pageWidth - margin, finalY + 7, { align: "right" });
@@ -205,23 +373,94 @@ const DepotSalesInvoice = () => {
     // 5. HANDLERS
     // ==========================================
     const handleOrderSync = (e) => {
-        const val = e.target.value; if (!val) return;
+
+        const val = e.target.value;
+        if (!val) return;
+
         const [source, orderNo] = val.split('|');
-        const config = listData.types.find(t => t.id === parseInt(formData.invoice_type_id));
-        if (!config) return alert("Select Invoice Type first.");
-        const order = listData.orders.find(o => o.order_no === orderNo);
+
+        const config = listData.types.find(
+            t => t.id === parseInt(formData.invoice_type_id)
+        );
+
+        if (!config) {
+            alert("Select Invoice Type first.");
+            return;
+        }
+
+        const order = listData.orders.find(
+            o => o.order_no === orderNo
+        );
+
+        if (!order) return;
+
         const details = order?.OrderDetails || [];
-        const newRows = details.map(d => ({
-            order_no: orderNo, order_type: 'WITH_ORDER',
-            product_id: d.product_id, product_description: d.Product?.product_name || '',
-            packs: d.packs || 0, total_kgs: d.qty || 0, rate: d.rate_cr || 0,
-            rate_per: 'KG', broker_code: order.Broker?.broker_code || '',
-            packing_type: d.packing_type || 'BAGS', identification_mark: '',
-            vat_per: config.vat_percentage || 0, sgst_per: config.sgst_percentage || 0,
-            cgst_per: config.cgst_percentage || 0, igst_per: config.igst_percentage || 0,
-            resale: 0, convert_to_hank: 0, convert_to_cone: 0, other_amt: 0, freight_amt: 0, discount_percentage: 0
+
+        // 🔵 AUTO FILL HEADER
+        const party = order.Party || {};
+        const broker = order.Broker || {};
+
+        setFormData(prev => ({
+            ...prev,
+
+            party_id: party.id || '',
+            broker_id: broker.id || '',
+            addr1: party.addr1 || '',
+            addr2: party.addr2 || '',
+            addr3: party.addr3 || '',
+
+            header_locked: true
+
         }));
-        setGridRows(runCalculations([...gridRows, ...newRows], formData.invoice_type_id));
+
+        // 🔵 CREATE GRID ROWS
+        const newRows = details.map(d => ({
+
+            order_no: orderNo,
+            order_type: 'WITH_ORDER',
+
+            product_id: d.product_id,
+            product_description: d.Product?.product_name || '',
+
+            packs: d.qty || 0,
+            total_kgs: d.qty || 0,
+
+            rate: d.rate_cr || 0,
+
+            rate_per: 0,
+            broker_code: broker.broker_code || '',
+
+            packing_type: d.packing_type || 'BAGS',
+            identification_mark: '',
+
+            vat_per: config.vat_percentage || 0,
+
+            cenvat_per: config.cenvat_percentage || 0,
+
+            duty_per: config.duty_percentage || 0,
+            cess_per: config.cess_percentage || 0,
+            hcess_per: config.hr_sec_cess_percentage || 0,
+
+            sgst_per: config.sgst_percentage || 0,
+            cgst_per: config.cgst_percentage || 0,
+            igst_per: config.igst_percentage || 0,
+
+            tcs_per: config.tcs_percentage || 0,
+
+            resale: 0,
+            convert_to_hank: 0,
+            convert_to_cone: 0,
+
+            other_amt: 0,
+            freight_amt: 0,
+            discount_percentage: 0
+
+        }));
+
+        setGridRows(
+            runCalculations([...gridRows, ...newRows], formData.invoice_type_id)
+        );
+
         e.target.value = "";
     };
     const updateGrid = (idx, field, val) => {
@@ -258,16 +497,16 @@ const DepotSalesInvoice = () => {
         <div className="min-h-screen bg-slate-100 p-6 font-sans">
             <div className="flex justify-between items-center mb-4">
                 <h1 className="text-2xl font-black uppercase tracking-tighter flex items-center gap-3">
-                    <Warehouse className="text-blue-600"/> Depot Sales Registry
+                    <Warehouse className="text-blue-600" /> Depot Sales Registry
                 </h1>
                 <button
                     onClick={() => {
-                        setFormData({...emptyInvoice, invoice_no: (listData.history.length + 1).toString()});
+                        setFormData({ ...emptyInvoice, invoice_no: (listData.history.length + 1).toString(), header_locked: false });
                         setGridRows([]); setIsModalOpen(true);
                     }}
                     className="bg-blue-600 text-white px-8 py-2 rounded-xl font-bold uppercase text-xs flex items-center gap-2 shadow-lg hover:bg-blue-700"
                 >
-                    <Plus size={18}/> New Depot Invoice
+                    <Plus size={18} /> New Depot Invoice
                 </button>
             </div>
             <div className="bg-white p-4 rounded-xl border border-slate-300 shadow-sm mb-6 flex gap-4 items-end">
@@ -292,7 +531,30 @@ const DepotSalesInvoice = () => {
                     </thead>
                     <tbody className="divide-y text-sm font-mono">
                         {filteredHistory.map(item => (
-                            <tr key={item.id} className="hover:bg-blue-50 cursor-pointer" onClick={() => { setFormData(item); setGridRows(item.DepotSalesDetails || []); setIsModalOpen(true); }}>
+                            <tr key={item.id} className="hover:bg-blue-50 cursor-pointer" onClick={() => {
+
+                                const formattedItem = {
+                                    ...item,
+
+                                    removal_time: item.removal_time
+                                        ? item.removal_time.replace(' ', 'T').slice(0, 16)
+                                        : ''
+                                };
+
+                                setFormData({
+                                        ...formattedItem,
+
+                                        addr1: formattedItem.Party?.addr1 || '',
+                                        addr2: formattedItem.Party?.addr2 || '',
+                                        addr3: formattedItem.Party?.addr3 || ''
+                                    });
+
+                                const rows = item.DepotSalesDetails || [];
+                                const recalculated = runCalculations(rows, item.invoice_type_id);
+
+                                setGridRows(recalculated);
+                                setIsModalOpen(true);
+                            }}>
                                 <td className="p-5 font-bold text-blue-600">{item.invoice_no}</td>
                                 <td className="p-5 text-slate-500">{item.date}</td>
                                 <td className="p-5 uppercase text-xs">{item.Depot?.account_name}</td>
@@ -307,7 +569,7 @@ const DepotSalesInvoice = () => {
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4">
                     <div className="bg-[#D9E5F7] rounded-lg shadow-2xl w-full max-w-[1250px] flex flex-col overflow-hidden border border-slate-400 h-[98vh]">
                         <div className="bg-[#FCD166] p-1.5 border-b border-slate-400 flex justify-between items-center">
-                            <span className="text-[13px] font-bold text-slate-700 ml-2 flex items-center gap-2"><Layers size={14}/> Depot Sales Engine</span>
+                            <span className="text-[13px] font-bold text-slate-700 ml-2 flex items-center gap-2"><Layers size={14} /> Depot Sales Engine</span>
                             <button onClick={() => setIsModalOpen(false)} className="bg-red-500 text-white px-2 rounded font-bold">×</button>
                         </div>
                         <div className="flex bg-[#D9E5F7] pt-2 px-4 gap-1">
@@ -321,34 +583,164 @@ const DepotSalesInvoice = () => {
                                     <div className="col-span-8 space-y-2">
                                         <div className="grid grid-cols-2 gap-4">
                                             <RowInput label="Invoice No" value={formData.invoice_no} readOnly color="bg-slate-50" />
-                                            <RowInput label="Date" type="date" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} />
+                                            <RowInput label="Date" type="date" value={formData.date} onChange={e => setFormData({ ...formData, date: e.target.value })} />
                                         </div>
-                                        <RowSelect label="Invoice Type" value={formData.invoice_type_id} options={listData.types.map(t => ({value:t.id, label:t.type_name}))} onChange={e => setFormData({...formData, invoice_type_id: e.target.value})} />
-                                        <RowSelect label="Depot (Source)" value={formData.depot_id} options={listData.depots.map(d => ({value:d.id, label:d.account_name}))} onChange={e => setFormData({...formData, depot_id: e.target.value})} />
-                                        <RowSelect label="Party (Customer)" value={formData.party_id} options={listData.parties.map(p => ({value:p.id, label:p.account_name}))} onChange={e => { const acc = listData.parties.find(a => a.id == e.target.value); setFormData({...formData, party_id: e.target.value, address: acc?.address || ''})}} />
-                                        <RowInput label="Address" value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} />
-                                       
+                                        <RowInput label="Sales Type" value="DEPOT SALES" readOnly color="bg-slate-100" />
+                                        <RowSelect label="Invoice Type" value={formData.invoice_type_id} options={listData.types.map(t => ({ value: t.id, label: t.type_name }))} onChange={e => setFormData({ ...formData, invoice_type_id: e.target.value })} />
+                                        <RowSelect label="Depot Name" value={formData.depot_id} options={listData.depots.map(d => ({ value: d.id, label: d.account_name }))} onChange={e => setFormData({ ...formData, depot_id: e.target.value })} />
+                                        <RowSelect
+    label="Party Name"
+    value={formData.party_id}
+    disabled={formData.header_locked}
+    options={listData.parties.map(p => ({
+        value: p.id,
+        label: p.account_name
+    }))}
+    onChange={e => {
+
+    const partyId = parseInt(e.target.value);
+
+    const acc = listData.parties.find(a => a.id === partyId);
+
+    console.log("Selected Party:", acc);
+
+    if (!acc) return;
+
+    setFormData(prev => ({
+        ...prev,
+        party_id: partyId,
+
+        addr1: acc.addr1 ?? '',
+        addr2: acc.addr2 ?? '',
+        addr3: acc.addr3 ?? ''
+    }));
+}}
+/>
+
+<RowInput
+    label="Address 1"
+    value={formData.addr1}
+    readOnly={formData.header_locked}
+    onChange={e => setFormData({ ...formData, addr1: e.target.value })}
+/>
+
+<RowInput
+    label="Address 2"
+    value={formData.addr2}
+    readOnly={formData.header_locked}
+    onChange={e => setFormData({ ...formData, addr2: e.target.value })}
+/>
+
+<RowInput
+    label="Address 3"
+    value={formData.addr3}
+    readOnly={formData.header_locked}
+    onChange={e => setFormData({ ...formData, addr3: e.target.value })}
+/>
                                         <div className="grid grid-cols-3 gap-2">
-                                            <RowInput label="Credit Days" type="number" value={formData.credit_days} onChange={e => setFormData({...formData, credit_days: e.target.value})} />
-                                            <RowInput label="Interest %" type="number" value={formData.interest_pct} onChange={e => setFormData({...formData, interest_pct: e.target.value})} />
-                                            <RowSelect label="Pay Mode" value={formData.pay_mode} options={[{value:'CREDIT', label:'CREDIT'}, {value:'CASH', label:'CASH'}]} onChange={e => setFormData({...formData, pay_mode: e.target.value})} />
+                                            <RowInput label="Credit Days" type="number" value={formData.credit_days} onChange={e => setFormData({ ...formData, credit_days: e.target.value })} />
+                                            <RowInput label="Interest %" type="number" value={formData.interest_pct} onChange={e => setFormData({ ...formData, interest_pct: e.target.value })} />
+                                            <RowSelect label="Pay Mode" value={formData.pay_mode} options={[{ value: 'CREDIT', label: 'CREDIT' }, { value: 'CASH', label: 'CASH' }, { value: 'Immediate', label: 'Immediate' }]} onChange={e => setFormData({ ...formData, pay_mode: e.target.value })} />
                                         </div>
-                                        <RowSelect label="Broker" value={formData.broker_id} options={listData.brokers.map(b => ({value: b.id, label: b.broker_name}))} onChange={e => setFormData({...formData, broker_id: e.target.value})}/>
+                                        <RowSelect label="Agent Name" value={formData.broker_id} disabled={formData.header_locked} options={listData.brokers.map(b => ({ value: b.id, label: b.broker_name }))} onChange={e => setFormData({ ...formData, broker_id: e.target.value })} />
                                         <div className="grid grid-cols-2 gap-4 pt-2 border-t">
-                                            <RowSelect label="Transport" value={formData.transport_id} options={listData.transports.map(t => ({value:t.id, label:t.transport_name}))} onChange={e => setFormData({...formData, transport_id: e.target.value})} />
-                                            <RowInput label="Vehicle No" value={formData.vehicle_no} onChange={e => setFormData({...formData, vehicle_no: e.target.value})} />
+
+                                            <RowSelect
+                                                label="Transport"
+                                                value={formData.transport_id}
+                                                options={listData.transports.map(t => ({
+                                                    value: t.id,
+                                                    label: t.transport_name
+                                                }))}
+                                                onChange={e => setFormData({ ...formData, transport_id: e.target.value })}
+                                            />
+
+                                            <RowInput
+                                                label="Vehicle No"
+                                                value={formData.vehicle_no}
+                                                onChange={e => setFormData({ ...formData, vehicle_no: e.target.value })}
+                                            />
+
+                                            <RowInput
+                                                label="LR No"
+                                                value={formData.lr_no}
+                                                onChange={e => setFormData({ ...formData, lr_no: e.target.value })}
+                                            />
+
+                                            <RowInput
+                                                label="Country"
+                                                value={formData.country}
+                                                onChange={e => setFormData({ ...formData, country: e.target.value })}
+                                            />
+
+                                            <RowInput
+                                                label="LR Date"
+                                                type="date"
+                                                value={formData.lr_date}
+                                                onChange={e => setFormData({ ...formData, lr_date: e.target.value })}
+                                            />
+
+                                            <RowInput
+                                                label="ARE No"
+                                                value={formData.are_no}
+                                                onChange={e => setFormData({ ...formData, are_no: e.target.value })}
+                                            />
+
+                                            <RowInput
+                                                label="Removal Time"
+                                                type="datetime-local"
+                                                value={formData.removal_time || ""}
+                                                onChange={e =>
+                                                    setFormData({ ...formData, removal_time: e.target.value })
+                                                }
+                                            />
+                                            <RowSelect
+                                                label="Pay Mode"
+                                                value={formData.pay_mode}
+                                                options={[
+                                                    { value: 'IMMEDIATE', label: 'IMMEDIATE' },
+                                                    { value: 'CREDIT', label: 'CREDIT' }
+                                                ]}
+                                                onChange={e => setFormData({ ...formData, pay_mode: e.target.value })}
+                                            />
+
+                                            <RowInput
+                                                label="Form JJ"
+                                                value={formData.form_jj}
+                                                onChange={e => setFormData({ ...formData, form_jj: e.target.value })}
+                                            />
+
+                                            <RowInput
+                                                label="Remarks"
+                                                value={formData.remarks}
+                                                onChange={e => setFormData({ ...formData, remarks: e.target.value })}
+                                            />
+
                                         </div>
                                     </div>
                                     <div className="col-span-4 bg-slate-50 border border-slate-300 p-4 rounded flex flex-col gap-1 shadow-inner font-black">
                                         <h3 className="text-xs text-blue-800 mb-2 border-b pb-1 uppercase tracking-tighter">Aggregate Value</h3>
                                         <TotalRow label="Assessable" value={formData.total_assessable} />
+
                                         <TotalRow label="Charity" value={formData.total_charity} />
+
                                         <TotalRow label="VAT Tax" value={formData.total_vat} />
-                                        <TotalRow label="SGST Total" value={formData.total_sgst} />
-                                        <TotalRow label="CGST Total" value={formData.total_cgst} />
-                                        <TotalRow label="IGST Total" value={formData.total_igst} />
+                                        <TotalRow label="CENVAT Tax" value={formData.total_cenvat} />
+                                        <TotalRow label="Duty" value={formData.total_duty} />
+                                        <TotalRow label="Cess" value={formData.total_cess} />
+                                        <TotalRow label="H.S. Cess" value={formData.total_hr_sec_cess} />
+
+                                        <TotalRow label="SGST" value={formData.total_sgst} />
+                                        <TotalRow label="CGST" value={formData.total_cgst} />
+                                        <TotalRow label="IGST" value={formData.total_igst} />
+
+                                        <TotalRow label="TCS" value={formData.total_tcs} />
+
                                         <TotalRow label="Discount" value={formData.total_discount} color="text-red-600" />
-                                        <TotalRow label="Freight" value={formData.freight} isEditable={false} /> {/* ← NOW READ-ONLY, SHOWS SUM FROM DETAILS */}
+
+                                        <TotalRow label="PF Amount" value={formData.pf_amount} isEditable={false} />
+
+                                        <TotalRow label="Freight" value={formData.freight} isEditable={false} />
                                         <div className="mt-auto pt-4 border-t-2 border-slate-400">
                                             <div className="flex justify-between items-center py-2 px-2 bg-white border border-slate-400 rounded shadow-sm">
                                                 <span className="text-[11px] uppercase">Invoice Net Value</span>
@@ -370,67 +762,92 @@ const DepotSalesInvoice = () => {
                                     </div>
                                     <div className="flex-1 border border-slate-300 overflow-x-auto bg-slate-50 shadow-inner rounded">
                                         {/* ... inside the Detail tab section ... */}
-<div className="flex-1 border border-slate-300 overflow-x-auto bg-slate-50 shadow-inner rounded">
-    <table className="min-w-[5000px] text-[10px] border-collapse bg-white">
-        <thead className="bg-slate-800 text-white sticky top-0 z-10 font-bold uppercase">
-            <tr>
-                <th className="p-3 border-r w-32">Order No</th>
-                <th className="p-3 border-r w-80">Product Description</th>
-                <th className="p-3 border-r w-32">Broker Code</th>
-                <th className="p-3 border-r w-24">Packs</th>
-                <th className="p-3 border-r w-32">Packing Type</th>
-                <th className="p-3 border-r w-32">Total Kgs</th>
-                <th className="p-3 border-r w-24">Rate</th>
-                <th className="p-3 border-r w-36 bg-blue-900">Base [H]</th>
-                <th className="p-3 border-r w-24 bg-indigo-900 text-indigo-100">Resale (-)</th>
-                <th className="p-3 border-r w-24 bg-indigo-900 text-indigo-100">Hank (+)</th>
-                <th className="p-3 border-r w-24 bg-indigo-900 text-indigo-100">Cone (-)</th>
-                <th className="p-3 border-r w-40 bg-blue-700 font-black">Assess [A]</th>
-                <th className="p-3 border-r w-24 text-center bg-slate-100 text-black">VAT%</th>
-                <th className="p-3 border-r w-32 text-center bg-slate-50 text-black">VAT Amt</th>
-                <th className="p-3 border-r w-24 text-center bg-slate-100 text-black">SGST%</th>
-                <th className="p-3 border-r w-32 text-center bg-slate-50 text-black">SGST Amt</th>
-                <th className="p-3 border-r w-24 text-center bg-slate-100 text-black">CGST%</th>
-                <th className="p-3 border-r w-32 text-center bg-slate-50 text-black">CGST Amt</th>
-                <th className="p-3 border-r w-24 text-center bg-slate-100 text-black">IGST%</th>
-                <th className="p-3 border-r w-32 text-center bg-slate-50 text-black">IGST Amt</th>
-                <th className="p-3 border-r w-24 text-center bg-rose-50 text-rose-800">Disc% (Edit)</th>
-                <th className="p-3 border-r w-36 text-center bg-rose-50 text-rose-800">Disc Amt</th>
-                <th className="p-3 border-r w-32 text-center">Other Amt</th>
-                <th className="p-3 border-r w-32 text-center">Freight Amt</th>
-                <th className="p-3 border-r w-80 text-center">ID Mark</th>
-                <th className="p-3 w-12"></th>
-            </tr>
-        </thead>
-        <tbody className="divide-y divide-slate-200 font-black">
-            {gridRows.map((r, i) => (
-                <tr key={i} className="hover:bg-blue-50">
-                    <td className="p-2 border-r text-blue-600">{r.order_no}</td>
-                    <td className="p-2 border-r uppercase">{r.product_description}</td>
-                    <td className="p-1 border-r"><input className="w-full text-center outline-none" value={r.broker_code} onChange={e => updateGrid(i, 'broker_code', e.target.value)} /></td>
-                    <td className="p-1 border-r text-center">{r.packs}</td>
-                    <td className="p-1 border-r text-center">{r.packing_type}</td>
-                    <td className="p-1 border-r"><input type="number" className="w-full text-center font-black" value={r.total_kgs} onChange={e => updateGrid(i, 'total_kgs', e.target.value)} /></td>
-                    <td className="p-1 border-r"><input type="number" className="w-full text-center font-black" value={r.rate} onChange={e => updateGrid(i, 'rate', e.target.value)} /></td>
-                    <td className="p-2 border-r text-center bg-blue-50">₹{num(r.base_h).toFixed(2)}</td>
-                    <td className="p-1 border-r bg-indigo-50"><input type="number" className="w-full text-center outline-none bg-white rounded border border-indigo-200" value={r.resale} onChange={e => updateGrid(i, 'resale', e.target.value)} /></td>
-                    <td className="p-1 border-r bg-indigo-50"><input type="number" className="w-full text-center outline-none bg-white rounded border border-indigo-200" value={r.convert_to_hank} onChange={e => updateGrid(i, 'convert_to_hank', e.target.value)} /></td>
-                    <td className="p-1 border-r bg-indigo-50"><input type="number" className="w-full text-center outline-none bg-white rounded border border-indigo-200" value={r.convert_to_cone} onChange={e => updateGrid(i, 'convert_to_cone', e.target.value)} /></td>
-                    <td className="p-2 border-r text-center bg-blue-100 font-black">₹{num(r.assessable_value).toFixed(2)}</td>
-                    {renderPairCell(r, i, 'vat_per', 'vat_amt', false, updateGrid)}
-                    {renderPairCell(r, i, 'sgst_per', 'sgst_amt', false, updateGrid)}
-                    {renderPairCell(r, i, 'cgst_per', 'cgst_amt', false, updateGrid)}
-                    {renderPairCell(r, i, 'igst_per', 'igst_amt', false, updateGrid)}
-                    {renderPairCell(r, i, 'discount_percentage', 'discount_amt', true, updateGrid, "text-rose-600")}
-                    <td className="p-1 border-r"><input type="number" className="w-full text-center outline-none" value={r.other_amt} onChange={e => updateGrid(i, 'other_amt', e.target.value)} /></td>
-                    <td className="p-1 border-r"><input type="number" className="w-full text-center outline-none" value={r.freight_amt} onChange={e => updateGrid(i, 'freight_amt', e.target.value)} /></td>
-                    <td className="p-1 border-r"><input className="w-full text-center outline-none text-[9px]" value={r.identification_mark} onChange={e => updateGrid(i, 'identification_mark', e.target.value)} /></td>
-                    <td className="p-2 text-center"><button onClick={() => setGridRows(prev => prev.filter((_, idx) => idx !== i))} className="text-red-500"><MinusCircle size={20}/></button></td>
-                </tr>
-            ))}
-        </tbody>
-    </table>
-</div>
+                                        <div className="flex-1 border border-slate-300 overflow-x-auto bg-slate-50 shadow-inner rounded">
+                                            <table className="min-w-[5000px] text-[10px] border-collapse bg-white">
+                                                <thead className="bg-slate-800 text-white sticky top-0 z-10 font-bold uppercase">
+                                                    <tr>
+                                                        <th className="p-3 border-r w-32">Order No</th>
+                                                        <th className="p-3 border-r w-80">Product Description</th>
+                                                        <th className="p-3 border-r w-32">Broker Code</th>
+                                                        <th className="p-3 border-r w-24">Packs</th>
+                                                        <th className="p-3 border-r w-32">Packing Type</th>
+                                                        <th className="p-3 border-r w-32">Total Kgs</th>
+                                                        <th className="p-3 border-r w-24">Rate</th>
+                                                        <th className="p-3 border-r w-36 bg-blue-900">Base [H]</th>
+                                                        <th className="p-3 border-r w-24 bg-indigo-900 text-indigo-100">Resale (-)</th>
+                                                        <th className="p-3 border-r w-24 bg-indigo-900 text-indigo-100">Hank (+)</th>
+                                                        <th className="p-3 border-r w-24 bg-indigo-900 text-indigo-100">Cone (-)</th>
+                                                        <th className="p-3 border-r w-40 bg-blue-700 font-black">Assess [A]</th>
+                                                        <th className="p-3 border-r w-24 text-center bg-slate-100 text-black">VAT%</th>
+                                                        <th className="p-3 border-r w-32 text-center bg-slate-50 text-black">VAT Amt</th>
+
+                                                        <th className="p-3 border-r w-24 text-center bg-slate-100 text-black">CENVAT%</th>
+                                                        <th className="p-3 border-r w-32 text-center bg-slate-50 text-black">CENVAT Amt</th>
+
+                                                        <th className="p-3 border-r w-24 text-center bg-slate-100 text-black">DUTY%</th>
+                                                        <th className="p-3 border-r w-32 text-center bg-slate-50 text-black">DUTY Amt</th>
+
+                                                        <th className="p-3 border-r w-24 text-center bg-slate-100 text-black">CESS%</th>
+                                                        <th className="p-3 border-r w-32 text-center bg-slate-50 text-black">CESS Amt</th>
+
+                                                        <th className="p-3 border-r w-24 text-center bg-slate-100 text-black">H.CESS%</th>
+                                                        <th className="p-3 border-r w-32 text-center bg-slate-50 text-black">H.CESS Amt</th>
+
+                                                        <th className="p-3 border-r w-24 text-center bg-slate-100 text-black">SGST%</th>
+                                                        <th className="p-3 border-r w-32 text-center bg-slate-50 text-black">SGST Amt</th>
+
+                                                        <th className="p-3 border-r w-24 text-center bg-slate-100 text-black">CGST%</th>
+                                                        <th className="p-3 border-r w-32 text-center bg-slate-50 text-black">CGST Amt</th>
+
+                                                        <th className="p-3 border-r w-24 text-center bg-slate-100 text-black">IGST%</th>
+                                                        <th className="p-3 border-r w-32 text-center bg-slate-50 text-black">IGST Amt</th>
+
+                                                        <th className="p-3 border-r w-24 text-center bg-slate-100 text-black">TCS%</th>
+                                                        <th className="p-3 border-r w-32 text-center bg-slate-50 text-black">TCS Amt</th>
+                                                        <th className="p-3 border-r w-24 text-center bg-rose-50 text-rose-800">Disc% (Edit)</th>
+                                                        <th className="p-3 border-r w-36 text-center bg-rose-50 text-rose-800">Disc Amt</th>
+                                                        <th className="p-3 border-r w-32 text-center">Other Amt</th>
+                                                        <th className="p-3 border-r w-32 text-center">PF Amt</th>
+                                                        <th className="p-3 border-r w-32 text-center">Freight Amt</th>
+                                                        <th className="p-3 border-r w-80 text-center">ID Mark</th>
+                                                        <th className="p-3 w-12"></th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-slate-200 font-black">
+                                                    {gridRows.map((r, i) => (
+                                                        <tr key={i} className="hover:bg-blue-50">
+                                                            <td className="p-2 border-r text-blue-600">{r.order_no}</td>
+                                                            <td className="p-2 border-r uppercase">{r.product_description}</td>
+                                                            <td className="p-1 border-r"><input className="w-full text-center outline-none" value={r.broker_code} onChange={e => updateGrid(i, 'broker_code', e.target.value)} /></td>
+                                                            <td className="p-1 border-r text-center">{r.packs}</td>
+                                                            <td className="p-1 border-r text-center">{r.packing_type}</td>
+                                                            <td className="p-1 border-r"><input type="number" className="w-full text-center font-black" value={r.total_kgs} onChange={e => updateGrid(i, 'total_kgs', e.target.value)} /></td>
+                                                            <td className="p-1 border-r"><input type="number" className="w-full text-center font-black" value={r.rate} onChange={e => updateGrid(i, 'rate', e.target.value)} /></td>
+                                                            <td className="p-2 border-r text-center bg-blue-50">₹{num(r.base_h).toFixed(2)}</td>
+                                                            <td className="p-1 border-r bg-indigo-50"><input type="number" className="w-full text-center outline-none bg-white rounded border border-indigo-200" value={r.resale} onChange={e => updateGrid(i, 'resale', e.target.value)} /></td>
+                                                            <td className="p-1 border-r bg-indigo-50"><input type="number" className="w-full text-center outline-none bg-white rounded border border-indigo-200" value={r.convert_to_hank} onChange={e => updateGrid(i, 'convert_to_hank', e.target.value)} /></td>
+                                                            <td className="p-1 border-r bg-indigo-50"><input type="number" className="w-full text-center outline-none bg-white rounded border border-indigo-200" value={r.convert_to_cone} onChange={e => updateGrid(i, 'convert_to_cone', e.target.value)} /></td>
+                                                            <td className="p-2 border-r text-center bg-blue-100 font-black">₹{num(r.assessable_value).toFixed(2)}</td>
+                                                            {renderPairCell(r, i, 'vat_per', 'vat_amt', false, updateGrid)}
+                                                            {renderPairCell(r, i, 'cenvat_per', 'cenvat_amt', false, updateGrid)}
+                                                            {renderPairCell(r, i, 'duty_per', 'duty_amt', false, updateGrid)}
+                                                            {renderPairCell(r, i, 'cess_per', 'cess_amt', false, updateGrid)}
+                                                            {renderPairCell(r, i, 'hcess_per', 'hcess_amt', false, updateGrid)}
+                                                            {renderPairCell(r, i, 'sgst_per', 'sgst_amt', false, updateGrid)}
+                                                            {renderPairCell(r, i, 'cgst_per', 'cgst_amt', false, updateGrid)}
+                                                            {renderPairCell(r, i, 'igst_per', 'igst_amt', false, updateGrid)}
+                                                            {renderPairCell(r, i, 'tcs_per', 'tcs_amt', false, updateGrid)}
+                                                            {renderPairCell(r, i, 'discount_percentage', 'discount_amt', true, updateGrid, "text-rose-600")}
+                                                            <td className="p-1 border-r"><input type="number" className="w-full text-center outline-none" value={r.other_amt} onChange={e => updateGrid(i, 'other_amt', e.target.value)} /></td>
+                                                            <td className="p-1 border-r"> <input type="number" className="w-full text-center outline-none" value={r.pf_amt || 0} onChange={e => updateGrid(i, 'pf_amt', e.target.value)} /> </td>
+                                                            <td className="p-1 border-r"><input type="number" className="w-full text-center outline-none" value={r.freight_amt} onChange={e => updateGrid(i, 'freight_amt', e.target.value)} /></td>
+                                                            <td className="p-1 border-r"><input className="w-full text-center outline-none text-[9px]" value={r.identification_mark} onChange={e => updateGrid(i, 'identification_mark', e.target.value)} /></td>
+                                                            <td className="p-2 text-center"><button onClick={() => setGridRows(prev => prev.filter((_, idx) => idx !== i))} className="text-red-500"><MinusCircle size={20} /></button></td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
                                     </div>
                                 </div>
                             )}
@@ -438,13 +855,13 @@ const DepotSalesInvoice = () => {
                         <div className="bg-[#D9E5F7] p-3 border-t border-slate-400 flex justify-between gap-3 px-6 shadow-inner">
                             <div className="flex gap-2">
                                 <button onClick={exportToPDF} disabled={gridRows.length === 0} className="bg-emerald-600 text-white px-6 py-2 text-[11px] font-black rounded flex items-center gap-2 shadow hover:bg-emerald-700">
-                                    <FileText size={16}/> DOWNLOAD PDF
+                                    <FileText size={16} /> DOWNLOAD PDF
                                 </button>
                             </div>
                             <div className="flex gap-3">
                                 <button onClick={() => setIsModalOpen(false)} className="bg-white border border-slate-400 px-10 py-2 text-[11px] font-black rounded uppercase hover:bg-slate-50">Cancel</button>
                                 <button onClick={handleSave} disabled={submitLoading || gridRows.length === 0} className="bg-blue-600 text-white border border-blue-700 px-12 py-2 text-[11px] font-black rounded flex items-center gap-2 hover:bg-blue-700 shadow-md">
-                                    <Save size={16}/> {submitLoading ? "SAVING..." : "COMMIT INVOICE"}
+                                    <Save size={16} /> {submitLoading ? "SAVING..." : "COMMIT INVOICE"}
                                 </button>
                             </div>
                         </div>

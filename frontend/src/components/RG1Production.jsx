@@ -3,7 +3,7 @@ import { mastersAPI, transactionsAPI } from '../service/api';
 import { 
     Plus, Edit, Trash2, X, ChevronLeft, 
     ChevronRight, RefreshCw, Save, Factory, Search, Filter, 
-    Square, CheckSquare
+    Square, CheckSquare, Loader2
 } from 'lucide-react';
 
 const RG1Production = () => {
@@ -47,22 +47,19 @@ const RG1Production = () => {
 
     // --- 2. Auto-Calculation Stock Logic ---
     useEffect(() => {
+
         const prod = parseFloat(formData.production_kgs) || 0;
         const prev = parseFloat(formData.prev_closing_kgs) || 0;
         const inv = parseFloat(formData.invoice_kgs) || 0;
-        const bagWt = parseFloat(formData.weight_per_bag) || 0;
 
         const closingKgs = (prev + prod) - inv;
-        const bags = bagWt > 0 ? Math.floor(closingKgs / bagWt) : 0;
-        const loose = bagWt > 0 ? (closingKgs % bagWt) : closingKgs;
-        
+
         setFormData(prevForm => ({
             ...prevForm,
-            stock_kgs: closingKgs.toFixed(2),
-            stock_bags: bags,
-            stock_loose_kgs: loose.toFixed(2)
+            stock_kgs: closingKgs.toFixed(2)
         }));
-    }, [formData.production_kgs, formData.prev_closing_kgs, formData.invoice_kgs, formData.weight_per_bag]);
+
+    }, [formData.production_kgs, formData.prev_closing_kgs, formData.invoice_kgs]);
 
     // --- 3. Data Fetching ---
     useEffect(() => {
@@ -262,105 +259,219 @@ const RG1Production = () => {
 
             {/* --- LEGACY STYLE POPUP MODAL (MATCHED TO IMAGE) --- */}
             {isModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 font-sans">
-                    <div className="bg-white w-full max-w-[800px] rounded shadow-2xl overflow-hidden animate-in zoom-in duration-200">
-                        
-                        {/* Header Area */}
-                        <div className="bg-[#6495ed] p-5 text-white">
-                            <div className="flex justify-between items-center mb-1">
-                                <h2 className="text-2xl font-bold tracking-tight">RG1 Production</h2>
-                                <button onClick={() => setIsModalOpen(false)} className="hover:bg-red-500 hover:text-white p-1 rounded-sm bg-white/10 transition-all"><X size={24}/></button>
-                            </div>
-                            <p className="text-blue-50 text-sm font-medium italic opacity-90">To Add, Modify packing production details.</p>
-                        </div>
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/65 backdrop-blur-md p-4 font-sans">
+    <div className="relative bg-white w-full max-w-3xl rounded-2xl shadow-2xl overflow-hidden border border-slate-200/70 animate-in zoom-in-95 duration-200 flex flex-col max-h-[92vh]">
+      
+      {/* Header */}
+      <div className="bg-gradient-to-r from-blue-700 to-indigo-700 px-6 py-5 flex justify-between items-center text-white shadow-md">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 bg-white/20 rounded-lg">
+            <Factory size={24} /> {/* or Zap, Package, Layers */}
+          </div>
+          <div>
+            <h2 className="text-xl font-bold tracking-tight">RG1 Production</h2>
+            <p className="text-blue-100/90 text-sm font-medium mt-0.5 uppercase tracking-wide">
+              Add / Modify Packing Production Details
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={() => setIsModalOpen(false)}
+          className="p-2.5 rounded-xl hover:bg-white/20 transition-all active:scale-95"
+        >
+          <X size={24} strokeWidth={3} />
+        </button>
+      </div>
 
-                        {/* Main Body (Lavender Interior) */}
-                        <div className="p-12 bg-[#cfe2ff]">
-                            <form onSubmit={handleSave} className="space-y-4 max-w-3xl mx-auto">
-                                
-                                {/* Row 1: Date */}
-                                <div className="grid grid-cols-12 items-center">
-                                    <div className="col-span-4 flex justify-end"><FormLabel>Date</FormLabel></div>
-                                    <div className="col-span-8">
-                                        <input type="date" className="w-48 p-1.5 border border-gray-400 bg-white text-sm font-bold outline-none shadow-inner" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} />
-                                    </div>
-                                </div>
+      {/* Body */}
+      <div className="p-8 overflow-y-auto flex-1 bg-gradient-to-b from-slate-50 to-white">
+        <form onSubmit={handleSave} className="space-y-7 max-w-3xl mx-auto">
+          
+          {/* Date */}
+          <div className="grid grid-cols-12 items-center gap-6">
+            <div className="col-span-4 flex justify-end">
+              <FormLabel>Date</FormLabel>
+            </div>
+            <div className="col-span-8">
+              <input
+                type="date"
+                className="w-56 p-3.5 border border-slate-300 rounded-lg bg-white text-base font-semibold focus:border-blue-500 focus:ring-2 focus:ring-blue-400/30 outline-none shadow-sm"
+                value={formData.date || ''}
+                onChange={e => setFormData({ ...formData, date: e.target.value })}
+              />
+            </div>
+          </div>
 
-                                {/* Row 2: Count (Product Name) */}
-                                <div className="grid grid-cols-12 items-center">
-                                    <div className="col-span-4 flex justify-end"><FormLabel>Count</FormLabel></div>
-                                    <div className="col-span-8">
-                                        <select className="w-full p-1.5 border border-gray-400 bg-[#fff5f5] uppercase text-[13px] font-black text-slate-800 outline-none focus:border-blue-500 shadow-inner" value={formData.product_id} onChange={e => onProductChange(e.target.value)}>
-                                            <option value="">-- SELECT SKU / PRODUCT --</option>
-                                            {products.map(p => <option key={p.id} value={p.id}>{p.product_name}</option>)}
-                                        </select>
-                                    </div>
-                                </div>
+          {/* Count / Product */}
+          <div className="grid grid-cols-12 items-center gap-6">
+            <div className="col-span-4 flex justify-end">
+              <FormLabel>Count</FormLabel>
+            </div>
+            <div className="col-span-8">
+              <select
+                className="w-full p-3.5 border border-slate-300 rounded-lg bg-white uppercase text-base font-semibold focus:border-blue-500 focus:ring-2 focus:ring-blue-400/30 outline-none shadow-sm"
+                value={formData.product_id || ''}
+                onChange={e => onProductChange(e.target.value)}
+              >
+                <option value="">-- SELECT SKU / PRODUCT --</option>
+                {products.map(p => (
+                  <option key={p.id} value={p.id}>
+                    {p.product_name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
 
-                                {/* Row 3: Packing Type & Weight */}
-                                <div className="grid grid-cols-12 items-center">
-                                    <div className="col-span-4 flex justify-end"><FormLabel>Packing Type</FormLabel></div>
-                                    <div className="col-span-3">
-                                        <input type="text" readOnly className="w-full p-1.5 border border-gray-400 bg-gray-200 text-slate-700 font-bold outline-none cursor-default shadow-sm" value={packingTypes.find(t => t.id == formData.packing_type_id)?.packing_type || '-'} />
-                                    </div>
-                                    <div className="col-span-2 flex justify-end"><FormLabel>Weight</FormLabel></div>
-                                    <div className="col-span-3">
-                                        <input type="text" readOnly className="w-full p-1.5 border border-gray-400 bg-gray-200 text-slate-700 font-bold outline-none cursor-default shadow-sm text-center" value={formData.weight_per_bag} />
-                                    </div>
-                                </div>
+          {/* Packing Type & Weight */}
+          <div className="grid grid-cols-12 items-center gap-6">
+            <div className="col-span-4 flex justify-end">
+              <FormLabel>Packing Type</FormLabel>
+            </div>
+            <div className="col-span-4">
+              <input
+                type="text"
+                readOnly
+                className="w-full p-3.5 border border-slate-300 bg-slate-100 text-slate-700 font-semibold rounded-lg outline-none cursor-default shadow-sm"
+                value={packingTypes.find(t => t.id == formData.packing_type_id)?.packing_type || '-'}
+              />
+            </div>
+            <div className="col-span-2 flex justify-end">
+              <FormLabel>Weight</FormLabel>
+            </div>
+            <div className="col-span-2">
+              <input
+                type="text"
+                readOnly
+                className="w-full p-3.5 border border-slate-300 bg-slate-100 text-slate-700 font-semibold text-center rounded-lg outline-none cursor-default shadow-sm"
+                value={formData.weight_per_bag || '-'}
+              />
+            </div>
+          </div>
 
-                                {/* Row 4: Prv. Day Closing & Production Kgs */}
-                                <div className="grid grid-cols-12 items-center">
-                                    <div className="col-span-4 flex justify-end"><FormLabel>Prv. Day Closing</FormLabel></div>
-                                    <div className="col-span-3">
-                                        <input type="text" readOnly className="w-full p-1.5 border border-gray-400 bg-gray-200 text-slate-800 font-bold outline-none cursor-default text-right" value={formData.prev_closing_kgs} />
-                                    </div>
-                                    <div className="col-span-2 flex justify-end"><FormLabel>Production Kgs</FormLabel></div>
-                                    <div className="col-span-3">
-                                        <input type="number" step="0.01" className="w-full p-1.5 border border-[#3b82f6] bg-white text-blue-800 font-black text-sm outline-none shadow-inner text-right" value={formData.production_kgs} onChange={e => setFormData({...formData, production_kgs: e.target.value})} />
-                                    </div>
-                                </div>
+          {/* Prev Day Closing & Production Kgs */}
+          <div className="grid grid-cols-12 items-center gap-6">
+            <div className="col-span-4 flex justify-end">
+              <FormLabel>Prv. Day Closing</FormLabel>
+            </div>
+            <div className="col-span-4">
+              <input
+                type="text"
+                readOnly
+                className="w-full p-3.5 border border-slate-300 bg-slate-100 text-slate-800 font-bold text-right rounded-lg outline-none cursor-default shadow-sm"
+                value={formData.prev_closing_kgs || '0.000'}
+              />
+            </div>
+            <div className="col-span-2 flex justify-end">
+              <FormLabel>Production Kgs</FormLabel>
+            </div>
+            <div className="col-span-2">
+              <input
+                type="number"
+                step="0.01"
+                className="w-full p-3.5 border-2 border-blue-500 bg-white text-blue-800 font-black text-base text-right rounded-lg outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-400/30 shadow-sm"
+                value={formData.production_kgs ?? ''}
+                onChange={e => setFormData({ ...formData, production_kgs: e.target.value })}
+              />
+            </div>
+          </div>
 
-                                {/* Row 5: Invoice Kgs & Stock Kgs */}
-                                <div className="grid grid-cols-12 items-center">
-                                    <div className="col-span-4 flex justify-end"><FormLabel>Invoice Kgs</FormLabel></div>
-                                    <div className="col-span-3">
-                                        <input type="number" step="0.01" className="w-full p-1.5 border border-gray-400 bg-white text-slate-800 font-bold text-sm outline-none shadow-inner text-right" value={formData.invoice_kgs} onChange={e => setFormData({...formData, invoice_kgs: e.target.value})} />
-                                    </div>
-                                    <div className="col-span-2 flex justify-end"><FormLabel>Stock Kgs</FormLabel></div>
-                                    <div className="col-span-3">
-                                        <input type="text" readOnly className="w-full p-1.5 border border-gray-400 bg-gray-200 text-slate-900 font-black outline-none cursor-default text-right" value={formData.stock_kgs} />
-                                    </div>
-                                </div>
+          {/* Invoice Kgs & Stock Kgs */}
+          <div className="grid grid-cols-12 items-center gap-6">
+            <div className="col-span-4 flex justify-end">
+              <FormLabel>Invoice Kgs</FormLabel>
+            </div>
+            <div className="col-span-4">
+              <input
+                type="number"
+                step="0.01"
+                className="w-full p-3.5 border border-slate-300 bg-white text-slate-800 font-bold text-base text-right rounded-lg outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-400/30 shadow-sm"
+                value={formData.invoice_kgs ?? ''}
+                onChange={e => setFormData({ ...formData, invoice_kgs: e.target.value })}
+              />
+            </div>
+            <div className="col-span-2 flex justify-end">
+              <FormLabel>Stock Kgs</FormLabel>
+            </div>
+            <div className="col-span-2">
+              <input
+                type="number"
+                step="0.01"
+                className="w-full p-3.5 border border-blue-400 bg-white text-blue-800 font-black text-base text-right rounded-lg outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-400/30 shadow-sm"
+                value={formData.stock_kgs ?? ''}
+                onChange={e => setFormData({ ...formData, stock_kgs: e.target.value })}
+              />
+            </div>
+          </div>
 
-                                {/* Row 6: Stock Bags & Stock Loose */}
-                                <div className="grid grid-cols-12 items-center">
-                                    <div className="col-span-4 flex justify-end"><FormLabel>Stock Bags</FormLabel></div>
-                                    <div className="col-span-3">
-                                        <input type="text" readOnly className="w-full p-1.5 border border-gray-400 bg-white text-slate-800 font-bold text-sm outline-none text-right" value={formData.stock_bags} />
-                                    </div>
-                                    <div className="col-span-2 flex justify-end"><FormLabel>Stock Loose</FormLabel></div>
-                                    <div className="col-span-3">
-                                        <input type="text" readOnly className="w-full p-1.5 border border-gray-400 bg-white text-slate-800 font-bold text-sm outline-none text-right" value={formData.stock_loose_kgs} />
-                                    </div>
-                                </div>
+          {/* Stock Bags & Stock Loose – Stock Bags is now editable */}
+          <div className="grid grid-cols-12 items-center gap-6">
+            <div className="col-span-4 flex justify-end">
+              <FormLabel>Stock Bags</FormLabel>
+            </div>
+            <div className="col-span-4">
+              <input
+                type="number"
+                step="0.01"
+                className="w-full p-3.5 border border-blue-400 bg-white text-blue-800 font-black text-base text-right rounded-lg outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-400/30 shadow-sm"
+                value={formData.stock_bags ?? ''}
+                onChange={e => setFormData({ ...formData, stock_bags: e.target.value })}
+                placeholder="Enter stock bags"
+              />
+            </div>
+            <div className="col-span-2 flex justify-end">
+              <FormLabel>Stock Loose</FormLabel>
+            </div>
+            <div className="col-span-2">
+              <input
+                type="number"
+                step="0.01"
+                className="w-full p-3.5 border border-blue-400 bg-white text-blue-800 font-black text-base text-right rounded-lg outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-400/30 shadow-sm"
+                value={formData.stock_loose_kgs ?? ''}
+                onChange={e => setFormData({ ...formData, stock_loose_kgs: e.target.value })}
+              />
+            </div>
+          </div>
 
-                                {/* Action Buttons at bottom right */}
-                                <div className="flex justify-end gap-3 pt-10">
-                                    <div className="bg-[#cfe2ff] border border-blue-200 p-3 flex gap-3 rounded-sm shadow-md">
-                                        <button type="submit" onClick={handleSave} disabled={submitLoading} className="flex items-center gap-2 bg-slate-50 border border-slate-400 px-8 py-1.5 text-xs font-black shadow-sm hover:bg-white active:scale-95 transition-all text-blue-700 uppercase">
-                                            <span className="font-black border border-blue-200 px-1 rounded bg-white">💾</span> Update
-                                        </button>
-                                        <button type="button" onClick={() => setIsModalOpen(false)} className="flex items-center gap-2 bg-slate-50 border border-slate-400 px-8 py-1.5 text-xs font-black shadow-sm hover:bg-white active:scale-95 transition-all text-red-600 uppercase">
-                                            <span className="font-black border border-red-200 px-1 rounded bg-white">X</span> Cancel
-                                        </button>
-                                    </div>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-            )}
+          {/* Footer Actions */}
+          <div className="flex justify-end gap-4 pt-10 mt-4 border-t border-slate-200">
+            <button
+              type="submit"
+              disabled={submitLoading}
+              className={`
+                px-10 py-3 rounded-xl font-semibold flex items-center gap-3 shadow-md min-w-[140px] justify-center transition-all
+                ${submitLoading
+                  ? 'bg-slate-400 text-white cursor-not-allowed'
+                  : 'bg-blue-600 hover:bg-blue-700 text-white hover:shadow-blue-300 active:scale-[0.98]'
+                }
+              `}
+            >
+              {submitLoading ? (
+                <>
+                  <Loader2 className="animate-spin" size={20} />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save size={20} />
+                  Update
+                </>
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setIsModalOpen(false)}
+              className="px-10 py-3 border-2 border-slate-400 rounded-xl text-slate-700 font-semibold hover:bg-slate-50 transition-colors flex items-center gap-3"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+)}
         </div>
     );
 };

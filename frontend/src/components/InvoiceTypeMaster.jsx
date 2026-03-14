@@ -3,7 +3,7 @@ import { mastersAPI } from '../service/api';
 import { 
     Plus, Edit, Trash2, X, ChevronLeft, 
     ChevronRight, RefreshCw, Save, Calculator, Search, Filter, 
-    Square, CheckSquare
+    Square, CheckSquare, FileText, Loader2
 } from 'lucide-react';
 
 const TAX_ROWS_CONFIG = [
@@ -281,228 +281,424 @@ const InvoiceTypeMaster = () => {
             </div>
 
             {/* Modal – wider & cleaner fonts */}
-            {isModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 overflow-y-auto">
-                    <div className="bg-[#cfe2ff] w-full max-w-[1200px] rounded shadow-2xl overflow-hidden border border-white animate-in zoom-in duration-200">
-                        <div className="bg-[#6495ed] p-5 flex justify-between items-center text-white border-b border-white/20">
-                            <div>
-                                <h2 className="text-xl font-medium tracking-wide">Invoice Type Master</h2>
-                                <p className="text-blue-50 text-base mt-1">Add / Modify Invoice Type details</p>
-                            </div>
-                            <button onClick={() => setIsModalOpen(false)} className="hover:bg-white/10 p-1 rounded-full"><X size={24}/></button>
-                        </div>
+           {isModalOpen && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4">
+    <div className="relative bg-white w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden border border-slate-200/70 animate-in zoom-in-95 duration-200 flex flex-col max-h-[94vh]">
+      
+      {/* Header */}
+      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-5 flex justify-between items-center text-white shadow-md">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-white/15 rounded-lg">
+            <FileText size={22} />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold tracking-tight">Invoice Type Master</h2>
+            <p className="text-blue-100/90 text-sm font-medium mt-0.5 uppercase tracking-wide">
+              {formData.id ? 'Edit Invoice Type' : 'New Invoice Type'}
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={() => setIsModalOpen(false)}
+          className="p-2 rounded-lg hover:bg-white/20 transition-colors active:scale-95"
+        >
+          <X size={22} strokeWidth={3} />
+        </button>
+      </div>
 
-                        <div className="p-6 max-h-[80vh] overflow-y-auto">
-                            <form onSubmit={handleSave} className="space-y-3">
-                                {/* Top row – Code, Option II, Round off digits */}
-                                <div className="grid grid-cols-12 gap-4 items-center">
-                                    <div className="col-span-2 flex justify-end"><FormLabel>Code</FormLabel></div>
-                                    <div className="col-span-2">
-                                        <input type="text" readOnly className="w-full p-1.5 border border-gray-400 bg-black text-white font-bold font-mono text-base outline-none cursor-default" value={formData.code} />
-                                    </div>
-                                    <div className="col-span-3 flex items-center gap-3">
-                                        <input type="checkbox" checked={formData.is_option_ii} onChange={e => setFormData({...formData, is_option_ii: e.target.checked})} className="w-5 h-5 accent-blue-600" />
-                                        <label className="text-base font-medium text-slate-700">Option II</label>
-                                    </div>
-                                    <div className="col-span-5 flex items-center gap-4">
-                                        <FormLabel>Round off digits</FormLabel>
-                                        <input type="number" className="w-20 p-1.5 border border-gray-400 bg-white text-base text-center" value={formData.round_off_digits} onChange={e => setFormData({...formData, round_off_digits: Number(e.target.value)})} />
-                                    </div>
-                                </div>
+      {/* Body */}
+      <div className="p-6 overflow-y-auto flex-1 bg-slate-50/70">
+        <form onSubmit={handleSave} className="space-y-6">
 
-                                {/* Invoice Type + Sales Type + Group */}
-                                <div className="grid grid-cols-12 gap-4 items-center">
-                                    <div className="col-span-2 flex justify-end"><FormLabel>Invoice Type</FormLabel></div>
-                                    <div className="col-span-5">
-                                        <input type="text" required className="w-full p-1.5 border border-gray-400 bg-white uppercase text-base font-semibold outline-none focus:border-blue-500" value={formData.type_name} onChange={e => setFormData({...formData, type_name: e.target.value.toUpperCase()})} />
-                                    </div>
-                                    <div className="col-span-2 flex justify-end"><FormLabel>Sales Type</FormLabel></div>
-                                    <div className="col-span-3">
-                                        <select className="w-full p-1.5 border border-gray-400 bg-white text-base outline-none focus:border-blue-500" value={formData.sales_type} onChange={e => setFormData({...formData, sales_type: e.target.value})}>
-                                            <option value="CST SALES">CST SALES</option>
-                                            <option value="GST SALES">GST SALES</option>
-                                            <option value="DEPOT SALES">DEPOT SALES</option>
-                                        </select>
-                                    </div>
-                                </div>
+          {/* Top row - Code, Option II, Round off */}
+          <div className="grid grid-cols-12 gap-4 items-center bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+            <div className="col-span-2 flex justify-end">
+              <FormLabel>Code</FormLabel>
+            </div>
+            <div className="col-span-2">
+              <input
+                readOnly
+                className="w-full p-2.5 bg-slate-800 text-white font-mono font-bold rounded-lg border border-slate-600 cursor-not-allowed"
+                value={formData.code || 'New'}
+              />
+            </div>
 
-                                <div className="grid grid-cols-12 gap-4 items-center">
-                                    <div className="col-span-2 flex justify-end"><FormLabel>Group Name</FormLabel></div>
-                                    <div className="col-span-5">
-                                        <input type="text" className="w-full p-1.5 border border-gray-400 bg-white uppercase text-base outline-none focus:border-blue-500" value={formData.group_name} onChange={e => setFormData({...formData, group_name: e.target.value.toUpperCase()})} />
-                                    </div>
-                                    <div className="col-span-5 flex items-center gap-4">
-                                        <label className="flex items-center gap-2 text-base font-medium text-slate-700 cursor-pointer">
-                                            <input type="checkbox" checked={formData.account_posting} onChange={e => setFormData({...formData, account_posting: e.target.checked})} className="w-5 h-5 accent-blue-600" />
-                                            Account Posting
-                                        </label>
-                                    </div>
-                                </div>
+            <div className="col-span-3 flex items-center gap-3">
+              <input
+                type="checkbox"
+                checked={formData.is_option_ii}
+                onChange={e => setFormData({...formData, is_option_ii: e.target.checked})}
+                className="w-5 h-5 accent-blue-600"
+              />
+              <label className="text-sm font-medium text-slate-700">Option II</label>
+            </div>
 
-                                {/* Tax Mapping Table – cleaner & larger fonts */}
-                                <div className="mt-6 border border-slate-300 rounded-lg overflow-hidden bg-white shadow-sm">
-                                    <div className="bg-blue-700 text-white grid grid-cols-12 py-2 px-3 font-semibold text-sm uppercase tracking-wide">
-                                        <div className="col-span-3">Description</div>
-                                        <div className="col-span-1 text-center">Enable</div>
-                                        <div className="col-span-1 text-center">%</div>
-                                        <div className="col-span-3">Formula</div>
-                                        <div className="col-span-2">Debit A/c</div>
-                                        <div className="col-span-2">Credit A/c</div>
-                                    </div>
+            <div className="col-span-5 flex items-center gap-4">
+              <FormLabel>Round off digits</FormLabel>
+              <input
+                type="number"
+                className="w-20 p-2.5 border border-slate-300 rounded-lg text-center text-sm focus:border-blue-500 focus:ring-1"
+                value={formData.round_off_digits ?? ''}
+                onChange={e => setFormData({...formData, round_off_digits: Number(e.target.value)})}
+              />
+            </div>
+          </div>
 
-                                    {/* Assess Value Row */}
-                                    <div className="grid grid-cols-12 gap-2 px-3 py-2 border-b items-center hover:bg-blue-50/30">
-                                        <div className="col-span-3 font-medium">Assess Value</div>
-                                        <div className="col-span-1 flex justify-center">
-                                            <input type="checkbox" checked={formData.assess_checked} onChange={e => setFormData({...formData, assess_checked: e.target.checked})} className="w-5 h-5 accent-blue-600" />
-                                        </div>
-                                        <div className="col-span-1"></div>
-                                        <div className="col-span-3">
-                                            <input className="w-full p-1.5 border border-gray-300 rounded text-base font-mono focus:border-blue-500" value={formData.assess_formula} onChange={e => setFormData({...formData, assess_formula: e.target.value})} placeholder="[formula]" />
-                                        </div>
-                                        <div className="col-span-2">
-                                            <input className="w-full p-1.5 border border-gray-300 rounded text-base uppercase" value={formData.assess_account} onChange={e => setFormData({...formData, assess_account: e.target.value.toUpperCase()})} placeholder="Debit A/c" />
-                                        </div>
-                                        <div className="col-span-2">
-                                            <input className="w-full p-1.5 border border-gray-300 rounded text-base uppercase" value={formData.assess_credit} onChange={e => setFormData({...formData, assess_credit: e.target.value.toUpperCase()})} placeholder="Credit A/c" />
-                                        </div>
-                                    </div>
+          {/* Basic info row */}
+          <div className="grid grid-cols-12 gap-4 items-center bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+            <div className="col-span-2 flex justify-end"><FormLabel>Invoice Type</FormLabel></div>
+            <div className="col-span-4">
+              <input
+                required
+                className="w-full p-2.5 border border-slate-300 rounded-lg uppercase font-semibold focus:border-blue-500 focus:ring-1"
+                value={formData.type_name || ''}
+                onChange={e => setFormData({...formData, type_name: e.target.value.toUpperCase()})}
+              />
+            </div>
 
-                                    {/* Dynamic Tax Rows */}
-                                    {formData.rows.map((row, idx) => (
-                                        <div key={row.id} className="grid grid-cols-12 gap-2 px-3 py-2 border-b last:border-b-0 items-center hover:bg-blue-50/30">
-                                            <div className="col-span-3 font-medium">{row.label}</div>
-                                            <div className="col-span-1 flex justify-center">
-                                                <input type="checkbox" checked={row.checked} onChange={e => {
-                                                    const newRows = [...formData.rows];
-                                                    newRows[idx].checked = e.target.checked;
-                                                    setFormData({...formData, rows: newRows});
-                                                }} className="w-5 h-5 accent-blue-600" />
-                                            </div>
-                                            <div className="col-span-1">
-                                                <input type="number" step="0.01" className="w-full p-1.5 border border-gray-300 rounded text-base text-center" value={row.val} onChange={e => {
-                                                    const newRows = [...formData.rows];
-                                                    newRows[idx].val = e.target.value;
-                                                    setFormData({...formData, rows: newRows});
-                                                }} />
-                                            </div>
-                                            <div className="col-span-3">
-                                                <input className="w-full p-1.5 border border-gray-300 rounded text-base font-mono focus:border-blue-500" value={row.formula} onChange={e => {
-                                                    const newRows = [...formData.rows];
-                                                    newRows[idx].formula = e.target.value;
-                                                    setFormData({...formData, rows: newRows});
-                                                }} placeholder="[formula]" />
-                                            </div>
-                                            <div className="col-span-2">
-                                                <input className="w-full p-1.5 border border-gray-300 rounded text-base uppercase" value={row.debit} onChange={e => {
-                                                    const newRows = [...formData.rows];
-                                                    newRows[idx].debit = e.target.value.toUpperCase();
-                                                    setFormData({...formData, rows: newRows});
-                                                }} placeholder="Debit A/c" />
-                                            </div>
-                                            <div className="col-span-2">
-                                                <input className="w-full p-1.5 border border-gray-300 rounded text-base uppercase" value={row.credit} onChange={e => {
-                                                    const newRows = [...formData.rows];
-                                                    newRows[idx].credit = e.target.value.toUpperCase();
-                                                    setFormData({...formData, rows: newRows});
-                                                }} placeholder="Credit A/c" />
-                                            </div>
-                                        </div>
-                                    ))}
+            <div className="col-span-2 flex justify-end"><FormLabel>Sales Type</FormLabel></div>
+            <div className="col-span-4">
+              <select
+                className="w-full p-2.5 border border-slate-300 rounded-lg focus:border-blue-500 focus:ring-1"
+                value={formData.sales_type || ''}
+                onChange={e => setFormData({...formData, sales_type: e.target.value})}
+              >
+                <option value="CST SALES">CST SALES</option>
+                <option value="GST SALES">GST SALES</option>
+                <option value="DEPOT SALES">DEPOT SALES</option>
+              </select>
+            </div>
+          </div>
 
-                                    {/* GST Section */}
-                                    <div className="grid grid-cols-12 gap-2 px-3 py-3 bg-blue-50/40 border-t">
-                                        <div className="col-span-3 font-medium flex items-center justify-end">GST</div>
-                                        <div className="col-span-1 flex justify-center">
-                                            <input type="checkbox" checked={formData.gst_checked} onChange={e => setFormData({...formData, gst_checked: e.target.checked})} className="w-5 h-5 accent-blue-600" />
-                                        </div>
-                                        <div className="col-span-4 flex items-center gap-3">
-                                            <span className="font-medium">SGST % :</span>
-                                            <input type="number" step="0.01" className="w-20 p-1.5 border border-gray-300 rounded text-base text-center" value={formData.sgst_percentage} onChange={e => setFormData({...formData, sgst_percentage: Number(e.target.value)})} />
-                                            <span className="font-medium">CGST % :</span>
-                                            <input type="number" step="0.01" className="w-20 p-1.5 border border-gray-300 rounded text-base text-center" value={formData.cgst_percentage} onChange={e => setFormData({...formData, cgst_percentage: Number(e.target.value)})} />
-                                        </div>
-                                        <div className="col-span-4 flex items-center gap-3">
-                                            <input className="flex-1 p-1.5 border border-gray-300 rounded text-base font-mono" value={formData.sgst_formula} onChange={e => setFormData({...formData, sgst_formula: e.target.value})} placeholder="SGST formula" />
-                                            <input className="flex-1 p-1.5 border border-gray-300 rounded text-base uppercase" value={formData.cgst_account} onChange={e => setFormData({...formData, cgst_account: e.target.value.toUpperCase()})} placeholder="CGST A/c" />
-                                        </div>
-                                    </div>
+          <div className="grid grid-cols-12 gap-4 items-center bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+            <div className="col-span-2 flex justify-end"><FormLabel>Group Name</FormLabel></div>
+            <div className="col-span-5">
+              <input
+                className="w-full p-2.5 border border-slate-300 rounded-lg uppercase focus:border-blue-500 focus:ring-1"
+                value={formData.group_name || ''}
+                onChange={e => setFormData({...formData, group_name: e.target.value.toUpperCase()})}
+              />
+            </div>
 
-                                    {/* IGST Row */}
-                                    <div className="grid grid-cols-12 gap-2 px-3 py-3 bg-blue-50/40 border-t">
-                                        <div className="col-span-3 font-medium flex items-center justify-end">IGST</div>
-                                        <div className="col-span-1 flex justify-center">
-                                            <input type="checkbox" checked={formData.igst_checked} onChange={e => setFormData({...formData, igst_checked: e.target.checked})} className="w-5 h-5 accent-blue-600" />
-                                        </div>
-                                        <div className="col-span-1">
-                                            <input type="number" step="0.01" className="w-full p-1.5 border border-gray-300 rounded text-base text-center" value={formData.igst_percentage} onChange={e => setFormData({...formData, igst_percentage: Number(e.target.value)})} />
-                                        </div>
-                                        <div className="col-span-4">
-                                            <input className="w-full p-1.5 border border-gray-300 rounded text-base font-mono" value={formData.igst_formula} onChange={e => setFormData({...formData, igst_formula: e.target.value})} placeholder="IGST formula" />
-                                        </div>
-                                        <div className="col-span-4 flex gap-3">
-                                            <input className="flex-1 p-1.5 border border-gray-300 rounded text-base uppercase" value={formData.igst_account} onChange={e => setFormData({...formData, igst_account: e.target.value.toUpperCase()})} placeholder="IGST Debit A/c" />
-                                            <input className="flex-1 p-1.5 border border-gray-300 rounded text-base uppercase" value={formData.igst_credit} onChange={e => setFormData({...formData, igst_credit: e.target.value.toUpperCase()})} placeholder="IGST Credit A/c" />
-                                        </div>
-                                    </div>
-                                </div>
+            <div className="col-span-5 flex items-center gap-6">
+              <label className="flex items-center gap-2 text-sm font-medium text-slate-700 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.account_posting}
+                  onChange={e => setFormData({...formData, account_posting: e.target.checked})}
+                  className="w-5 h-5 accent-blue-600"
+                />
+                Account Posting
+              </label>
+            </div>
+          </div>
 
-                                {/* Footer Formulas */}
-                                <div className="grid grid-cols-12 gap-4 pt-6 border-t">
-                                    <div className="col-span-3 flex justify-end"><FormLabel>Sub Total</FormLabel></div>
-                                    <div className="col-span-9">
-                                        <input className="w-full p-1.5 border border-gray-400 bg-white text-base font-mono focus:border-blue-500" value={formData.sub_total_formula} onChange={e => setFormData({...formData, sub_total_formula: e.target.value})} />
-                                    </div>
+          {/* Tax Mapping Table */}
+          <div className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-sm">
+            <div className="bg-blue-700 text-white grid grid-cols-12 py-3 px-4 font-semibold text-sm uppercase tracking-wide sticky top-0 z-10">
+              <div className="col-span-3">Description</div>
+              <div className="col-span-1 text-center">Enable</div>
+              <div className="col-span-1 text-center">%</div>
+              <div className="col-span-3">Formula</div>
+              <div className="col-span-2">Debit A/c</div>
+              <div className="col-span-2">Credit A/c</div>
+            </div>
 
-                                    <div className="col-span-3 flex justify-end"><FormLabel>Total Value</FormLabel></div>
-                                    <div className="col-span-9">
-                                        <input className="w-full p-1.5 border border-gray-400 bg-white text-base font-mono focus:border-blue-500" value={formData.total_value_formula} onChange={e => setFormData({...formData, total_value_formula: e.target.value})} />
-                                    </div>
+            {/* Assess Value */}
+            <div className="grid grid-cols-12 gap-3 px-4 py-3 border-b hover:bg-slate-50">
+              <div className="col-span-3 font-medium flex items-center">Assess Value</div>
+              <div className="col-span-1 flex justify-center items-center">
+                <input
+                  type="checkbox"
+                  checked={formData.assess_checked}
+                  onChange={e => setFormData({...formData, assess_checked: e.target.checked})}
+                  className="w-5 h-5 accent-blue-600"
+                />
+              </div>
+              <div className="col-span-1" />
+              <div className="col-span-3">
+                <input
+                  className="w-full p-2 border border-slate-300 rounded font-mono text-sm focus:border-blue-500"
+                  value={formData.assess_formula || ''}
+                  onChange={e => setFormData({...formData, assess_formula: e.target.value})}
+                  placeholder="[formula]"
+                />
+              </div>
+              <div className="col-span-2">
+                <input
+                  className="w-full p-2 border border-slate-300 rounded uppercase text-sm"
+                  value={formData.assess_account || ''}
+                  onChange={e => setFormData({...formData, assess_account: e.target.value.toUpperCase()})}
+                  placeholder="Debit A/c"
+                />
+              </div>
+              <div className="col-span-2">
+                <input
+                  className="w-full p-2 border border-slate-300 rounded uppercase text-sm"
+                  value={formData.assess_credit || ''}
+                  onChange={e => setFormData({...formData, assess_credit: e.target.value.toUpperCase()})}
+                  placeholder="Credit A/c"
+                />
+              </div>
+            </div>
 
-                                    <div className="col-span-3 flex justify-end"><FormLabel>Round Off</FormLabel></div>
-                                    <div className="col-span-9 flex items-center gap-6">
-                                        <div className="flex gap-4">
-                                            <label className="flex items-center gap-2 text-base">
-                                                <input type="radio" value="Forward" checked={formData.round_off_direction === 'Forward'} onChange={e => setFormData({...formData, round_off_direction: e.target.value})} className="w-4 h-4" />
-                                                Forward
-                                            </label>
-                                            <label className="flex items-center gap-2 text-base">
-                                                <input type="radio" value="Reverse" checked={formData.round_off_direction === 'Reverse'} onChange={e => setFormData({...formData, round_off_direction: e.target.value})} className="w-4 h-4" />
-                                                Reverse
-                                            </label>
-                                        </div>
-                                        <input className="flex-1 p-1.5 border border-gray-400 bg-white uppercase text-base font-bold" value={formData.round_off_account} onChange={e => setFormData({...formData, round_off_account: e.target.value.toUpperCase()})} placeholder="ROUND OFF A/C" />
-                                    </div>
-
-                                    <div className="col-span-3 flex justify-end"><FormLabel>Lorry Freight</FormLabel></div>
-                                    <div className="col-span-9">
-                                        <input className="w-full p-1.5 border border-gray-400 bg-white uppercase text-base font-bold" value={formData.lorry_freight_account} onChange={e => setFormData({...formData, lorry_freight_account: e.target.value.toUpperCase()})} placeholder="FREIGHT LEDGER" />
-                                    </div>
-                                </div>
-                            </form>
-                        </div>
-
-                        {/* Footer Buttons */}
-                        <div className="p-5 bg-[#cfe2ff] border-t border-blue-200 flex justify-end gap-4">
-                            <button 
-                                type="submit" 
-                                onClick={handleSave} 
-                                disabled={submitLoading} 
-                                className="flex items-center gap-2 bg-slate-50 border border-slate-400 px-10 py-2.5 text-base font-bold shadow-sm hover:bg-white active:scale-95 transition-all"
-                            >
-                                <span className="text-blue-700 p-1 border border-blue-100 bg-white rounded"><Save size={16}/></span>
-                                {formData.id ? 'Update' : 'Save'}
-                            </button>
-                            <button 
-                                onClick={() => setIsModalOpen(false)} 
-                                className="flex items-center gap-2 bg-slate-50 border border-slate-400 px-10 py-2.5 text-base font-bold shadow-sm hover:bg-white active:scale-95 transition-all"
-                            >
-                                <span className="text-red-600 font-black p-1 border border-red-100 bg-white rounded">X</span> Cancel
-                            </button>
-                        </div>
-                    </div>
+            {/* Dynamic rows */}
+            {formData.rows?.map((row, idx) => (
+              <div key={row.id || idx} className="grid grid-cols-12 gap-3 px-4 py-3 border-b last:border-b-0 hover:bg-slate-50">
+                <div className="col-span-3 font-medium flex items-center">{row.label}</div>
+                <div className="col-span-1 flex justify-center items-center">
+                  <input
+                    type="checkbox"
+                    checked={row.checked}
+                    onChange={e => {
+                      const newRows = [...formData.rows];
+                      newRows[idx].checked = e.target.checked;
+                      setFormData({...formData, rows: newRows});
+                    }}
+                    className="w-5 h-5 accent-blue-600"
+                  />
                 </div>
-            )}
+                <div className="col-span-1">
+                  <input
+                    type="number"
+                    step="0.01"
+                    className="w-full p-2 border border-slate-300 rounded text-center text-sm"
+                    value={row.val ?? ''}
+                    onChange={e => {
+                      const newRows = [...formData.rows];
+                      newRows[idx].val = e.target.value;
+                      setFormData({...formData, rows: newRows});
+                    }}
+                  />
+                </div>
+                <div className="col-span-3">
+                  <input
+                    className="w-full p-2 border border-slate-300 rounded font-mono text-sm focus:border-blue-500"
+                    value={row.formula || ''}
+                    onChange={e => {
+                      const newRows = [...formData.rows];
+                      newRows[idx].formula = e.target.value;
+                      setFormData({...formData, rows: newRows});
+                    }}
+                    placeholder="[formula]"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <input
+                    className="w-full p-2 border border-slate-300 rounded uppercase text-sm"
+                    value={row.debit || ''}
+                    onChange={e => {
+                      const newRows = [...formData.rows];
+                      newRows[idx].debit = e.target.value.toUpperCase();
+                      setFormData({...formData, rows: newRows});
+                    }}
+                    placeholder="Debit A/c"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <input
+                    className="w-full p-2 border border-slate-300 rounded uppercase text-sm"
+                    value={row.credit || ''}
+                    onChange={e => {
+                      const newRows = [...formData.rows];
+                      newRows[idx].credit = e.target.value.toUpperCase();
+                      setFormData({...formData, rows: newRows});
+                    }}
+                    placeholder="Credit A/c"
+                  />
+                </div>
+              </div>
+            ))}
+
+            {/* GST / IGST compact */}
+            <div className="grid grid-cols-12 gap-4 px-4 py-4 bg-blue-50/50 border-t">
+              <div className="col-span-3 font-medium flex items-center justify-end">GST</div>
+              <div className="col-span-1 flex justify-center items-center">
+                <input
+                  type="checkbox"
+                  checked={formData.gst_checked}
+                  onChange={e => setFormData({...formData, gst_checked: e.target.checked})}
+                  className="w-5 h-5 accent-blue-600"
+                />
+              </div>
+              <div className="col-span-8 grid grid-cols-8 gap-3">
+                <div className="col-span-2 flex items-center gap-2">
+                  <span className="text-sm font-medium">SGST %</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    className="w-full p-2 border border-slate-300 rounded text-center text-sm"
+                    value={formData.sgst_percentage ?? ''}
+                    onChange={e => setFormData({...formData, sgst_percentage: Number(e.target.value)})}
+                  />
+                </div>
+                <div className="col-span-3">
+                  <input
+                    className="w-full p-2 border border-slate-300 rounded font-mono text-sm"
+                    value={formData.sgst_formula || ''}
+                    onChange={e => setFormData({...formData, sgst_formula: e.target.value})}
+                    placeholder="SGST formula"
+                  />
+                </div>
+                <div className="col-span-3">
+                  <input
+                    className="w-full p-2 border border-slate-300 rounded uppercase text-sm"
+                    value={formData.cgst_account || ''}
+                    onChange={e => setFormData({...formData, cgst_account: e.target.value.toUpperCase()})}
+                    placeholder="CGST A/c"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-12 gap-4 px-4 py-4 bg-blue-50/50 border-t">
+              <div className="col-span-3 font-medium flex items-center justify-end">IGST</div>
+              <div className="col-span-1 flex justify-center items-center">
+                <input
+                  type="checkbox"
+                  checked={formData.igst_checked}
+                  onChange={e => setFormData({...formData, igst_checked: e.target.checked})}
+                  className="w-5 h-5 accent-blue-600"
+                />
+              </div>
+              <div className="col-span-8 grid grid-cols-8 gap-3">
+                <div className="col-span-2">
+                  <input
+                    type="number"
+                    step="0.01"
+                    className="w-full p-2 border border-slate-300 rounded text-center text-sm"
+                    value={formData.igst_percentage ?? ''}
+                    onChange={e => setFormData({...formData, igst_percentage: Number(e.target.value)})}
+                  />
+                </div>
+                <div className="col-span-3">
+                  <input
+                    className="w-full p-2 border border-slate-300 rounded font-mono text-sm"
+                    value={formData.igst_formula || ''}
+                    onChange={e => setFormData({...formData, igst_formula: e.target.value})}
+                    placeholder="IGST formula"
+                  />
+                </div>
+                <div className="col-span-3 flex gap-3">
+                  <input
+                    className="flex-1 p-2 border border-slate-300 rounded uppercase text-sm"
+                    value={formData.igst_account || ''}
+                    onChange={e => setFormData({...formData, igst_account: e.target.value.toUpperCase()})}
+                    placeholder="IGST Debit"
+                  />
+                  <input
+                    className="flex-1 p-2 border border-slate-300 rounded uppercase text-sm"
+                    value={formData.igst_credit || ''}
+                    onChange={e => setFormData({...formData, igst_credit: e.target.value.toUpperCase()})}
+                    placeholder="IGST Credit"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Footer formulas */}
+          <div className="grid grid-cols-12 gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+            <div className="col-span-3 flex justify-end items-center"><FormLabel>Sub Total</FormLabel></div>
+            <div className="col-span-9">
+              <input
+                className="w-full p-2.5 border border-slate-300 rounded-lg font-mono focus:border-blue-500 focus:ring-1"
+                value={formData.sub_total_formula || ''}
+                onChange={e => setFormData({...formData, sub_total_formula: e.target.value})}
+              />
+            </div>
+
+            <div className="col-span-3 flex justify-end items-center"><FormLabel>Total Value</FormLabel></div>
+            <div className="col-span-9">
+              <input
+                className="w-full p-2.5 border border-slate-300 rounded-lg font-mono focus:border-blue-500 focus:ring-1"
+                value={formData.total_value_formula || ''}
+                onChange={e => setFormData({...formData, total_value_formula: e.target.value})}
+              />
+            </div>
+
+            <div className="col-span-3 flex justify-end items-center"><FormLabel>Round Off</FormLabel></div>
+            <div className="col-span-9 flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+              <div className="flex gap-6">
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="radio"
+                    value="Forward"
+                    checked={formData.round_off_direction === 'Forward'}
+                    onChange={e => setFormData({...formData, round_off_direction: e.target.value})}
+                    className="w-4 h-4"
+                  />
+                  Forward
+                </label>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="radio"
+                    value="Reverse"
+                    checked={formData.round_off_direction === 'Reverse'}
+                    onChange={e => setFormData({...formData, round_off_direction: e.target.value})}
+                    className="w-4 h-4"
+                  />
+                  Reverse
+                </label>
+              </div>
+              <input
+                className="flex-1 p-2.5 border border-slate-300 rounded-lg uppercase font-bold focus:border-blue-500 focus:ring-1"
+                value={formData.round_off_account || ''}
+                onChange={e => setFormData({...formData, round_off_account: e.target.value.toUpperCase()})}
+                placeholder="ROUND OFF A/C"
+              />
+            </div>
+
+            <div className="col-span-3 flex justify-end items-center"><FormLabel>Lorry Freight</FormLabel></div>
+            <div className="col-span-9">
+              <input
+                className="w-full p-2.5 border border-slate-300 rounded-lg uppercase font-bold focus:border-blue-500 focus:ring-1"
+                value={formData.lorry_freight_account || ''}
+                onChange={e => setFormData({...formData, lorry_freight_account: e.target.value.toUpperCase()})}
+                placeholder="FREIGHT LEDGER"
+              />
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex justify-end gap-4 pt-6 border-t border-slate-200 mt-4">
+            <button
+              type="button"
+              onClick={() => setIsModalOpen(false)}
+              className="px-8 py-3 border border-slate-400 rounded-xl text-slate-700 font-semibold hover:bg-slate-50 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={submitLoading}
+              className={`
+                px-10 py-3 rounded-xl font-semibold flex items-center gap-2 shadow-md min-w-[160px] justify-center
+                ${submitLoading
+                  ? 'bg-slate-400 text-white cursor-not-allowed'
+                  : 'bg-blue-600 hover:bg-blue-700 text-white'
+                }
+              `}
+            >
+              {submitLoading ? (
+                <>
+                  <Loader2 className="animate-spin" size={18} />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save size={18} />
+                  {formData.id ? 'Update' : 'Save'}
+                </>
+              )}
+            </button>
+          </div>
+
+        </form>
+      </div>
+    </div>
+  </div>
+)}
         </div>
     );
 };

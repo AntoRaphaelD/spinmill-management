@@ -3,7 +3,7 @@ import { mastersAPI } from '../service/api';
 import { 
     Plus, Edit, Trash2, X, ChevronLeft, 
     ChevronRight, RefreshCw, Save, Building2, Search, Filter, 
-    Square, CheckSquare
+    Square, CheckSquare, Hash, Landmark, Phone, Mail, Globe, User, CreditCard, Loader2
 } from 'lucide-react';
 
 const AccountMaster = () => {
@@ -51,23 +51,8 @@ const AccountMaster = () => {
     const [formData, setFormData] = useState(emptyAccount);
 
     // --- 2. Split/Join Logic for 3-Line Address ---
-    const mapDbToUi = (item) => {
-        const addrLines = (item.address || '').split('\n');
-        const delLines = (item.delivery_address || '').split('\n');
-        return {
-            ...item,
-            addr1: addrLines[0] || '', addr2: addrLines[1] || '', addr3: addrLines[2] || '',
-            del1: delLines[0] || '', del2: delLines[1] || '', del3: delLines[2] || ''
-        };
-    };
-
-    const mapUiToDb = (data) => {
-        return {
-            ...data,
-            address: `${data.addr1}\n${data.addr2}\n${data.addr3}`.trim(),
-            delivery_address: `${data.del1}\n${data.del2}\n${data.del3}`.trim()
-        };
-    };
+    const mapDbToUi = (item) => item;
+    const mapUiToDb = (data) => data;
 
     // --- 3. Lifecycle & API ---
     useEffect(() => { fetchRecords(); }, []);
@@ -258,184 +243,165 @@ const AccountMaster = () => {
             </div>
 
             {/* POPUP MODAL (SPLIT TWO-COLUMN WITH 3-LINE ADDRESS) */}
-            {isModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
-                    <div className="bg-[#cfe2ff] w-full max-w-[1000px] rounded shadow-2xl overflow-hidden border border-white animate-in zoom-in duration-200">
-                        
-                        <div className="bg-[#6495ed] p-5 flex justify-between items-center text-white border-b border-white/20">
-                            <div>
-                                <h2 className="text-xl font-medium tracking-wide">Accounts Master</h2>
-                                <p className="text-blue-50 text-base mt-1">To Add, Modify Accounts details.</p>
-                            </div>
-                            <button onClick={() => setIsModalOpen(false)} className="hover:bg-white/10 p-1 rounded-full"><X size={24}/></button>
-                        </div>
-
-                        <div className="p-8 text-base">
-                            <form onSubmit={handleSave} className="space-y-2">
-                                <div className="flex flex-col lg:flex-row gap-x-10 gap-y-2">
-                                    
-                                    {/* --- LEFT COLUMN --- */}
-                                    <div className="flex-1 space-y-2">
-                                        <div className="grid grid-cols-12 items-center">
-                                            <div className="col-span-4 flex justify-end"><FormLabel>Code</FormLabel></div>
-                                            <div className="col-span-8">
-                                                <input type="text" readOnly className="w-32 p-1 border border-gray-400 bg-black text-white font-bold outline-none cursor-default font-mono" value={formData.account_code} />
-                                            </div>
-                                        </div>
-
-                                       {/* MAIN GROUP */}
-<div className="grid grid-cols-12 items-center">
-    <div className="col-span-4 flex justify-end">
-        <FormLabel>Main Group</FormLabel>
-    </div>
-    <div className="col-span-8">
-        <select
-            className="w-full p-1 border border-gray-400 bg-white text-base outline-none"
-            value={formData.main_group}
-            onChange={e => setFormData({ ...formData, main_group: e.target.value })}
+            {/* POPUP MODAL ENHANCEMENT */}
+{isModalOpen && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 backdrop-blur-sm p-4">
+    <div className="bg-white w-full max-w-[1100px] rounded-xl shadow-2xl border border-slate-500 flex flex-col max-h-[94vh]">
+      
+      {/* Header - smaller */}
+      <div className="bg-blue-700 text-white px-5 py-3 flex justify-between items-center rounded-t-xl">
+        <div>
+          <h2 className="text-xl font-bold uppercase tracking-wide">Account Master</h2>
+          <p className="text-blue-100 text-xs">Create / Edit Account</p>
+        </div>
+        <button
+          onClick={() => setIsModalOpen(false)}
+          className="p-2 hover:bg-red-600 rounded transition-colors"
         >
-            <option value="ASSETS">ASSETS</option>
-            <option value="LIABILITIES">LIABILITIES</option>
-            <option value="INCOME">INCOME</option>
-            <option value="EXPENSE">EXPENSE</option>
-        </select>
-    </div>
-</div>
+          <X size={24} strokeWidth={3} />
+        </button>
+      </div>
 
-{/* PRIMARY GROUP */}
-<div className="grid grid-cols-12 items-center">
-    <div className="col-span-4 flex justify-end">
-        <FormLabel>Primary Group</FormLabel>
-    </div>
-    <div className="col-span-8">
-        <input
-            type="text"
-            className="w-full p-1 border border-gray-400 bg-white uppercase text-base"
-            value={formData.primary_group}
-            onChange={e => setFormData({ ...formData, primary_group: e.target.value.toUpperCase() })}
-        />
-    </div>
-</div>
+      {/* Body - tighter padding */}
+      <div className="p-5 overflow-y-auto flex-1">
+        <form onSubmit={handleSave} className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-10 gap-y-4">
 
-{/* ACCOUNT SUB GROUP */}
-<div className="grid grid-cols-12 items-center">
-    <div className="col-span-4 flex justify-end">
-        <FormLabel>Account Group</FormLabel>
-    </div>
-    <div className="col-span-8">
-        <select
-            className="w-full p-1 border border-gray-400 bg-white text-base outline-none"
-            value={formData.account_group}
-            onChange={e => setFormData({ ...formData, account_group: e.target.value })}
-        >
-            <option value="DEBTORS - OTHERS">DEBTORS - OTHERS</option>
-            <option value="DEBTORS - DEPOT - SALES">DEBTORS - DEPOT - SALES</option>
-            <option value="DEBTOR - YARN - SALES">DEBTOR - YARN - SALES</option>
-        </select>
-    </div>
-</div>
-                                        <div className="grid grid-cols-12 items-center">
-                                            <div className="col-span-4 flex justify-end"><FormLabel>Account Name</FormLabel></div>
-                                            <div className="col-span-8">
-                                                <input type="text" required className="w-full p-1 border border-gray-400 bg-white uppercase text-base font-bold" value={formData.account_name} onChange={e => setFormData({...formData, account_name: e.target.value.toUpperCase()})} />
-                                            </div>
-                                        </div>
+            {/* LEFT COLUMN */}
+            <div className="space-y-4">
+              <h3 className="text-base font-bold text-blue-800 border-b pb-1 uppercase">Primary Details</h3>
 
-                                        <div className="grid grid-cols-12 items-center">
-                                            <div className="col-span-4 flex justify-end"><FormLabel>Place</FormLabel></div>
-                                            <div className="col-span-8">
-                                                <input type="text" className="w-full p-1 border border-gray-400 bg-white uppercase text-base" value={formData.place} onChange={e => setFormData({...formData, place: e.target.value.toUpperCase()})} />
-                                            </div>
-                                        </div>
+              <div className="grid grid-cols-12 items-center gap-2">
+                <label className="col-span-4 text-right text-sm font-semibold">Code</label>
+                <input readOnly className="col-span-8 p-2 bg-gray-100 border rounded text-base font-mono" value={formData.account_code} />
+              </div>
 
-                                        {/* 3-LINE ADDRESS SETTER */}
-                                        <div className="grid grid-cols-12 items-start">
-                                            <div className="col-span-4 flex justify-end pt-1"><FormLabel>Address</FormLabel></div>
-                                            <div className="col-span-8 space-y-1">
-                                                <input type="text" className="w-full p-1 border border-gray-400 bg-white uppercase text-sm" value={formData.addr1} onChange={e => setFormData({...formData, addr1: e.target.value.toUpperCase()})} />
-                                                <input type="text" className="w-full p-1 border border-gray-400 bg-white uppercase text-sm" value={formData.addr2} onChange={e => setFormData({...formData, addr2: e.target.value.toUpperCase()})} />
-                                                <input type="text" className="w-full p-1 border border-gray-400 bg-white uppercase text-sm" value={formData.addr3} onChange={e => setFormData({...formData, addr3: e.target.value.toUpperCase()})} />
-                                            </div>
-                                        </div>
+              <div className="grid grid-cols-12 items-center gap-2">
+                <label className="col-span-4 text-right text-sm font-semibold">Main Group</label>
+                <select className="col-span-8 p-2 border rounded text-base" value={formData.main_group} onChange={e => setFormData({...formData, main_group: e.target.value})}>
+                  <option>ASSETS</option>
+                  <option>LIABILITIES</option>
+                  <option>INCOME</option>
+                  <option>EXPENSE</option>
+                </select>
+              </div>
 
-                                        <div className="grid grid-cols-12 items-center">
-                                            <div className="col-span-4 flex justify-end"><FormLabel>Pincode</FormLabel></div>
-                                            <div className="col-span-8">
-                                                <input type="text" className="w-32 p-1 border border-gray-400 bg-white text-base" value={formData.pincode} onChange={e => setFormData({...formData, pincode: e.target.value})} />
-                                            </div>
-                                        </div>
+              <div className="grid grid-cols-12 items-center gap-2">
+                <label className="col-span-4 text-right text-sm font-semibold">Primary Group</label>
+                <input className="col-span-8 p-2 border rounded uppercase text-base" value={formData.primary_group} onChange={e => setFormData({...formData, primary_group: e.target.value.toUpperCase()})} />
+              </div>
 
-                                        <div className="grid grid-cols-12 items-center">
-                                            <div className="col-span-4 flex justify-end"><FormLabel>State</FormLabel></div>
-                                            <div className="col-span-8">
-                                                <input type="text" className="w-full p-1 border border-gray-400 bg-[#ffe4e1] uppercase text-base font-bold" value={formData.state} onChange={e => setFormData({...formData, state: e.target.value.toUpperCase()})} />
-                                            </div>
-                                        </div>
+              <div className="grid grid-cols-12 items-center gap-2">
+                <label className="col-span-4 text-right text-sm font-semibold">Account Group</label>
+                <select className="col-span-8 p-2 border rounded text-base" value={formData.account_group} onChange={e => setFormData({...formData, account_group: e.target.value})}>
+                  <option>DEBTORS - YARN SALES</option>
+                  <option>DEBTORS - OTHERS</option>
+                  <option>DEBTORS - DEPOT - SALES</option>
+                </select>
+              </div>
 
-                                        {/* 3-LINE DELIVERY ADDRESS SETTER */}
-                                        <div className="grid grid-cols-12 items-start">
-                                            <div className="col-span-4 flex justify-end pt-1"><FormLabel>Delivery Address</FormLabel></div>
-                                            <div className="col-span-8 space-y-1">
-                                                <input type="text" className="w-full p-1 border border-gray-400 bg-white uppercase text-sm" value={formData.del1} onChange={e => setFormData({...formData, del1: e.target.value.toUpperCase()})} />
-                                                <input type="text" className="w-full p-1 border border-gray-400 bg-white uppercase text-sm" value={formData.del2} onChange={e => setFormData({...formData, del2: e.target.value.toUpperCase()})} />
-                                                <input type="text" className="w-full p-1 border border-gray-400 bg-white uppercase text-sm" value={formData.del3} onChange={e => setFormData({...formData, del3: e.target.value.toUpperCase()})} />
-                                            </div>
-                                        </div>
-                                    </div>
+              <div className="grid grid-cols-12 items-center gap-2">
+                <label className="col-span-4 text-right text-sm font-semibold">Account Name</label>
+                <input required className="col-span-8 p-2 border-2 border-slate-600 rounded font-bold text-base uppercase" value={formData.account_name} onChange={e => setFormData({...formData, account_name: e.target.value.toUpperCase()})} />
+              </div>
 
-                                    {/* --- RIGHT COLUMN --- */}
-                                    <div className="flex-1 space-y-2">
-                                        {[
-                                            { label: 'TIN No.', key: 'tin_no' },
-                                            { label: 'CST No.', key: 'cst_no' },
-                                            { label: 'Ph. No.', key: 'phone_no' },
-                                            { label: 'Email', key: 'email' },
-                                            { label: 'Fax', key: 'fax' },
-                                            { label: 'WebSite', key: 'website' },
-                                            { label: 'Account No.', key: 'account_no' },
-                                            { label: 'Contact', key: 'contact_person' },
-                                            { label: 'Cell No.', key: 'cell_no' },
-                                            { label: 'GST No.', key: 'gst_no' },
-                                        ].map((field) => (
-                                            <div key={field.key} className="grid grid-cols-12 items-center">
-                                                <div className="col-span-4 flex justify-end"><FormLabel>{field.label}</FormLabel></div>
-                                                <div className="col-span-8">
-                                                    <input type="text" className="w-full p-1 border border-gray-400 bg-white text-base" value={formData[field.key]} onChange={e => setFormData({...formData, [field.key]: e.target.value})} />
-                                                </div>
-                                            </div>
-                                        ))}
+              <div className="grid grid-cols-12 items-center gap-2">
+                <label className="col-span-4 text-right text-sm font-semibold">Place</label>
+                <input className="col-span-8 p-2 border rounded uppercase text-base" value={formData.place} onChange={e => setFormData({...formData, place: e.target.value.toUpperCase()})} />
+              </div>
 
-                                        <div className="grid grid-cols-12 items-center">
-                                            <div className="col-span-4 flex justify-end"><FormLabel>Opening Credit</FormLabel></div>
-                                            <div className="col-span-8 flex gap-2">
-                                                <input type="number" className="w-32 p-1 border border-gray-400 bg-white text-base text-right" value={formData.opening_credit} onChange={e => setFormData({...formData, opening_credit: e.target.value})} />
-                                            </div>
-                                        </div>
-                                        <div className="grid grid-cols-12 items-center">
-                                            <div className="col-span-4 flex justify-end"><FormLabel>Opening Debit</FormLabel></div>
-                                            <div className="col-span-8 flex gap-2">
-                                                <input type="number" className="w-32 p-1 border border-gray-400 bg-white text-base text-right" value={formData.opening_debit} onChange={e => setFormData({...formData, opening_debit: e.target.value})} />
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Action Buttons */}
-                                <div className="flex justify-end gap-3 pt-6">
-                                    <div className="bg-[#cfe2ff] border border-blue-200 p-3 flex gap-3 rounded-sm shadow-sm">
-                                        <button type="submit" disabled={submitLoading} className="flex items-center gap-2 bg-slate-50 border border-slate-400 px-8 py-1.5 text-xs font-bold shadow-sm hover:bg-white active:scale-95 transition-all">
-                                            <span className="text-blue-700 p-0.5 border border-blue-100 bg-white rounded-sm"><Save size={14}/></span> Update
-                                        </button>
-                                        <button type="button" onClick={() => setIsModalOpen(false)} className="flex items-center gap-2 bg-slate-50 border border-slate-400 px-8 py-1.5 text-xs font-bold shadow-sm hover:bg-white active:scale-95 transition-all">
-                                            <span className="text-red-600 font-black p-0.5 border border-red-100 bg-white rounded-sm">X</span> Cancel
-                                        </button>
-                                    </div>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
+              <div className="grid grid-cols-12 gap-2 items-start">
+                <label className="col-span-4 text-right text-sm font-semibold pt-1">Address</label>
+                <div className="col-span-8 space-y-1.5">
+                  <input className="w-full p-2 border rounded text-sm uppercase" placeholder="Line 1" value={formData.addr1} onChange={e => setFormData({...formData, addr1: e.target.value.toUpperCase()})} />
+                  <input className="w-full p-2 border rounded text-sm uppercase" placeholder="Line 2" value={formData.addr2} onChange={e => setFormData({...formData, addr2: e.target.value.toUpperCase()})} />
+                  <input className="w-full p-2 border rounded text-sm uppercase" placeholder="Line 3" value={formData.addr3} onChange={e => setFormData({...formData, addr3: e.target.value.toUpperCase()})} />
                 </div>
-            )}
+              </div>
+
+              <div className="grid grid-cols-12 items-center gap-2">
+                <label className="col-span-4 text-right text-sm font-semibold">Pincode / State</label>
+                <div className="col-span-8 flex gap-2">
+                  <input className="w-1/3 p-2 border rounded text-base" placeholder="PIN" value={formData.pincode} onChange={e => setFormData({...formData, pincode: e.target.value})} />
+                  <input className="w-2/3 p-2 border rounded uppercase text-base" placeholder="STATE" value={formData.state} onChange={e => setFormData({...formData, state: e.target.value.toUpperCase()})} />
+                </div>
+              </div>
+            </div>
+
+            {/* RIGHT COLUMN */}
+            <div className="space-y-4">
+              <h3 className="text-base font-bold text-green-800 border-b pb-1 uppercase">Contact & Tax Info</h3>
+
+              <div className="grid grid-cols-12 gap-2 items-start">
+                <label className="col-span-4 text-right text-sm font-semibold pt-1">Delivery Address</label>
+                <div className="col-span-8 space-y-1.5">
+                  <input className="w-full p-2 border rounded text-sm uppercase" placeholder="Line 1" value={formData.del1} onChange={e => setFormData({...formData, del1: e.target.value.toUpperCase()})} />
+                  <input className="w-full p-2 border rounded text-sm uppercase" placeholder="Line 2" value={formData.del2} onChange={e => setFormData({...formData, del2: e.target.value.toUpperCase()})} />
+                  <input className="w-full p-2 border rounded text-sm uppercase" placeholder="Line 3" value={formData.del3} onChange={e => setFormData({...formData, del3: e.target.value.toUpperCase()})} />
+                </div>
+              </div>
+
+              {[
+                { label: 'TIN No.', key: 'tin_no' },
+                { label: 'CST No.', key: 'cst_no' },
+                { label: 'Phone No.', key: 'phone_no' },
+                { label: 'Email', key: 'email' },
+                { label: 'Fax ', key: 'fax' },
+                { label: 'Website', key: 'website' },
+                { label: 'Account No.', key: 'account_no' },
+                { label: 'Contact', key: 'contact_person' },
+                { label: 'Cell No.', key: 'cell_no' },
+                { label: 'GST No.', key: 'gst_no', important: true },
+              ].map(f => (
+                <div key={f.key} className="grid grid-cols-12 items-center gap-2">
+                  <label className="col-span-4 text-right text-sm font-semibold">{f.label}</label>
+                  <input
+                    className={`col-span-8 p-2 border rounded text-base ${f.important ? 'border-blue-600 font-semibold' : ''}`}
+                    value={formData[f.key]}
+                    onChange={e => setFormData({...formData, [f.key]: e.target.value})}
+                  />
+                </div>
+              ))}
+
+              {/* Opening balances - compact */}
+              <div className="bg-gray-50 p-4 rounded border grid grid-cols-2 gap-4 mt-3">
+                <div>
+                  <label className="block text-center text-xs font-semibold text-gray-700 mb-1">Opening Credit</label>
+                  <input type="number" className="w-full p-2.5 text-right border rounded text-lg font-bold" value={formData.opening_credit} onChange={e => setFormData({...formData, opening_credit: e.target.value})} />
+                </div>
+                <div>
+                  <label className="block text-center text-xs font-semibold text-gray-700 mb-1">Opening Debit</label>
+                  <input type="number" className="w-full p-2.5 text-right border rounded text-lg font-bold" value={formData.opening_debit} onChange={e => setFormData({...formData, opening_debit: e.target.value})} />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Footer - smaller buttons */}
+          <div className="flex justify-end gap-4 pt-4 border-t">
+            <button
+              type="button"
+              onClick={() => setIsModalOpen(false)}
+              className="px-8 py-2.5 border border-slate-600 rounded font-semibold hover:bg-slate-50 text-sm"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={submitLoading}
+              className={`px-10 py-2.5 rounded font-semibold text-white flex items-center gap-2 min-w-[140px] justify-center text-sm ${
+                submitLoading ? 'bg-gray-400' : 'bg-blue-700 hover:bg-blue-800'
+              }`}
+            >
+              {submitLoading ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
+              {submitLoading ? 'Saving...' : formData.id ? 'Update' : 'Save'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+)}
         </div>
     );
 };

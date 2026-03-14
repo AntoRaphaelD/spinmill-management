@@ -41,7 +41,7 @@ const SalesWithoutOrder = () => {
     const emptyRow = {
         product_id: '',
         packing_type: '', 
-        rate: 0,          
+        rate_cr: 0,          
         rate_imm: 0,      
         rate_per: 0,
         qty: 0,
@@ -441,8 +441,8 @@ const SalesWithoutOrder = () => {
                                                             <input 
                                                                 type="number" 
                                                                 step="0.01" 
-                                                                value={row.rate} 
-                                                                onChange={e => updateGrid(idx, 'rate', e.target.value)} 
+                                                                value={row.rate_cr} 
+                                                                onChange={e => updateGrid(idx, 'rate_cr', e.target.value)} 
                                                                 className="w-full p-3 text-right border border-gray-400 rounded text-lg focus:border-blue-500" 
                                                             />
                                                         </td>

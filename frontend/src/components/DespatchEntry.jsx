@@ -273,196 +273,125 @@ const DespatchEntry = () => {
 
             {/* Modal */}
             {isModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-                    <div className="bg-[#cfe2ff] w-full max-w-[950px] rounded-xl shadow-2xl overflow-hidden border border-white animate-in zoom-in duration-200">
-                        <div className="bg-[#6495ed] p-6 flex justify-between items-center text-white border-b border-white/20">
-                            <div>
-                                <h2 className="text-2xl font-bold tracking-wide">Despatch Entry</h2>
-                                <p className="text-blue-100 text-base mt-1">Add / Modify Despatch Record</p>
-                            </div>
-                            <button onClick={() => setIsModalOpen(false)} className="hover:bg-white/20 p-2 rounded-full transition-colors">
-                                <X size={28} />
-                            </button>
-                        </div>
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 backdrop-blur-sm p-4 font-sans">
+    <div className="relative bg-white w-full max-w-xl rounded-xl shadow-2xl overflow-hidden border-2 border-slate-950 animate-in zoom-in-95 duration-200 flex flex-col max-h-[94vh]">
+      
+      {/* Header */}
+      <div className="bg-slate-950 px-6 py-4 flex justify-between items-center text-white">
+        <div className="flex items-center gap-3">
+          <Truck size={24} className="text-blue-400" />
+          <h2 className="text-xl font-black uppercase tracking-tight">Despatch Entry</h2>
+        </div>
+        <button onClick={() => setIsModalOpen(false)} className="bg-red-600 p-2 rounded-lg">
+          <X size={24} strokeWidth={3} />
+        </button>
+      </div>
 
-                        <div className="p-10 bg-[#cfe2ff]">
-                            <form onSubmit={handleSave} className="space-y-6 max-w-4xl mx-auto bg-white p-8 rounded-xl shadow-md">
-                                <div className="grid grid-cols-12 items-center gap-6">
-                                    <div className="col-span-3 flex justify-end"><FormLabel>Load No & Date</FormLabel></div>
-                                    <div className="col-span-9 flex gap-4">
-                                        <input 
-                                            type="text" 
-                                            readOnly 
-                                            className="w-36 p-3 border border-gray-400 bg-black text-white font-bold font-mono text-lg outline-none cursor-default text-center rounded" 
-                                            value={formData.load_no} 
-                                        />
-                                        <input 
-                                            type="date" 
-                                            className="w-56 p-3 border border-gray-400 bg-white text-lg text-black outline-none focus:border-blue-500 rounded" 
-                                            value={formData.load_date} 
-                                            onChange={e => setFormData({...formData, load_date: e.target.value})} 
-                                        />
-                                    </div>
-                                </div>
+      {/* Body */}
+      <div className="p-5 overflow-y-auto flex-1 bg-white">
+        <form onSubmit={handleSave} className="space-y-3">
+          
+          {/* Load Info */}
+          <div className="grid grid-cols-12 items-center gap-4">
+            <label className="col-span-4 text-right text-sm font-black text-slate-950 uppercase">Load Info</label>
+            <div className="col-span-8 flex gap-2">
+              <input type="text" readOnly className="w-24 p-2 bg-slate-100 border border-slate-400 text-slate-950 font-black text-lg rounded text-center" value={formData.load_no || 'NEW'} />
+              <input type="date" className="flex-1 p-2 border-2 border-slate-300 rounded text-lg font-black text-slate-950 outline-none focus:border-blue-600" value={formData.load_date || ''} onChange={e => setFormData({ ...formData, load_date: e.target.value })} />
+            </div>
+          </div>
 
-                                <div className="grid grid-cols-12 items-center gap-6">
-                                    <div className="col-span-3 flex justify-end"><FormLabel>Transport Agency</FormLabel></div>
-                                    <div className="col-span-9">
-                                        <select 
-                                            className="w-full p-3 border border-gray-400 bg-white uppercase text-lg text-black outline-none focus:border-blue-500 rounded" 
-                                            value={formData.transport_id} 
-                                            onChange={e => setFormData({...formData, transport_id: e.target.value})}
-                                        >
-                                            <option value="">— Select Transport Agency —</option>
-                                            {transports.map(t => (
-                                                <option key={t.id} value={t.id}>{t.transport_name}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                </div>
+          {/* Transport */}
+          <div className="grid grid-cols-12 items-center gap-4">
+            <label className="col-span-4 text-right text-sm font-black text-slate-950 uppercase">Transport</label>
+            <select className="col-span-8 p-2 border-2 border-slate-300 rounded uppercase text-lg font-black text-slate-950 outline-none focus:border-blue-600" value={formData.transport_id || ''} onChange={e => setFormData({ ...formData, transport_id: e.target.value })}>
+              <option value="">— SELECT AGENCY —</option>
+              {transports.map(t => <option key={t.id} value={t.id}>{t.transport_name}</option>)}
+            </select>
+          </div>
 
-                                <div className="grid grid-cols-12 items-center gap-6">
-                                    <div className="col-span-3 flex justify-end"><FormLabel>LR No & Date</FormLabel></div>
-                                    <div className="col-span-9 flex gap-4">
-                                        <input 
-                                            type="text" 
-                                            className="w-36 p-3 border border-gray-400 bg-white text-lg text-black outline-none focus:border-blue-500 rounded uppercase" 
-                                            value={formData.lr_no} 
-                                            onChange={e => setFormData({...formData, lr_no: e.target.value.toUpperCase()})} 
-                                        />
-                                        <input 
-                                            type="date" 
-                                            className="w-56 p-3 border border-gray-400 bg-white text-lg text-black outline-none focus:border-blue-500 rounded" 
-                                            value={formData.lr_date} 
-                                            onChange={e => setFormData({...formData, lr_date: e.target.value})} 
-                                        />
-                                    </div>
-                                </div>
+          {/* LR Details */}
+          <div className="grid grid-cols-12 items-center gap-4">
+            <label className="col-span-4 text-right text-sm font-black text-slate-950 uppercase">LR No/Date</label>
+            <div className="col-span-8 flex gap-2">
+              <input type="text" className="flex-1 p-2 border-2 border-slate-300 rounded text-lg font-black text-slate-950 uppercase outline-none focus:border-blue-600" value={formData.lr_no || ''} onChange={e => setFormData({ ...formData, lr_no: e.target.value.toUpperCase() })} placeholder="LR NO" />
+              <input type="date" className="flex-1 p-2 border-2 border-slate-300 rounded text-lg font-black text-slate-950 outline-none" value={formData.lr_date || ''} onChange={e => setFormData({ ...formData, lr_date: e.target.value })} />
+            </div>
+          </div>
 
-                                <div className="grid grid-cols-12 items-center gap-6">
-                                    <div className="col-span-3 flex justify-end"><FormLabel>Vehicle No.</FormLabel></div>
-                                    <div className="col-span-9">
-                                        <input 
-                                            type="text" 
-                                            required 
-                                            className="w-full p-3 border border-gray-400 bg-white uppercase text-lg text-black outline-none focus:border-blue-500 rounded" 
-                                            value={formData.vehicle_no} 
-                                            onChange={e => setFormData({...formData, vehicle_no: e.target.value.toUpperCase()})} 
-                                        />
-                                    </div>
-                                </div>
+          {/* Vehicle No */}
+          <div className="grid grid-cols-12 items-center gap-4">
+            <label className="col-span-4 text-right text-sm font-black text-slate-950 uppercase">Vehicle No</label>
+            <input type="text" required className="col-span-8 p-2 border-2 border-slate-950 bg-white text-lg font-black text-slate-950 uppercase outline-none focus:bg-yellow-50" value={formData.vehicle_no || ''} onChange={e => setFormData({ ...formData, vehicle_no: e.target.value.toUpperCase() })} placeholder="TN 37 AB 1234" />
+          </div>
 
-                                <div className="grid grid-cols-12 items-center gap-6">
-                                    <div className="col-span-3 flex justify-end"><FormLabel>Delivery To</FormLabel></div>
-                                    <div className="col-span-9">
-                                        <input 
-                                            type="text" 
-                                            className="w-full p-3 border border-gray-400 bg-white uppercase text-lg text-black outline-none focus:border-blue-500 rounded" 
-                                            value={formData.delivery} 
-                                            onChange={e => setFormData({...formData, delivery: e.target.value.toUpperCase()})} 
-                                        />
-                                    </div>
-                                </div>
+          {/* Delivery */}
+          <div className="grid grid-cols-12 items-center gap-4">
+            <label className="col-span-4 text-right text-sm font-black text-slate-950 uppercase">Delivery To</label>
+            <input type="text" className="col-span-8 p-2 border-2 border-slate-300 rounded text-lg font-black text-slate-950 uppercase outline-none" value={formData.delivery || ''} onChange={e => setFormData({ ...formData, delivery: e.target.value.toUpperCase() })} placeholder="LOCATION / PARTY" />
+          </div>
 
-                                <div className="grid grid-cols-12 items-center gap-6">
-                                    <div className="col-span-3 flex justify-end"><FormLabel>Insurance No</FormLabel></div>
-                                    <div className="col-span-9">
-                                        <input 
-                                            type="text" 
-                                            className="w-full p-3 border border-gray-400 bg-white text-lg text-black outline-none focus:border-blue-500 rounded" 
-                                            value={formData.insurance_no} 
-                                            onChange={e => setFormData({...formData, insurance_no: e.target.value})} 
-                                        />
-                                    </div>
-                                </div>
+          {/* Insurance */}
+          <div className="grid grid-cols-12 items-center gap-4">
+            <label className="col-span-4 text-right text-sm font-black text-slate-950 uppercase">Insurance</label>
+            <input type="text" className="col-span-8 p-2 border-2 border-slate-300 rounded text-lg font-bold text-slate-950 outline-none" value={formData.insurance_no || ''} onChange={e => setFormData({ ...formData, insurance_no: e.target.value })} placeholder="POLICY NUMBER" />
+          </div>
 
-                                <div className="grid grid-cols-12 items-center gap-6">
-                                    <div className="col-span-3 flex justify-end"><FormLabel>IN Time</FormLabel></div>
-                                    <div className="col-span-5 flex items-center gap-3">
-                                        <select className="border border-gray-400 p-3 text-lg font-bold text-black bg-white rounded" value={formData.in_hh} onChange={e => setFormData({...formData, in_hh: e.target.value})}>
-                                            {hours.map(h => <option key={h} value={h}>{h}</option>)}
-                                        </select>
-                                        <span className="text-xl font-bold text-black">:</span>
-                                        <select className="border border-gray-400 p-3 text-lg font-bold text-black bg-white rounded" value={formData.in_mm} onChange={e => setFormData({...formData, in_mm: e.target.value})}>
-                                            {minutes.map(m => <option key={m} value={m}>{m}</option>)}
-                                        </select>
-                                        <select className="border border-gray-400 p-3 text-lg font-bold text-black bg-white rounded" value={formData.in_period} onChange={e => setFormData({...formData, in_period: e.target.value})}>
-                                            <option value="AM">AM</option>
-                                            <option value="PM">PM</option>
-                                        </select>
-                                        <Clock size={24} className="text-blue-600 ml-2" />
-                                    </div>
+          {/* Time */}
+          <div className="grid grid-cols-12 items-center gap-4">
+            <label className="col-span-4 text-right text-sm font-black text-slate-950 uppercase">Time In/Out</label>
+            <div className="col-span-8 flex items-center gap-2">
+              <div className="flex bg-slate-100 border border-slate-400 p-1 rounded font-black text-slate-950">
+                <select className="bg-transparent" value={formData.in_hh} onChange={e => setFormData({ ...formData, in_hh: e.target.value })}>{hours.map(h => <option key={h} value={h}>{h}</option>)}</select>
+                <span>:</span>
+                <select className="bg-transparent" value={formData.in_mm} onChange={e => setFormData({ ...formData, in_mm: e.target.value })}>{minutes.map(m => <option key={m} value={m}>{m}</option>)}</select>
+                <select className="bg-transparent text-blue-700" value={formData.in_period} onChange={e => setFormData({ ...formData, in_period: e.target.value })}><option value="AM">AM</option><option value="PM">PM</option></select>
+              </div>
+              <span className="font-bold">→</span>
+              <div className="flex bg-slate-100 border border-slate-400 p-1 rounded font-black text-slate-950">
+                <select className="bg-transparent" value={formData.out_hh} onChange={e => setFormData({ ...formData, out_hh: e.target.value })}>{hours.map(h => <option key={h} value={h}>{h}</option>)}</select>
+                <span>:</span>
+                <select className="bg-transparent" value={formData.out_mm} onChange={e => setFormData({ ...formData, out_mm: e.target.value })}>{minutes.map(m => <option key={m} value={m}>{m}</option>)}</select>
+                <select className="bg-transparent text-red-700" value={formData.out_period} onChange={e => setFormData({ ...formData, out_period: e.target.value })}><option value="AM">AM</option><option value="PM">PM</option></select>
+              </div>
+            </div>
+          </div>
 
-                                    <div className="col-span-1 flex justify-end"><FormLabel>OUT</FormLabel></div>
-                                    <div className="col-span-3 flex items-center gap-3">
-                                        <select className="border border-gray-400 p-3 text-lg font-bold text-black bg-white rounded" value={formData.out_hh} onChange={e => setFormData({...formData, out_hh: e.target.value})}>
-                                            {hours.map(h => <option key={h} value={h}>{h}</option>)}
-                                        </select>
-                                        <span className="text-xl font-bold text-black">:</span>
-                                        <select className="border border-gray-400 p-3 text-lg font-bold text-black bg-white rounded" value={formData.out_mm} onChange={e => setFormData({...formData, out_mm: e.target.value})}>
-                                            {minutes.map(m => <option key={m} value={m}>{m}</option>)}
-                                        </select>
-                                        <select className="border border-gray-400 p-3 text-lg font-bold text-black bg-white rounded" value={formData.out_period} onChange={e => setFormData({...formData, out_period: e.target.value})}>
-                                            <option value="AM">AM</option>
-                                            <option value="PM">PM</option>
-                                        </select>
-                                    </div>
-                                </div>
+          {/* SEPARATE BOX FOR NO. OF BAGS */}
+          <div className="grid grid-cols-12 items-center gap-4">
+            <label className="col-span-4 text-right text-sm font-black text-slate-950 uppercase">No. of Bags</label>
+            <div className="col-span-8">
+              <input type="number" className="w-40 p-2 border-2 border-slate-400 rounded text-xl font-black text-slate-950 text-right outline-none focus:border-blue-600" value={formData.no_of_bags ?? ''} onChange={e => setFormData({ ...formData, no_of_bags: Number(e.target.value) })} placeholder="0" />
+            </div>
+          </div>
 
-                                <div className="grid grid-cols-12 items-center gap-6">
-                                    <div className="col-span-3 flex justify-end"><FormLabel>No. of Bags</FormLabel></div>
-                                    <div className="col-span-4">
-                                        <input 
-                                            type="number" 
-                                            className="w-full p-3 border border-gray-400 bg-white text-lg text-black font-bold outline-none focus:border-blue-500 text-right rounded" 
-                                            value={formData.no_of_bags} 
-                                            onChange={e => setFormData({...formData, no_of_bags: e.target.value})} 
-                                        />
-                                    </div>
-                                    <div className="col-span-2 flex justify-end"><FormLabel>Freight (₹)</FormLabel></div>
-                                    <div className="col-span-3">
-                                        <input 
-                                            type="number" 
-                                            className="w-full p-3 border border-gray-400 bg-white text-lg text-black font-bold outline-none focus:border-blue-500 text-right rounded" 
-                                            value={formData.freight} 
-                                            onChange={e => setFormData({...formData, freight: e.target.value})} 
-                                        />
-                                    </div>
-                                </div>
+          {/* SEPARATE BOX FOR FREIGHT */}
+          <div className="grid grid-cols-12 items-center gap-4">
+            <label className="col-span-4 text-right text-sm font-black text-slate-950 uppercase">Total Freight</label>
+            <div className="col-span-8">
+              <input type="number" className="w-full p-2 border-2 border-slate-400 rounded text-xl font-black text-slate-950 text-right outline-none focus:border-blue-600" value={formData.freight ?? ''} onChange={e => setFormData({ ...formData, freight: Number(e.target.value) })} placeholder="ENTER AMOUNT (₹)" />
+            </div>
+          </div>
 
-                                <div className="grid grid-cols-12 items-center gap-6">
-                                    <div className="col-span-3 flex justify-end"><FormLabel>Freight per Bag</FormLabel></div>
-                                    <div className="col-span-9">
-                                        <input 
-                                            type="text" 
-                                            readOnly 
-                                            className="w-44 p-3 border border-gray-400 bg-gray-200 text-black font-bold text-lg outline-none cursor-default text-right rounded" 
-                                            value={calculatedFreightPerBag} 
-                                        />
-                                    </div>
-                                </div>
+          {/* SEPARATE BOX FOR CALCULATION */}
+          <div className="grid grid-cols-12 items-center gap-4">
+            <label className="col-span-4 text-right text-sm font-black text-slate-500 uppercase">Freight Per Bag</label>
+            <div className="col-span-8">
+              <input type="text" readOnly className="w-40 p-2 bg-blue-50 border-2 border-blue-200 rounded text-xl font-black text-blue-700 text-right cursor-default" value={`₹ ${calculatedFreightPerBag}`} />
+            </div>
+          </div>
 
-                                <div className="flex justify-end gap-6 pt-10">
-                                    <button 
-                                        type="submit" 
-                                        onClick={handleSave} 
-                                        disabled={submitLoading} 
-                                        className="flex items-center gap-3 bg-white border-2 border-blue-600 px-12 py-3 text-lg font-bold text-blue-700 rounded-lg shadow-md hover:bg-blue-50 active:scale-95 transition-all"
-                                    >
-                                        <Save size={20} /> {formData.id ? 'Update' : 'Save'}
-                                    </button>
-                                    <button 
-                                        onClick={() => setIsModalOpen(false)} 
-                                        className="flex items-center gap-3 bg-white border-2 border-red-600 px-12 py-3 text-lg font-bold text-red-700 rounded-lg shadow-md hover:bg-red-50 active:scale-95 transition-all"
-                                    >
-                                        <X size={20} className="font-black" /> Cancel
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-            )}
+          {/* Footer */}
+          <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
+            <button type="button" onClick={() => setIsModalOpen(false)} className="px-6 py-2 border-2 border-slate-950 rounded font-black text-slate-950 uppercase">Cancel</button>
+            <button type="submit" disabled={submitLoading} className={`px-12 py-2 rounded font-black text-lg shadow-lg uppercase transition-all active:scale-95 ${submitLoading ? 'bg-slate-300 text-slate-500' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>
+              {submitLoading ? 'Saving...' : 'Save Record'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+)}
         </div>
     );
 };
