@@ -44,7 +44,7 @@ app.use((err, req, res, next) => {
      * Recommended during development to automatically update table schemas 
      * when you add new fields to your models.
      */
-    await sequelize.sync({ alter: true }); 
+    await sequelize.sync({ alter: false }); // Set to true if you want Sequelize to automatically alter tables to match models (use with caution in production)
     // await sequelize.sync({ force: true }); 
     console.log('✅ All 9 Models synced with database');
 
