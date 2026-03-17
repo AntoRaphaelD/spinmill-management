@@ -404,18 +404,18 @@ const SalesWithoutOrder = () => {
                             ) : (
                                 <div className="bg-white rounded-xl shadow-md border border-slate-300 overflow-hidden">
                                     <div className="overflow-x-auto max-h-[520px]">
-                                        <table className="w-full border-collapse">
+                                        <table className="w-full min-w-[1200px] border-collapse">
                                             <thead className="bg-blue-700 text-white sticky top-0 z-10">
                                                 <tr>
-                                                    <th className="p-4 text-left w-12 font-bold text-base">#</th>
-                                                    <th className="p-4 text-left min-w-[340px] font-bold text-base">Product / SKU</th>
-                                                    <th className="p-4 text-center w-32 font-bold text-base">Packing</th>
-                                                    <th className="p-4 text-right w-32 font-bold text-base">Rate (Cr)</th>
-                                                    <th className="p-4 text-right w-32 font-bold text-base">Rate (Imm.)</th>
-                                                    <th className="p-4 text-center w-24 font-bold text-base">Per</th>
-                                                    <th className="p-4 text-right w-32 font-bold text-base">Qty (KG)</th>
-                                                    <th className="p-4 text-right w-32 font-bold text-base">Bag Wt</th>
-                                                    <th className="p-4 text-center w-16"></th>
+                                                <th className="p-4 text-left w-12 font-bold text-base">#</th>
+                                                <th className="p-4 text-left min-w-[420px] font-bold text-base">Product / SKU</th>
+                                                <th className="p-4 text-center min-w-[150px] font-bold text-base">Packing</th>
+                                                <th className="p-4 text-right min-w-[180px] font-bold text-base">Rate (Cr)</th>
+                                                <th className="p-4 text-right min-w-[180px] font-bold text-base">Rate (Imm.)</th>
+                                                <th className="p-4 text-center min-w-[130px] font-bold text-base">Per</th>
+                                                <th className="p-4 text-right min-w-[150px] font-bold text-base">Qty (KG)</th>
+                                                <th className="p-4 text-right min-w-[150px] font-bold text-base">Bag Wt</th>
+                                                <th className="p-4 text-center w-16"></th>
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-slate-200">

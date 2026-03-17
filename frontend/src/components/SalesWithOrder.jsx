@@ -444,17 +444,17 @@ const SalesWithOrder = () => {
             <div className="overflow-x-auto">
               <table className="w-full border-collapse">
                 <thead className="bg-blue-700 text-white sticky top-0 z-10 shadow-sm">
-                  <tr>
-                    <th className="p-4 text-left w-10 font-semibold">#</th>
-                    <th className="p-4 text-left min-w-[340px] font-semibold">Product</th>
-                    <th className="p-4 text-center w-32 font-semibold">Packing</th>
-                    <th className="p-4 text-right w-32 font-semibold">Rate Cr</th>
-                    <th className="p-4 text-right w-32 font-semibold">Rate Imm</th>
-                    <th className="p-4 text-center w-24 font-semibold">Per</th>
-                    <th className="p-4 text-right w-32 font-semibold">Qty</th>
-                    <th className="p-4 text-right w-32 font-semibold">Bag Wt</th>
-                    <th className="p-4 text-center w-14 font-semibold"></th>
-                  </tr>
+                 <tr>
+                  <th className="p-4 text-left w-12 font-semibold">#</th>
+                  <th className="p-4 text-left min-w-[420px] font-semibold">Product</th>
+                  <th className="p-4 text-center min-w-[140px] font-semibold">Packing</th>
+                  <th className="p-4 text-right min-w-[180px] font-semibold">Rate Cr</th>
+                  <th className="p-4 text-right min-w-[180px] font-semibold">Rate Imm</th>
+                  <th className="p-4 text-center min-w-[120px] font-semibold">Per</th>
+                  <th className="p-4 text-right min-w-[140px] font-semibold">Qty</th>
+                  <th className="p-4 text-right min-w-[140px] font-semibold">Bag Wt</th>
+                  <th className="p-4 text-center w-16 font-semibold"></th>
+                </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {gridRows.map((row, idx) => (
@@ -501,7 +501,7 @@ const SalesWithOrder = () => {
                           value={row.rate_per || ''}
                           onChange={e => updateGrid(idx, 'rate_per', e.target.value)}
                           className="w-full p-2.5 text-center border border-slate-300 rounded-lg uppercase focus:border-blue-500 focus:ring-1"
-                          placeholder="Kg / Bag"
+                          placeholder="0"
                         />
                       </td>
                       <td className="p-3">

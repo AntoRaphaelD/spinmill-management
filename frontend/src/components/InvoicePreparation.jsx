@@ -516,9 +516,8 @@ const InvoicePreparation = () => {
             // ======================
             const avgContent =
                 num(item.packs) > 0
-                    ? num(item.total_kgs) / num(item.packs)
+                    ? Number((num(item.total_kgs) / num(item.packs)).toFixed(3))
                     : 0;
-
             // ======================
             // 2. ASSESS VALUE [A]
             // ======================
@@ -813,13 +812,15 @@ const InvoicePreparation = () => {
         const load = listData.loads.find(l => l.id === parseInt(formData.load_id));
         const details = source === 'WITH' ? order.OrderDetails || [] : order.DirectInvoiceDetails || [];
         const newRows = details.map(d => {
-            const broker = listData.brokers.find(b => b.id === order.broker_id);
+        const broker = listData.brokers.find(b => b.id === order.broker_id);
+        const qty = num(d.qty || 0);
+        const bagWt = num(d.bag_wt || 0);
             return {
                 order_no: orderNo, order_type: source === 'WITH' ? 'WITH_ORDER' : 'WITHOUT_ORDER',
                 sales_type_label: source === 'WITH' ? 'Order' : 'Direct', product_id: d.product_id,
                 broker_code: broker?.broker_code || '', broker_percentage: broker?.commission_pct || 0,
                 product_description: d.Product?.product_name || '', packs: load?.no_of_bags || d.packs || 0,
-                packing_type: d.packing_type || d.Product?.packing_type || 'BAGS', total_kgs: d.qty || d.total_kgs || 0,
+                packing_type: d.packing_type || d.Product?.packing_type || 'BAGS', total_kgs: qty * bagWt || d.total_kgs || 0,
                 avg_content: d.bag_wt || 0, rate: d.rate_cr || d.rate || 0, rate_per: d.rate_per || d.Product?.rate_per || 'KG', identification_mark: '',
                 from_no: '', to_no: '', resale: 0, convert_to_hank: 0, convert_to_cone: 0,
                 vat_per: config.vat_percentage || 0, cenvat_per: config.cenvat_percentage || 0, duty_per: config.duty_percentage || 0,
