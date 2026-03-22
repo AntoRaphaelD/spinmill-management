@@ -251,6 +251,32 @@ const InvoicePreparation = () => {
     // ==========================================
     // SEARCH FILTER ENGINE
     // ==========================================
+    // Filter Invoice Types with Exclusion Logic to prevent overlap
+const filteredInvoiceTypes = useMemo(() => {
+    return listData.types.filter(type => {
+        const typeName = (type.type_name || '').toLowerCase();
+        const salesType = formData.sales_type;
+        
+        if (salesType === 'DEPOT SALES') {
+            // Must contain "depot yarn sales"
+            return typeName.includes("depot yarn sales");
+        }
+        
+        if (salesType === 'GST SALES') {
+            // Must contain "yarn sales gst" 
+            // BUT must NOT contain "depot" (This fixes the overlap)
+            return typeName.includes("yarn sales gst") && !typeName.includes("depot");
+        }
+        
+        if (salesType === 'DIRECT SALES') {
+            // Must contain "depot stock transfer" OR "lab yarn sales"
+            return typeName.includes("depot stock transfer") || 
+                   typeName.includes("lab yarn sales");
+        }
+        
+        return false;
+    });
+}, [listData.types, formData.sales_type]);
     const filteredInvoices = useMemo(() => {
 
         let result = [...listData.history];
@@ -483,220 +509,104 @@ const InvoicePreparation = () => {
             return 0;
         }
     };
-    const runCalculations = useCallback((rows, typeId, hFreight = formData.freight_charges) => {
+    const runCalculations = useCallback((rows, typeId, hFreight = formData.freight_charges, salesType = formData.sales_type) => {
+    if (!typeId) return rows;
 
-        if (!typeId) return rows;
+    const config = listData.types.find(t => t.id === parseInt(typeId));
+    if (!config) return rows;
 
-        const config = listData.types.find(t => t.id === parseInt(typeId));
-        if (!config) return rows;
+    const totalWeight = rows.reduce((sum, r) => sum + num(r.total_kgs), 0);
 
-        // Total weight for freight distribution
-        const totalWeight = rows.reduce((sum, r) => sum + num(r.total_kgs), 0);
+    let hTotals = {
+        assess: 0, charity: 0, vat: 0, cenvat: 0, duty: 0, cess: 0, 
+        hcess: 0, tcs: 0, gst: 0, sgst: 0, cgst: 0, igst: 0, 
+        disc: 0, brok: 0, other: 0, net: 0
+    };
 
-        let hTotals = {
-            assess: 0, charity: 0, vat: 0, cenvat: 0,
-            duty: 0, cess: 0, hcess: 0, tcs: 0,
-            gst: 0, igst: 0, disc: 0, brok: 0,
-            other: 0, net: 0
+    const updatedRows = rows.map((item) => {
+        const product = listData.products.find(p => p.id === parseInt(item.product_id));
+
+        // 1. Base Logic
+        const H = num(item.rate) * num(item.total_kgs);
+        const A = H - num(item.resale) + num(item.convert_to_hank) - num(item.convert_to_cone);
+        
+        const freightShare = totalWeight > 0 ? (num(hFreight) * num(item.total_kgs)) / totalWeight : 0;
+        const taxable = A + freightShare;
+
+        // 2. NEW CHARITY LOGIC
+        // If GST SALES -> ₹3, else Product Master Rate
+        const charityRate = (salesType === 'GST SALES') ? 3 : num(product?.charity_rs);
+        const charity = config.charity_checked ? (charityRate * num(item.total_kgs)) : 0;
+
+        // 3. TAX CALCULATIONS (Based on row's editable percentages)
+        const vat = (num(item.vat_per) * taxable) / 100;
+        const cenvat = (num(item.cenvat_per) * taxable) / 100;
+        const duty = (num(item.duty_per) * taxable) / 100;
+        const cess = (num(item.cess_per) * taxable) / 100;
+        const hcess = (num(item.hcess_per) * taxable) / 100;
+        const tcs = (num(item.tcs_per) * taxable) / 100;
+        const gst = (num(item.gst_per) * taxable) / 100;
+        const sgst = (num(item.sgst_per) * taxable) / 100;
+        const cgst = (num(item.cgst_per) * taxable) / 100;
+        const igst = (num(item.igst_per) * taxable) / 100;
+
+        // 4. Basis and Deductions
+        const basis = taxable + gst + sgst + cgst + igst + vat + cenvat + duty + cess + hcess + tcs + charity + num(item.other_amt);
+        const discAmt = (num(item.discount_percentage) * basis) / 100;
+        const brokAmt = (num(item.broker_percentage) * basis) / 100;
+        
+        const rowTotal = basis - discAmt - brokAmt;
+
+        // Accumulate Header Totals
+        hTotals.assess += A;
+        hTotals.charity += charity;
+        hTotals.gst += gst; hTotals.sgst += sgst; hTotals.cgst += cgst; hTotals.igst += igst;
+        hTotals.vat += vat; hTotals.cenvat += cenvat; hTotals.duty += duty;
+        hTotals.cess += cess; hTotals.hcess += hcess; hTotals.tcs += tcs;
+        hTotals.disc += discAmt; hTotals.brok += brokAmt;
+        hTotals.other += num(item.other_amt);
+        hTotals.net += rowTotal;
+
+        return {
+            ...item,
+            base_h: H,
+            assessable_value: A,
+            charity_amt: charity,
+            freight_amt: freightShare,
+            vat_amt: vat, cenvat_amt: cenvat, duty_amt: duty, cess_amt: cess, 
+            hr_sec_cess_amt: hcess, tcs_amt: tcs, gst_amt: gst, 
+            sgst_amt: sgst, cgst_amt: cgst, igst_amt: igst,
+            discount_amt: discAmt, broker_amt: brokAmt,
+            sub_total: basis, final_value: rowTotal
         };
+    });
 
-        const updatedRows = rows.map((item) => {
+    const finalNetTotal = Number(hTotals.net.toFixed(config.round_off_digits || 0));
 
-            const product = listData.products.find(
-                p => p.id === parseInt(item.product_id)
-            );
+    setFormData(prev => ({
+        ...prev,
+        total_assessable: money(hTotals.assess),
+        total_charity: money(hTotals.charity),
+        total_gst: money(hTotals.gst),
+        total_sgst: money(hTotals.sgst),
+        total_cgst: money(hTotals.cgst),
+        total_igst: money(hTotals.igst),
+        total_vat: money(hTotals.vat),
+        total_cenvat: money(hTotals.cenvat),
+        total_duty: money(hTotals.duty),
+        total_cess: money(hTotals.cess),
+        total_hr_sec_cess: money(hTotals.hcess),
+        total_tcs: money(hTotals.tcs),
+        total_discount: money(hTotals.disc),
+        total_broker: money(hTotals.brok),
+        total_other: money(hTotals.other),
+        sub_total: money(hTotals.net),
+        round_off: money(finalNetTotal - hTotals.net),
+        net_amount: finalNetTotal
+    }));
 
-            // ======================
-            // 1. BASE VALUE [H]
-            // ======================
-            const H = num(item.rate) * num(item.total_kgs);
-
-            // ======================
-            // AVG CONTENT AUTO CALC
-            // ======================
-            const avgContent =
-                num(item.packs) > 0
-                    ? Number((num(item.total_kgs) / num(item.packs)).toFixed(3))
-                    : 0;
-            // ======================
-            // 2. ASSESS VALUE [A]
-            // ======================
-            const A =
-                H
-                - num(item.resale)
-                + num(item.convert_to_hank)
-                - num(item.convert_to_cone);
-
-            // ======================
-            // FREIGHT DISTRIBUTION
-            // ======================
-            const freightShare =
-                totalWeight > 0
-                    ? (num(hFreight) * num(item.total_kgs)) / totalWeight
-                    : 0;
-
-            const taxable = A + freightShare;
-
-            // ======================
-            // TAXES
-            // ======================
-            const charity = config.charity_checked
-                ? num(product?.charity_rs) * num(item.total_kgs)
-                : 0;
-
-            const vat = config.vat_checked ? num(item.vat_per) * taxable / 100 : 0;
-            const cenvat = config.cenvat_checked ? num(item.cenvat_per) * taxable / 100 : 0;
-            const duty = config.duty_checked ? num(item.duty_per) * taxable / 100 : 0;
-            const cess = config.cess_checked ? num(item.cess_per) * taxable / 100 : 0;
-            const hcess = config.hr_sec_cess_checked ? num(item.hcess_per) * taxable / 100 : 0;
-            const tcs = config.tcs_checked ? num(item.tcs_per) * taxable / 100 : 0;
-
-            const sgst = config.gst_checked ? num(item.sgst_per) * taxable / 100 : 0;
-            const cgst = config.gst_checked ? num(item.cgst_per) * taxable / 100 : 0;
-            let igst = 0;
-
-            if (config.igst_checked && config.igst_formula) {
-
-                const ctx = {
-                    H: H,
-                    A: A,
-
-                    "Total Kgs": num(item.total_kgs),
-                    Rate: num(item.rate),
-                    CharityRs: num(product?.charity_rs),
-
-                    igstper: num(item.igst_per),
-                    sgstper: num(item.sgst_per),
-                    cgstper: num(item.cgst_per),
-
-                    round_digits: num(config.round_off_digits)   // ⭐ ADD THIS
-                };
-
-                igst = evaluateFormula(config.igst_formula, ctx);
-            }
-
-            // ======================
-            // BASIS VALUE
-            // ======================
-            const basis =
-                taxable
-                + sgst + cgst + igst
-                + vat + cenvat + duty + cess + hcess + tcs
-                + charity
-                + num(item.other_amt);
-
-            // ======================
-            // DEDUCTIONS
-            // ======================
-            const discAmt = num(item.discount_percentage) * basis / 100;
-            const brokAmt = num(item.broker_percentage) * basis / 100;
-
-            // ======================
-            // FINAL VALUE
-            // ======================
-            const rowTotal = basis - discAmt - brokAmt;
-
-            const roundedValue = Number(rowTotal.toFixed(2));
-
-            const rowRoundedOff =
-                Number((roundedValue - Number(rowTotal.toFixed(2))).toFixed(2));
-
-            // ======================
-            // HEADER TOTALS
-            // ======================
-            hTotals.assess += A;
-            hTotals.charity += charity;
-            hTotals.vat += vat;
-            hTotals.cenvat += cenvat;
-            hTotals.duty += duty;
-            hTotals.cess += cess;
-            hTotals.hcess += hcess;
-            hTotals.tcs += tcs;
-            hTotals.gst += (sgst + cgst);
-            hTotals.igst += igst;
-            hTotals.disc += discAmt;
-            hTotals.brok += brokAmt;
-            hTotals.other += num(item.other_amt);
-            hTotals.net += rowTotal;
-
-            return {
-                ...item,
-
-                avg_content: avgContent,
-
-                base_h: H,
-
-                assessable_value: A,
-
-                freight_amt: freightShare,
-
-                charity_amt: charity,
-
-                vat_amt: vat,
-                cenvat_amt: cenvat,
-                duty_amt: duty,
-                cess_amt: cess,
-                hr_sec_cess_amt: hcess,
-                tcs_amt: tcs,
-
-                sgst_amt: sgst,
-                cgst_amt: cgst,
-                igst_amt: igst,
-
-                discount_amt: discAmt,
-                broker_amt: brokAmt,
-
-                sub_total: basis,
-
-                rounded_off: rowRoundedOff,
-
-                final_value: roundedValue
-            };
-        });
-
-        // ======================
-        // HEADER TOTAL
-        // ======================
-        const finalRawTotal = hTotals.net;
-
-        const finalNetTotal = Number(
-            finalRawTotal.toFixed(config.round_off_digits ?? 2)
-        );
-
-        setFormData(prev => ({
-            ...prev,
-
-            total_assessable: money(hTotals.assess),
-            total_charity: money(hTotals.charity),
-
-            total_vat: money(hTotals.vat),
-            total_cenvat: money(hTotals.cenvat),
-
-            total_duty: money(hTotals.duty),
-            total_cess: money(hTotals.cess),
-
-            total_hr_sec_cess: money(hTotals.hcess),
-
-            total_tcs: money(hTotals.tcs),
-
-            total_gst: money(hTotals.gst),
-            total_igst: money(hTotals.igst),
-
-            total_discount: money(hTotals.disc),
-            total_broker: money(hTotals.brok),
-
-            total_other: money(hTotals.other),
-
-            sub_total: money(finalRawTotal),
-
-            round_off: money(finalNetTotal - finalRawTotal),
-
-            net_amount: finalNetTotal
-        }));
-
-        return updatedRows;
-
-    }, [listData.types, listData.products, formData.freight_charges]);
+    return updatedRows;
+}, [listData.types, listData.products, formData.freight_charges, formData.sales_type]);
 
     // ==========================================
     // 3. INITIAL LOAD
@@ -735,6 +645,7 @@ const InvoicePreparation = () => {
     };
 
     useEffect(() => { init(); }, []);
+    
 
     // ==========================================
     // 4. HANDLERS
@@ -825,7 +736,7 @@ const InvoicePreparation = () => {
                 from_no: '', to_no: '', resale: 0, convert_to_hank: 0, convert_to_cone: 0,
                 vat_per: config.vat_percentage || 0, cenvat_per: config.cenvat_percentage || 0, duty_per: config.duty_percentage || 0,
                 cess_per: config.cess_percentage || 0, hcess_per: config.hr_sec_cess_percentage || 0,
-                sgst_per: config.sgst_percentage || 0, cgst_per: config.cgst_percentage || 0,
+                gst_per: config.gst_percentage || 0, sgst_per: config.sgst_percentage || 0, cgst_per: config.cgst_percentage || 0,
                 igst_per: config.igst_percentage || 0, tcs_per: config.tcs_percentage || 0,
                 discount_percentage: 0, other_amt: 0, freight_amt: 0
             };
@@ -1076,8 +987,32 @@ const InvoicePreparation = () => {
                                             <RowSelect label="Load No" value={formData.load_id} options={listData.loads.map(l => ({ value: l.id, label: l.load_no }))} onChange={e => handleLoadSync(e.target.value)} width="w-44" />
                                         </div>
                                         <RowInput label="Date" type="date" value={formData.date} onChange={e => setFormData({ ...formData, date: e.target.value })} width="w-44" />
-                                        <RowSelect label="Sales Type" value={formData.sales_type} options={[{ value: 'GST SALES', label: 'GST SALES' }, { value: 'DEPOT SALES', label: 'DEPOT SALES' }, { value: 'DIRECT SALES', label: 'DIRECT SALES' }]} onChange={e => setFormData({ ...formData, sales_type: e.target.value })} />
-                                        <RowSelect label="Invoice Type" value={formData.invoice_type_id} options={listData.types.map(t => ({ value: t.id, label: t.type_name }))} onChange={e => setFormData({ ...formData, invoice_type_id: e.target.value })} />
+                                        <RowSelect 
+    label="Sales Type" 
+    value={formData.sales_type} 
+    options={[
+        { value: 'GST SALES', label: 'GST SALES' }, 
+        { value: 'DEPOT SALES', label: 'DEPOT SALES' }, 
+        { value: 'DIRECT SALES', label: 'DIRECT SALES' }
+    ]} 
+    onChange={e => setFormData({ 
+        ...formData, 
+        sales_type: e.target.value, 
+        invoice_type_id: '' // 🟢 Clear selected ID when type changes
+    })} 
+/>
+                                        <RowSelect 
+    label="Invoice Type" 
+    value={formData.invoice_type_id} 
+    options={filteredInvoiceTypes.map(t => ({ 
+        value: t.id, 
+        label: t.type_name 
+    }))} 
+    onChange={e => setFormData({ 
+        ...formData, 
+        invoice_type_id: e.target.value 
+    })} 
+/>
                                         <RowSelect label="Party name" value={formData.party_id} options={listData.parties.map(p => ({ value: p.id, label: p.account_name }))} onChange={e => handleAccountSync(e.target.value)} />
                                         <div className="flex flex-col gap-1 ml-[120px]">
                                             <input readOnly value={formData.addr1} className="border border-slate-300 p-1 text-[11px] bg-[#F5F8FA] font-bold outline-none" />
@@ -1124,28 +1059,30 @@ const InvoicePreparation = () => {
                                         <RowInput label="EPCG No" value={formData.epcg_no} onChange={e => setFormData({ ...formData, epcg_no: e.target.value })} />
                                     </div>
                                     <div className="col-span-4 bg-[#F5F8FA] border border-slate-300 p-4 flex flex-col gap-1 rounded shadow-inner">
-                                        <h3 className="text-xs font-black text-slate-500 mb-2 border-b border-slate-300 pb-1 uppercase tracking-tight">Invoice Value</h3>
-                                        <TotalRow label="Assessable Value" value={formData.total_assessable} />
-                                        <TotalRow label="Charity" value={formData.total_charity} />
-                                        <TotalRow label="VAT Tax" value={formData.total_vat} />
-                                        <TotalRow label="Cenvat" value={formData.total_cenvat} />
-                                        <TotalRow label="Duty" value={formData.total_duty} />
-                                        <TotalRow label="Cess" value={formData.total_cess} />
-                                        <TotalRow label="H.S.Cess" value={formData.total_hr_sec_cess} />
-                                        <TotalRow label="TCS" value={formData.total_tcs} />
-                                        <TotalRow label="Freight" value={formData.freight_charges} />
-                                        <TotalRow label="Others" value={formData.total_other} />
-                                        <TotalRow label="GST" value={formData.total_gst} />
-                                        <TotalRow label="IGST" value={formData.total_igst} />
-                                        <div className="mt-auto pt-4 border-t-2 border-slate-400 space-y-1.5">
-                                            <TotalRow label="Sub Total" value={formData.sub_total} />
-                                            <TotalRow label="Round off" value={formData.round_off} />
-                                            <div className="flex justify-between items-center py-2 px-2 bg-white border border-slate-400 mt-2 shadow-sm">
-                                                <span className="text-[11px] font-black uppercase text-slate-700">Invoice Value</span>
-                                                <span className="text-xl font-black font-mono text-blue-700">₹ {parseFloat(formData.net_amount).toLocaleString()}</span>
-                                            </div>
-                                        </div>
-                                    </div>
+    <h3 className="text-xs font-black text-slate-500 mb-2 border-b border-slate-300 pb-1 uppercase tracking-tight">Invoice Summary</h3>
+    <TotalRow label="Assessable Value" value={formData.total_assessable} />
+    <TotalRow label="Charity" value={formData.total_charity} />
+    <TotalRow label="VAT" value={formData.total_vat} />
+    <TotalRow label="CENVAT" value={formData.total_cenvat} />
+    <TotalRow label="Duty" value={formData.total_duty} />
+    <TotalRow label="CESS" value={formData.total_cess} />
+    <TotalRow label="H.S. CESS" value={formData.total_hr_sec_cess} />
+    <TotalRow label="GST (Gen)" value={formData.total_gst} />
+    <TotalRow label="SGST" value={formData.total_sgst} />
+    <TotalRow label="CGST" value={formData.total_cgst} />
+    <TotalRow label="IGST" value={formData.total_igst} />
+    <TotalRow label="TCS" value={formData.total_tcs} />
+    <TotalRow label="Freight" value={formData.freight_charges} />
+    <TotalRow label="Other" value={formData.total_other} />
+    <div className="mt-auto pt-4 border-t-2 border-slate-400 space-y-1.5">
+        <TotalRow label="Gross Total" value={formData.sub_total} />
+        <TotalRow label="Round off" value={formData.round_off} />
+        <div className="flex justify-between items-center py-2 px-2 bg-white border border-slate-400 mt-2 shadow-sm">
+            <span className="text-[11px] font-black uppercase text-slate-700">Net Amount</span>
+            <span className="text-xl font-black font-mono text-blue-700">₹ {num(formData.net_amount).toLocaleString()}</span>
+        </div>
+    </div>
+</div>
                                 </div>
                             ) : (
                                 /* TAB 2: DETAIL MATRIX */
@@ -1168,89 +1105,83 @@ const InvoicePreparation = () => {
                                     </div>
 
                                     <div className="flex-1 border border-slate-300 overflow-x-auto bg-[#F5F8FA]">
-                                        <table className="min-w-[8500px] text-[11px] border-collapse bg-white">
-                                            <thead className="bg-[#F5F8FA] sticky top-0 z-10 border-b border-slate-300 text-slate-600">
-                                                <tr>
-                                                    <th className="p-3 border-r w-10"></th>
-                                                    <th className="p-3 border-r w-32 text-left">OrderNo</th>
-                                                    <th className="p-3 border-r w-80 text-left">Product</th>
-                                                    <th className="p-3 border-r w-32 text-left">Broker Code</th>
-                                                    <th className="p-3 border-r w-24 text-center">Broker %</th>
-                                                    <th className="p-3 border-r w-24 text-center">Packs</th>
-                                                    <th className="p-3 border-r w-32 text-center">Packing Type</th>
-                                                    <th className="p-3 border-r w-24 text-center">From No</th>
-                                                    <th className="p-3 border-r w-24 text-center">To No</th>
-                                                    <th className="p-3 border-r w-32 text-center">Total Kgs</th>
-                                                    <th className="p-3 border-r w-24 text-center">Avg Content</th>
-                                                    <th className="p-3 border-r w-32 text-center">Rate</th>
-                                                    <th className="p-3 border-r w-24 text-center">Rate Per</th>
-                                                    <th className="p-3 border-r w-36 text-center bg-blue-50 text-blue-800">Base [H]</th>
-                                                    <th className="p-3 border-r w-32 text-center bg-indigo-50 text-indigo-800">Resale (-)</th>
-                                                    <th className="p-3 border-r w-32 text-center bg-indigo-50 text-indigo-800">Hank (+)</th>
-                                                    <th className="p-3 border-r w-32 text-center bg-indigo-50 text-indigo-800">Cone Adjust (-)</th>
-                                                    <th className="p-3 border-r w-40 text-center bg-blue-100 text-blue-900 font-black">Assess [A]</th>
-                                                    <th className="p-3 border-r w-32 text-center">Charity</th>
-                                                    <th className="p-3 border-r w-24 text-center bg-slate-100">VAT%</th><th className="p-3 border-r w-32 text-center bg-slate-50">VAT Amt</th>
-                                                    <th className="p-3 border-r w-24 text-center bg-slate-100">CENVAT%</th><th className="p-3 border-r w-32 text-center bg-slate-50">CENVAT Amt</th>
-                                                    <th className="p-3 border-r w-24 text-center bg-slate-100">DUTY%</th><th className="p-3 border-r w-32 text-center bg-slate-50">DUTY Amt</th>
-                                                    <th className="p-3 border-r w-24 text-center bg-slate-100">CESS%</th><th className="p-3 border-r w-32 text-center bg-slate-50">CESS Amt</th>
-                                                    <th className="p-3 border-r w-24 text-center bg-slate-100">H.CESS%</th><th className="p-3 border-r w-32 text-center bg-slate-50">H.CESS Amt</th>
-                                                    <th className="p-3 border-r w-24 text-center bg-slate-100">SGST%</th><th className="p-3 border-r w-32 text-center bg-slate-50">SGST Amt</th>
-                                                    <th className="p-3 border-r w-24 text-center bg-slate-100">CGST%</th><th className="p-3 border-r w-32 text-center bg-slate-50">CGST Amt</th>
-                                                    <th className="p-3 border-r w-24 text-center bg-slate-100">IGST%</th><th className="p-3 border-r w-32 text-center bg-slate-50">IGST Amt</th>
-                                                    <th className="p-3 border-r w-24 text-center bg-slate-100">TCS%</th><th className="p-3 border-r w-32 text-center bg-slate-50">TCS Amt</th>
-                                                    <th className="p-3 border-r w-24 text-center bg-rose-50 text-rose-800">Disc% (Edit)</th><th className="p-3 border-r w-36 text-center bg-rose-50 text-rose-800">Disc Amt</th>
-                                                    <th className="p-3 border-r w-32 text-center">Other Amt</th>
-                                                    <th className="p-3 border-r w-32 text-center">Freight Amt</th>
-                                                    <th className="p-3 border-r w-80 text-center">ID Mark</th>
-                                                    <th className="p-3 text-center w-24"></th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-slate-200">
-                                                {gridRows.map((r, i) => (
-                                                    <tr key={i} className="hover:bg-blue-50 font-black">
-                                                        <td className="p-2 border-r text-center text-slate-300">▶</td>
-                                                        <td className="p-2 border-r text-blue-700">{r.order_no}</td>
-                                                        <td className="p-2 border-r uppercase text-slate-800">{r.product_description}</td>
-                                                        <td className="p-1 border-r"><input type="text" className="w-full p-2 outline-none" value={r.broker_code} onChange={e => updateGrid(i, 'broker_code', e.target.value)} /></td>
-                                                        <td className="p-1 border-r"><input type="number" className="w-full p-2 text-center outline-none text-amber-600" value={r.broker_percentage} onChange={e => updateGrid(i, 'broker_percentage', e.target.value)} /></td>
-                                                        <td className="p-2 border-r bg-[#FFD1FF] text-center font-black">{r.packs}</td>
-                                                        <td className="p-2 border-r text-center uppercase">{r.packing_type}</td>
-                                                        <td className="p-1 border-r"><input type="text" className="w-full p-2 text-center outline-none" value={r.from_no} onChange={e => updateGrid(i, 'from_no', e.target.value)} /></td>
-                                                        <td className="p-1 border-r"><input type="text" className="w-full p-2 text-center outline-none" value={r.to_no} onChange={e => updateGrid(i, 'to_no', e.target.value)} /></td>
-                                                        <td className="p-2 border-r text-center text-blue-700 font-black">{r.total_kgs}</td>
-                                                        <td className="p-2 border-r text-center">{r.avg_content}</td>
-                                                        <td className="p-2 border-r text-center">₹{r.rate}</td>
-                                                        <td className="p-1 border-r"><input type="text" className="w-full p-2 text-center outline-none" value={r.rate_per} onChange={e => updateGrid(i, 'rate_per', e.target.value)} /></td>
-                                                        <td className="p-2 border-r text-center bg-blue-50 text-blue-600">₹{num(r.base_h).toFixed(2)}</td>
+    <table className="min-w-[8000px] text-[11px] border-collapse bg-white">
+        <thead className="bg-[#F5F8FA] sticky top-0 z-10 border-b border-slate-300 text-slate-600">
+            {/* Row 1: Main Headers */}
+            <tr className="h-10">
+                <th className="p-3 border-r w-10"></th>
+                <th className="p-3 border-r w-32 text-left">Order No</th>
+                <th className="p-3 border-r w-80 text-left">Product</th>
+                <th className="p-3 border-r w-24 text-center">Packs</th>
+                <th className="p-3 border-r w-32 text-center">Total Kgs</th>
+                <th className="p-3 border-r w-32 text-center">Rate</th>
+                <th className="p-3 border-r w-40 text-center font-black bg-blue-100">Assess [A]</th>
+                <th className="p-3 border-r w-32 text-center">Charity</th>
+                
+                {/* TAX HEADERS (Span 2 columns each) */}
+                <th colSpan="2" className="border-r text-center bg-blue-50">GST</th>
+                <th colSpan="2" className="border-r text-center bg-slate-50">SGST</th>
+                <th colSpan="2" className="border-r text-center bg-blue-50">CGST</th>
+                <th colSpan="2" className="border-r text-center bg-slate-50">IGST</th>
+                <th colSpan="2" className="border-r text-center bg-blue-50">VAT</th>
+                <th colSpan="2" className="border-r text-center bg-slate-50">CENVAT</th>
+                <th colSpan="2" className="border-r text-center bg-blue-50">DUTY</th>
+                <th colSpan="2" className="border-r text-center bg-slate-50">CESS</th>
+                <th colSpan="2" className="border-r text-center bg-blue-50">H.CESS</th>
+                <th colSpan="2" className="border-r text-center bg-slate-50">TCS</th>
+                <th colSpan="2" className="border-r text-center bg-rose-50">Discount</th>
+                
+                <th className="p-3 border-r w-32 text-center">Other Amt</th>
+                <th className="p-3 border-r w-32 text-center">Freight</th>
+                <th className="p-3 border-r w-40 text-center">ID Mark</th>
+                <th className="p-3 text-center w-24">Action</th>
+            </tr>
+            {/* Row 2: Sub-headers for % and Amt */}
+            <tr className="bg-slate-200 text-[9px] uppercase font-bold">
+                <th colSpan="8"></th>
+                {[...Array(11)].map((_, i) => (
+                    <React.Fragment key={i}>
+                        <th className="border-r p-1 w-16 text-blue-700">Percent %</th>
+                        <th className="border-r p-1 w-24 text-slate-600">Amount ₹</th>
+                    </React.Fragment>
+                ))}
+                <th colSpan="4"></th>
+            </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-200">
+            {gridRows.map((r, i) => (
+                <tr key={i} className="hover:bg-blue-50 font-black">
+                    <td className="p-2 border-r text-center text-slate-300">▶</td>
+                    <td className="p-2 border-r text-blue-700 font-mono">{r.order_no}</td>
+                    <td className="p-2 border-r uppercase">{r.product_description}</td>
+                    <td className="p-2 border-r text-center font-black bg-pink-50">{r.packs}</td>
+                    <td className="p-2 border-r text-center text-blue-700 font-black">{r.total_kgs}</td>
+                    <td className="p-2 border-r text-center">₹{r.rate}</td>
+                    <td className="p-2 border-r text-center bg-blue-100 font-black">₹{num(r.assessable_value).toFixed(2)}</td>
+                    <td className="p-2 border-r text-center text-orange-600">₹{num(r.charity_amt).toFixed(2)}</td>
 
-                                                        <td className="p-1 border-r bg-indigo-50"><input type="number" className="w-full p-2 text-center outline-none bg-white rounded border border-indigo-100" value={r.resale} onChange={e => updateGrid(i, 'resale', parseFloat(e.target.value) || 0)} /></td>
-                                                        <td className="p-1 border-r bg-indigo-50"><input type="number" className="w-full p-2 text-center outline-none bg-white rounded border border-indigo-100" value={r.convert_to_hank} onChange={e => updateGrid(i, 'convert_to_hank', parseFloat(e.target.value) || 0)} /></td>
-                                                        <td className="p-1 border-r bg-indigo-50"><input type="number" className="w-full p-2 text-center outline-none bg-white rounded border border-indigo-100" value={r.convert_to_cone} onChange={e => updateGrid(i, 'convert_to_cone', parseInt(e.target.value) || 0)} /></td>
+                    {/* RENDER PAIR CELLS (Percentage is Editable, Amount is Calculated) */}
+                    {renderPairCell(r, i, 'gst_per', 'gst_amt', true, updateGrid)}
+                    {renderPairCell(r, i, 'sgst_per', 'sgst_amt', true, updateGrid)}
+                    {renderPairCell(r, i, 'cgst_per', 'cgst_amt', true, updateGrid)}
+                    {renderPairCell(r, i, 'igst_per', 'igst_amt', true, updateGrid)}
+                    {renderPairCell(r, i, 'vat_per', 'vat_amt', true, updateGrid)}
+                    {renderPairCell(r, i, 'cenvat_per', 'cenvat_amt', true, updateGrid)}
+                    {renderPairCell(r, i, 'duty_per', 'duty_amt', true, updateGrid)}
+                    {renderPairCell(r, i, 'cess_per', 'cess_amt', true, updateGrid)}
+                    {renderPairCell(r, i, 'hcess_per', 'hr_sec_cess_amt', true, updateGrid)}
+                    {renderPairCell(r, i, 'tcs_per', 'tcs_amt', true, updateGrid)}
+                    {renderPairCell(r, i, 'discount_percentage', 'discount_amt', true, updateGrid, "text-rose-600")}
 
-                                                        <td className="p-2 border-r text-center bg-blue-100 text-blue-900 font-black">₹{num(r.assessable_value).toFixed(2)}</td>
-                                                        <td className="p-2 border-r text-center font-bold text-orange-600">₹{num(r.charity_amt).toFixed(2)}</td>
-
-                                                        {renderPairCell(r, i, 'vat_per', 'vat_amt', false, updateGrid)}
-                                                        {renderPairCell(r, i, 'cenvat_per', 'cenvat_amt', false, updateGrid)}
-                                                        {renderPairCell(r, i, 'duty_per', 'duty_amt', false, updateGrid)}
-                                                        {renderPairCell(r, i, 'cess_per', 'cess_amt', false, updateGrid)}
-                                                        {renderPairCell(r, i, 'hcess_per', 'hr_sec_cess_amt', false, updateGrid)}
-                                                        {renderPairCell(r, i, 'sgst_per', 'sgst_amt', false, updateGrid)}
-                                                        {renderPairCell(r, i, 'cgst_per', 'cgst_amt', false, updateGrid)}
-                                                        {renderPairCell(r, i, 'igst_per', 'igst_amt', false, updateGrid)}
-                                                        {renderPairCell(r, i, 'tcs_per', 'tcs_amt', false, updateGrid)}
-                                                        {renderPairCell(r, i, 'discount_percentage', 'discount_amt', true, updateGrid, "text-rose-600")}
-
-                                                        <td className="p-1 border-r"><input type="number" className="w-full p-2 text-center outline-none" value={r.other_amt} onChange={e => updateGrid(i, 'other_amt', parseFloat(e.target.value) || 0)} /></td>
-                                                        <td className="p-1 border-r"><input type="number" className="w-full p-2 text-center outline-none" value={r.freight_amt} onChange={e => updateGrid(i, 'freight_amt', parseFloat(e.target.value) || 0)} /></td>
-                                                        <td className="p-1 border-r"><input type="text" className="w-full p-2 text-xs border rounded font-black uppercase text-center" value={r.identification_mark} onChange={e => updateGrid(i, 'identification_mark', e.target.value)} /></td>
-                                                        <td className="p-2 text-center"><button onClick={() => setGridRows(gridRows.filter((_, idx) => idx !== i))}><MinusCircle size={22} className="text-red-500 hover:scale-110 transition-transform" /></button></td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
+                    <td className="p-1 border-r"><input type="number" className="w-full p-2 text-center outline-none" value={r.other_amt} onChange={e => updateGrid(i, 'other_amt', parseFloat(e.target.value) || 0)} /></td>
+                    <td className="p-1 border-r"><input type="number" className="w-full p-2 text-center outline-none" value={r.freight_amt} onChange={e => updateGrid(i, 'freight_amt', parseFloat(e.target.value) || 0)} /></td>
+                    <td className="p-1 border-r"><input type="text" className="w-full p-2 text-xs border rounded font-black uppercase text-center" value={r.identification_mark} onChange={e => updateGrid(i, 'identification_mark', e.target.value)} /></td>
+                    <td className="p-2 text-center"><button onClick={() => setGridRows(gridRows.filter((_, idx) => idx !== i))}><MinusCircle size={22} className="text-red-500 hover:scale-110 transition-transform" /></button></td>
+                </tr>
+            ))}
+        </tbody>
+    </table>
+</div>
                                 </div>
                             )}
                         </div>
@@ -1395,19 +1326,19 @@ const FooterBtn = ({ label, icon }) => (
 
 const renderPairCell = (row, idx, perKey, amtKey, isEditable, updateGrid, color = "text-blue-600") => (
     <>
-        <td className="p-1 border-r text-slate-400">
+        <td className="p-1 border-r bg-white">
             <input
-                type="number" step="0.01"
+                type="number" 
+                step="0.01"
                 disabled={!isEditable}
-                className={`w-full p-2 text-center font-black border rounded bg-white outline-none focus:border-blue-500 ${color} disabled:bg-slate-50 disabled:border-none`}
+                className={`w-full p-2 text-center font-bold border-none outline-none focus:bg-yellow-50 ${color} disabled:bg-slate-50`}
                 value={row[perKey] || 0}
                 onChange={(e) => updateGrid(idx, perKey, e.target.value)}
             />
         </td>
-        <td className={`p-2 border-r text-center font-black bg-slate-50 ${color}`}>
-            {parseFloat(row[amtKey] || 0).toFixed(2)}
+        <td className={`p-2 border-r text-right font-black bg-slate-50 ${color}`}>
+            {num(row[amtKey]).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </td>
     </>
 );
-
 export default InvoicePreparation;

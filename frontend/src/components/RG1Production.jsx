@@ -34,13 +34,13 @@ const RG1Production = () => {
         date: new Date().toISOString().split('T')[0], 
         product_id: '',
         packing_type_id: '',
-        weight_per_bag: 0,
-        production_kgs: 0, 
-        prev_closing_kgs: 0,
-        invoice_kgs: 0, 
-        stock_kgs: 0,
-        stock_bags: 0,
-        stock_loose_kgs: 0
+        weight_per_bag: '',
+        production_kgs: '', 
+        prev_closing_kgs: '',
+        invoice_kgs: '', 
+        stock_kgs: '',
+        stock_bags: '',
+        stock_loose_kgs: ''
     };
 
     const [formData, setFormData] = useState(emptyState);
@@ -88,24 +88,27 @@ const RG1Production = () => {
     };
 
     // --- 4. Action Handlers ---
-    const handleAddNew = () => {
-        setFormData({ ...emptyState });
-        setIsModalOpen(true);
-    };
+  const handleAddNew = () => {
+    setFormData({ ...emptyState }); // Reset to initial empty strings
+    setIsModalOpen(true);
+};
 
-    const onProductChange = (productId) => {
-        const product = products.find(p => p.id === parseInt(productId));
-        if (!product) return;
-        const pType = packingTypes.find(t => t.packing_type === product.packing_type);
+   const onProductChange = (productId) => {
+    // Find product in the recently updated products list
+    const product = products.find(p => p.id === parseInt(productId));
+    if (!product) return;
+    
+    const pType = packingTypes.find(t => t.packing_type === product.packing_type);
 
-        setFormData(prev => ({
-            ...prev,
-            product_id: productId,
-            packing_type_id: pType ? pType.id : '',
-            weight_per_bag: product.pack_nett_wt || 0,
-            prev_closing_kgs: product.mill_stock || 0
-        }));
-    };
+    setFormData(prev => ({
+        ...prev,
+        product_id: productId,
+        packing_type_id: pType ? pType.id : '',
+        weight_per_bag: product.pack_nett_wt || 0,
+        // 🟢 This mill_stock must be updated by the backend during the previous save
+        prev_closing_kgs: product.mill_stock || 0
+    }));
+};
 
     const handleRowClick = (item) => {
         if (isSelectionMode) {
@@ -133,17 +136,43 @@ const RG1Production = () => {
     };
 
     const handleSave = async (e) => {
-        e.preventDefault();
-        if (!formData.product_id) return alert("Please select a Count/Product");
-        setSubmitLoading(true);
-        try {
-            if (formData.id) await transactionsAPI.production.update(formData.id, formData);
-            else await transactionsAPI.production.create(formData);
-            fetchRecords();
-            setIsModalOpen(false);
-        } catch (err) { alert("Error saving."); } 
-        finally { setSubmitLoading(false); }
-    };
+    e.preventDefault();
+    if (!formData.product_id) return alert("Please select a Count/Product");
+    
+    setSubmitLoading(true);
+    try {
+        if (formData.id) {
+            await transactionsAPI.production.update(formData.id, formData);
+        } else {
+            const payload = {
+ date: formData.date,
+ product_id: formData.product_id,
+ packing_type_id: formData.packing_type_id,
+ weight_per_bag: formData.weight_per_bag,
+ production_kgs: formData.production_kgs,
+ invoice_kgs: formData.invoice_kgs,
+ stock_bags: formData.stock_bags,
+ stock_loose_kgs: formData.stock_loose_kgs
+};
+
+await transactionsAPI.production.create(payload);
+        }
+
+        // 🟢 CRITICAL: Re-fetch Product Masters to get the NEW mill_stock
+        await fetchMasters(); 
+        
+        // Refresh the ledger list at the bottom
+        await fetchRecords(); 
+        
+        setIsModalOpen(false);
+        // Clear form for next entry
+        setFormData(emptyState); 
+    } catch (err) { 
+        alert("Error saving production log."); 
+    } finally { 
+        setSubmitLoading(false); 
+    }
+};
 
     const filteredData = useMemo(() => {
         let result = Array.isArray(list) ? [...list] : [];

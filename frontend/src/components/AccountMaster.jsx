@@ -21,7 +21,7 @@ const AccountMaster = () => {
     const [searchValue, setSearchValue] = useState('');
 
     const [currentPage, setCurrentPage] = useState(1);
-    const itemsPerPage = 10;
+    const [itemsPerPage, setItemsPerPage] = useState(10); 
 
     const emptyAccount = {
         id: null, 
@@ -180,68 +180,110 @@ const AccountMaster = () => {
             </div>
 
             {/* List Table */}
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                <table className="w-full text-left">
-                    <thead className="bg-blue-700 border-b text-white text-sm font-bold uppercase tracking-wider">
-                        <tr>
-    {isSelectionMode && <th className="p-4 w-12 text-center">#</th>}
-    <th className="p-4">Account Code</th>
-    <th className="p-4">Account Name</th>
-    <th className="p-4">Sub Group</th>
-    <th className="p-4">Group</th>
-    <th className="p-4">Main</th>
-    <th className="p-4">Place</th>
-    <th className="p-4">Phone No.</th>
-    <th className="p-4">Email Id</th>
-    {!isSelectionMode && <th className="p-4 w-10"></th>}
-</tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 text-sm">
-                        {currentItems.map(item => (
-                            <tr key={item.id} className={`hover:bg-blue-50 cursor-pointer ${selectedIds.includes(item.id) ? 'bg-blue-100/50' : ''}`} onClick={() => handleRowClick(item)}>
-                                {isSelectionMode && (
-                                    <td className="p-4 text-center">
-                                        {selectedIds.includes(item.id) ? <CheckSquare size={18} className="text-blue-600 mx-auto"/> : <Square size={18} className="text-slate-200 mx-auto"/>}
-                                    </td>
-                                )}
-                                <td className="p-4 text-base font-bold text-blue-600 font-mono">
-    {item.account_code}
-</td>
-
-<td className="p-4 text-base font-semibold text-slate-700 uppercase">
-    {item.account_name}
-</td>
-
-<td className="p-4 text-sm font-bold text-amber-600 uppercase">
-    {item.account_group}
-</td>
-
-<td className="p-4 text-sm font-bold text-slate-600 uppercase">
-    {item.primary_group}
-</td>
-
-<td className="p-4 text-sm font-bold text-slate-500 uppercase">
-    {item.main_group}
-</td>
-
-<td className="p-4 text-base text-slate-600 uppercase">
-    {item.place}
-</td>
-
-<td className="p-4 text-xs text-slate-500">
-    {item.phone_no || '-'}
-</td>
-
-<td className="p-4 text-xs text-slate-500 lowercase">
-    {item.email || '-'}
-</td>
-                                {!isSelectionMode && <td className="p-4 text-slate-300"><Edit size={16} /></td>}
+            {/* List Table Container */}
+            <div className="bg-white rounded-xl border border-slate-200 shadow-xl overflow-hidden flex flex-col">
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                        <thead className="bg-blue-700 text-white text-sm font-bold uppercase tracking-wider sticky top-0">
+                            <tr>
+                                {isSelectionMode && <th className="p-4 w-12 text-center">#</th>}
+                                <th className="p-4">Account Code</th>
+                                <th className="p-4">Account Name</th>
+                                <th className="p-4">Sub Group</th>
+                                <th className="p-4">Group</th>
+                                <th className="p-4">Main</th>
+                                <th className="p-4">Place</th>
+                                <th className="p-4">Phone No.</th>
+                                <th className="p-4">Email Id</th>
+                                {!isSelectionMode && <th className="p-4 w-10"></th>}
                             </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 text-sm">
+                            {currentItems.length > 0 ? (
+                                currentItems.map(item => (
+                                    <tr key={item.id} className={`hover:bg-blue-50 transition-colors cursor-pointer ${selectedIds.includes(item.id) ? 'bg-blue-100/50' : ''}`} onClick={() => handleRowClick(item)}>
+                                        {isSelectionMode && (
+                                            <td className="p-4 text-center">
+                                                {selectedIds.includes(item.id) ? <CheckSquare size={18} className="text-blue-600 mx-auto"/> : <Square size={18} className="text-slate-200 mx-auto"/>}
+                                            </td>
+                                        )}
+                                        <td className="p-4 font-bold text-blue-600 font-mono">{item.account_code}</td>
+                                        <td className="p-4 font-semibold text-slate-700 uppercase">{item.account_name}</td>
+                                        <td className="p-4 font-bold text-amber-600 uppercase text-xs">{item.account_group}</td>
+                                        <td className="p-4 font-bold text-slate-600 uppercase text-xs">{item.primary_group || '-'}</td>
+                                        <td className="p-4 font-bold text-slate-500 uppercase text-xs">{item.main_group || '-'}</td>
+                                        <td className="p-4 text-slate-600 uppercase">{item.place}</td>
+                                        <td className="p-4 text-xs text-slate-500">{item.phone_no || '-'}</td>
+                                        <td className="p-4 text-xs text-slate-500 lowercase">{item.email || '-'}</td>
+                                        {!isSelectionMode && <td className="p-4 text-slate-300"><Edit size={16} /></td>}
+                                    </tr>
+                                ))
+                            ) : (
+                                <tr>
+                                    <td colSpan={10} className="p-20 text-center text-slate-400 font-medium">No records found matching your search.</td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
 
+                {/* --- IMPROVED PAGINATION FOOTER --- */}
+                <div className="p-4 bg-slate-50 border-t border-slate-200 flex flex-col md:flex-row items-center justify-between gap-4">
+                    <div className="flex items-center gap-6">
+                        {/* Page Size Selector */}
+                        <div className="flex items-center gap-2">
+                            <span className="text-[11px] text-slate-500 font-black uppercase tracking-widest">Rows per page</span>
+                            <select 
+                                value={itemsPerPage}
+                                onChange={(e) => {
+                                    setItemsPerPage(Number(e.target.value));
+                                    setCurrentPage(1); 
+                                }}
+                                className="border border-slate-300 rounded-lg px-3 py-1.5 text-sm font-bold outline-none focus:ring-2 focus:ring-blue-500 bg-white shadow-sm cursor-pointer"
+                            >
+                                <option value={5}>5</option>
+                                <option value={10}>10</option>
+                                <option value={25}>25</option>
+                                <option value={50}>50</option>
+                                <option value={100}>100</option>
+                            </select>
+                        </div>
+                        
+                        {/* Total Count Display */}
+                        <div className="h-8 w-[1px] bg-slate-200 hidden md:block"></div>
+                        <span className="text-slate-600 font-bold text-sm">
+                            Showing <span className="text-blue-700">{(currentPage - 1) * itemsPerPage + 1}</span> to <span className="text-blue-700">{Math.min(currentPage * itemsPerPage, filteredData.length)}</span> of <span className="text-blue-700">{filteredData.length}</span> entries
+                        </span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                        {/* Previous Button */}
+                        <button 
+                            disabled={currentPage === 1} 
+                            onClick={() => setCurrentPage(p => p - 1)} 
+                            className="flex items-center gap-1 px-4 py-2 border border-slate-300 rounded-lg bg-white text-sm font-bold text-slate-700 hover:bg-blue-50 disabled:opacity-30 disabled:hover:bg-white transition-all shadow-sm"
+                        >
+                            <ChevronLeft size={18}/>
+                            <span>Prev</span>
+                        </button>
+
+                        {/* Page Indicators */}
+                        <div className="flex items-center px-4 py-2 bg-blue-600 rounded-lg shadow-inner">
+                            <span className="text-white text-sm font-black uppercase">Page {currentPage} of {totalPages}</span>
+                        </div>
+
+                        {/* Next Button */}
+                        <button 
+                            disabled={currentPage === totalPages || totalPages === 0} 
+                            onClick={() => setCurrentPage(p => p + 1)} 
+                            className="flex items-center gap-1 px-4 py-2 border border-slate-300 rounded-lg bg-white text-sm font-bold text-slate-700 hover:bg-blue-50 disabled:opacity-30 disabled:hover:bg-white transition-all shadow-sm"
+                        >
+                            <span>Next</span>
+                            <ChevronRight size={18}/>
+                        </button>
+                    </div>
+                </div>
+            </div>
             {/* POPUP MODAL (SPLIT TWO-COLUMN WITH 3-LINE ADDRESS) */}
             {/* POPUP MODAL ENHANCEMENT */}
 {isModalOpen && (
@@ -276,7 +318,7 @@ const AccountMaster = () => {
                 <input readOnly className="col-span-8 p-2 bg-gray-100 border rounded text-base font-mono" value={formData.account_code} />
               </div>
 
-              <div className="grid grid-cols-12 items-center gap-2">
+              {/* <div className="grid grid-cols-12 items-center gap-2">
                 <label className="col-span-4 text-right text-sm font-semibold">Main Group</label>
                 <select className="col-span-8 p-2 border rounded text-base" value={formData.main_group} onChange={e => setFormData({...formData, main_group: e.target.value})}>
                   <option>ASSETS</option>
@@ -284,19 +326,20 @@ const AccountMaster = () => {
                   <option>INCOME</option>
                   <option>EXPENSE</option>
                 </select>
-              </div>
+              </div> */}
 
-              <div className="grid grid-cols-12 items-center gap-2">
+              {/* <div className="grid grid-cols-12 items-center gap-2">
                 <label className="col-span-4 text-right text-sm font-semibold">Primary Group</label>
                 <input className="col-span-8 p-2 border rounded uppercase text-base" value={formData.primary_group} onChange={e => setFormData({...formData, primary_group: e.target.value.toUpperCase()})} />
-              </div>
+              </div> */}
 
               <div className="grid grid-cols-12 items-center gap-2">
                 <label className="col-span-4 text-right text-sm font-semibold">Account Group</label>
                 <select className="col-span-8 p-2 border rounded text-base" value={formData.account_group} onChange={e => setFormData({...formData, account_group: e.target.value})}>
                   <option>DEBTORS - YARN SALES</option>
-                  <option>DEBTORS - OTHERS</option>
                   <option>DEBTORS - DEPOT - SALES</option>
+                  <option>DEBTORS - DEPOT - PARTIES</option>
+                  <option>DEBTORS - OTHERS</option>
                 </select>
               </div>
 
@@ -320,18 +363,19 @@ const AccountMaster = () => {
               </div>
 
               <div className="grid grid-cols-12 items-center gap-2">
-                <label className="col-span-4 text-right text-sm font-semibold">Pincode / State</label>
+                <label className="col-span-4 text-right text-sm font-semibold">Pincode </label>
                 <div className="col-span-8 flex gap-2">
-                  <input className="w-1/3 p-2 border rounded text-base" placeholder="PIN" value={formData.pincode} onChange={e => setFormData({...formData, pincode: e.target.value})} />
-                  <input className="w-2/3 p-2 border rounded uppercase text-base" placeholder="STATE" value={formData.state} onChange={e => setFormData({...formData, state: e.target.value.toUpperCase()})} />
+                  <input className="w-full p-2 border rounded text-base" placeholder="PIN" value={formData.pincode} onChange={e => setFormData({...formData, pincode: e.target.value})} />
+                  {/* <input className="w-2/3 p-2 border rounded uppercase text-base" placeholder="STATE" value={formData.state} onChange={e => setFormData({...formData, state: e.target.value.toUpperCase()})} /> */}
                 </div>
               </div>
-            </div>
-
-            {/* RIGHT COLUMN */}
-            <div className="space-y-4">
-              <h3 className="text-base font-bold text-green-800 border-b pb-1 uppercase">Contact & Tax Info</h3>
-
+              <div className="grid grid-cols-12 items-center gap-2">
+                <label className="col-span-4 text-right text-sm font-semibold">State</label>
+                <div className="col-span-8 flex gap-2">
+                  {/* <input className="w-1/3 p-2 border rounded text-base" placeholder="PIN" value={formData.pincode} onChange={e => setFormData({...formData, pincode: e.target.value})} /> */}
+                  <input className="w-full p-2 border rounded uppercase text-base" placeholder="STATE" value={formData.state} onChange={e => setFormData({...formData, state: e.target.value.toUpperCase()})} />
+                </div>
+              </div>
               <div className="grid grid-cols-12 gap-2 items-start">
                 <label className="col-span-4 text-right text-sm font-semibold pt-1">Delivery Address</label>
                 <div className="col-span-8 space-y-1.5">
@@ -340,6 +384,12 @@ const AccountMaster = () => {
                   <input className="w-full p-2 border rounded text-sm uppercase" placeholder="Line 3" value={formData.del3} onChange={e => setFormData({...formData, del3: e.target.value.toUpperCase()})} />
                 </div>
               </div>
+            </div>
+
+            {/* RIGHT COLUMN */}
+            <div className="space-y-4">
+              <h3 className="text-base font-bold text-green-800 border-b pb-1 uppercase">Contact & Tax Info</h3>
+
 
               {[
                 { label: 'TIN No.', key: 'tin_no' },

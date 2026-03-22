@@ -425,7 +425,7 @@ const InvoiceHeader = sequelize.define('InvoiceHeader', {
     type: DataTypes.DECIMAL(15, 2),
     defaultValue: 0
   },
-
+  total_gst: { type: DataTypes.DECIMAL(15, 2), defaultValue: 0 },
   total_sgst: {
     type: DataTypes.DECIMAL(15, 2),
     defaultValue: 0
@@ -584,6 +584,7 @@ const InvoiceDetail = sequelize.define('InvoiceDetail', {
   cess_amt: { type: DataTypes.DECIMAL(15, 2), defaultValue: 0 },
   hr_sec_cess_amt: { type: DataTypes.DECIMAL(15, 2), defaultValue: 0 },
 
+  gst_amt: { type: DataTypes.DECIMAL(15, 2), defaultValue: 0 },
   sgst_amt: { type: DataTypes.DECIMAL(15, 2), defaultValue: 0 },
   cgst_amt: { type: DataTypes.DECIMAL(15, 2), defaultValue: 0 },
   igst_amt: { type: DataTypes.DECIMAL(15, 2), defaultValue: 0 },
@@ -615,6 +616,11 @@ const InvoiceDetail = sequelize.define('InvoiceDetail', {
   },
 
   hcess_per: {
+    type: DataTypes.DECIMAL(10, 2),
+    defaultValue: 0
+  },
+  
+  gst_per:{
     type: DataTypes.DECIMAL(10, 2),
     defaultValue: 0
   },
@@ -845,6 +851,11 @@ addr3: {
   },
 
   total_hr_sec_cess: {
+    type: DataTypes.DECIMAL(15, 2),
+    defaultValue: 0
+  },
+
+  total_gst: {
     type: DataTypes.DECIMAL(15, 2),
     defaultValue: 0
   },
@@ -1093,6 +1104,17 @@ const DepotSalesDetail = sequelize.define('DepotSalesDetail', {
   hcess_amt: {
     type: DataTypes.DECIMAL(15, 2),
     defaultValue: 0
+  },
+
+  gst_per: {
+    type : DataTypes.DECIMAL(10,2),
+    defaultValue : 0
+  },
+
+  gst_amt: 
+  {
+    type : DataTypes.DECIMAL(10,2),
+    defaultValue : 0
   },
 
   sgst_per: {
@@ -1409,56 +1431,33 @@ const InvoiceType = sequelize.define("InvoiceType", {
   // =============================
   // GST (SGST + CGST)
   // =============================
-  gst_checked: {
-    type: DataTypes.BOOLEAN,
-    defaultValue: false
-  },
+  // Inside InvoiceType definition in models.js
+// ... existing fields ...
 
-  sgst_percentage: {
-    type: DataTypes.DECIMAL(10, 2),
-    defaultValue: 0
-  },
+// Generic GST (For cases where it's not split)
+gst_checked: { type: DataTypes.BOOLEAN, defaultValue: false },
+gst_percentage: { type: DataTypes.DECIMAL(10, 2), defaultValue: 0 },
+gst_formula: { type: DataTypes.STRING },
+gst_account: { type: DataTypes.STRING },
 
-  cgst_percentage: {
-    type: DataTypes.DECIMAL(10, 2),
-    defaultValue: 0
-  },
+// SGST
+sgst_checked: { type: DataTypes.BOOLEAN, defaultValue: false }, // Added specific check
+sgst_percentage: { type: DataTypes.DECIMAL(10, 2), defaultValue: 0 },
+sgst_formula: { type: DataTypes.STRING },
+sgst_account: { type: DataTypes.STRING },
 
-  sgst_formula: {
-    type: DataTypes.STRING
-  },
+// CGST
+cgst_checked: { type: DataTypes.BOOLEAN, defaultValue: false }, // Added specific check
+cgst_percentage: { type: DataTypes.DECIMAL(10, 2), defaultValue: 0 },
+cgst_formula: { type: DataTypes.STRING },
+cgst_account: { type: DataTypes.STRING },
 
-  cgst_formula: {
-    type: DataTypes.STRING
-  },
-
-  sgst_account: {
-    type: DataTypes.STRING
-  },
-
-  cgst_account: {
-    type: DataTypes.STRING
-  },
-
-  // =============================
-  // IGST
-  // =============================
-  igst_checked: {
-    type: DataTypes.BOOLEAN,
-    defaultValue: false
-  },
-
-  igst_percentage: {
-    type: DataTypes.DECIMAL(10, 2)
-  },
-
-  igst_formula: {
-    type: DataTypes.STRING
-  },
-
-  igst_account: {
-    type: DataTypes.STRING
-  },
+// IGST
+igst_checked: { type: DataTypes.BOOLEAN, defaultValue: false },
+igst_percentage: { type: DataTypes.DECIMAL(10, 2), defaultValue: 0 },
+igst_formula: { type: DataTypes.STRING },
+igst_account: { type: DataTypes.STRING },
+// ... rest of the model
 
   // =============================
   // FOOTER FORMULAS

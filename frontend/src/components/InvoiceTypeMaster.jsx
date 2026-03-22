@@ -16,7 +16,52 @@ const TAX_ROWS_CONFIG = [
     { id: 'cst',     label: 'CST' },
     { id: 'cenvat',  label: 'CENVAT' },
 ];
-
+const TaxRow = ({ label, checked, onCheck, val, onVal, formula, onFormula, debit, onDebit, credit, onCredit, color = "" }) => (
+  <div className={`grid grid-cols-12 gap-3 px-5 py-2.5 border-b hover:bg-slate-50 items-center ${color}`}>
+    <div className="col-span-2 font-bold text-slate-700">{label}</div>
+    <div className="col-span-1 flex justify-center">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={e => onCheck(e.target.checked)}
+        className="w-6 h-6 accent-blue-600 cursor-pointer"
+      />
+    </div>
+    <div className="col-span-1">
+      <input
+        type="number"
+        className="w-full p-2 border border-slate-300 rounded-lg text-center font-bold"
+        // FIX: If value is 0, show empty string so screen stays clean
+        value={val === 0 ? '' : val} 
+        onChange={e => onVal(e.target.value)}
+      />
+    </div>
+    <div className="col-span-4">
+      <input
+        className="w-full p-2 border border-slate-300 rounded-lg font-mono text-sm text-blue-700 bg-blue-50/30"
+        value={formula || ''}
+        onChange={e => onFormula(e.target.value)}
+        placeholder="Formula"
+      />
+    </div>
+    <div className="col-span-2">
+      <input
+        className="w-full p-2 border border-slate-300 rounded-lg uppercase text-xs font-bold"
+        value={debit || ''}
+        onChange={e => onDebit(e.target.value.toUpperCase())}
+        placeholder="DEBIT A/C"
+      />
+    </div>
+    <div className="col-span-2">
+      <input
+        className="w-full p-2 border border-slate-300 rounded-lg uppercase text-xs font-bold"
+        value={credit || ''}
+        onChange={e => onCredit(e.target.value.toUpperCase())}
+        placeholder="CREDIT A/C"
+      />
+    </div>
+  </div>
+);
 const InvoiceTypeMaster = () => {
     const [list, setList] = useState([]);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -35,7 +80,7 @@ const InvoiceTypeMaster = () => {
         id: null,
         code: '', 
         type_name: '', 
-        sales_type: 'CST SALES', 
+        sales_type: 'DIRECT SALES', 
         group_name: 'OTHERS', 
         is_option_ii: false,
         round_off_digits: 0,
@@ -48,17 +93,24 @@ const InvoiceTypeMaster = () => {
             id: c.id, label: c.label, checked: false, val: 0, formula: '', debit: '', credit: ''
         })),
         gst_checked: false,
+        gst_percentage: 0,
+        gst_formula: '',
+        gst_account: '',
+
+        sgst_checked: false,
         sgst_percentage: 0,
-        cgst_percentage: 0,
         sgst_formula: '',
-        cgst_formula: '',
         sgst_account: '',
+
+        cgst_checked: false,
+        cgst_percentage: 0,
+        cgst_formula: '',
         cgst_account: '',
+
         igst_checked: false,
         igst_percentage: 0,
         igst_formula: '',
         igst_account: '',
-        igst_credit: '',
         sub_total_formula: '[I]',
         total_value_formula: '[Rate / Kg] * [Total Kgs]',
         round_off_formula: '',
@@ -176,6 +228,8 @@ const InvoiceTypeMaster = () => {
             {children}
         </label>
     );
+    // 1. THIS MUST BE OUTSIDE THE MAIN COMPONENT TO FIX CURSOR FOCUS
+
 
     return (
         <div className="min-h-screen bg-slate-100 p-6 font-sans">
@@ -282,62 +336,62 @@ const InvoiceTypeMaster = () => {
 
             {/* Modal – wider & cleaner fonts */}
            {isModalOpen && (
-  <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4">
-    <div className="relative bg-white w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden border border-slate-200/70 animate-in zoom-in-95 duration-200 flex flex-col max-h-[94vh]">
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 backdrop-blur-md p-4">
+    <div className="relative bg-white w-full max-w-5xl rounded-2xl shadow-2xl overflow-hidden border border-slate-200/70 animate-in zoom-in-95 duration-200 flex flex-col max-h-[85vh]">
       
       {/* Header */}
-      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-5 flex justify-between items-center text-white shadow-md">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-white/15 rounded-lg">
-            <FileText size={22} />
+      <div className="bg-gradient-to-r from-blue-700 to-indigo-700 px-6 py-4 flex justify-between items-center text-white shadow-md">
+        <div className="flex items-center gap-4">
+          <div className="p-2.5 bg-white/15 rounded-xl">
+            <FileText size={26} />
           </div>
           <div>
-            <h2 className="text-xl font-bold tracking-tight">Invoice Type Master</h2>
-            <p className="text-blue-100/90 text-sm font-medium mt-0.5 uppercase tracking-wide">
-              {formData.id ? 'Edit Invoice Type' : 'New Invoice Type'}
+            <h2 className="text-2xl font-bold tracking-tight">Invoice Type Master</h2>
+            <p className="text-blue-100/90 text-sm font-medium mt-0.5 uppercase tracking-widest">
+              {formData.id ? 'Edit Configuration' : 'Create New Configuration'}
             </p>
           </div>
         </div>
         <button
           onClick={() => setIsModalOpen(false)}
-          className="p-2 rounded-lg hover:bg-white/20 transition-colors active:scale-95"
+          className="p-2 rounded-xl hover:bg-white/20 transition-colors active:scale-95"
         >
-          <X size={22} strokeWidth={3} />
+          <X size={28} strokeWidth={2.5} />
         </button>
       </div>
 
       {/* Body */}
-      <div className="p-6 overflow-y-auto flex-1 bg-slate-50/70">
-        <form onSubmit={handleSave} className="space-y-6">
-
-          {/* Top row - Code, Option II, Round off */}
+      <div className="p-6 overflow-y-auto flex-1 bg-slate-50/50">
+        <form onSubmit={handleSave} className="space-y-5">
+                {/* Top row - Code, Option II, Round off */}
           <div className="grid grid-cols-12 gap-4 items-center bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-            <div className="col-span-2 flex justify-end">
+            <div className="col-span-1 flex justify-end">
               <FormLabel>Code</FormLabel>
             </div>
             <div className="col-span-2">
               <input
                 readOnly
-                className="w-full p-2.5 bg-slate-800 text-white font-mono font-bold rounded-lg border border-slate-600 cursor-not-allowed"
-                value={formData.code || 'New'}
+                className="w-full p-3 bg-slate-800 text-white font-mono font-bold rounded-xl border border-slate-600 cursor-not-allowed text-center"
+                value={formData.code || 'NEW'}
               />
             </div>
 
-            <div className="col-span-3 flex items-center gap-3">
+            <div className="col-span-3 flex items-center justify-center gap-4 border-x border-slate-100 px-4">
               <input
                 type="checkbox"
+                id="opt2"
                 checked={formData.is_option_ii}
                 onChange={e => setFormData({...formData, is_option_ii: e.target.checked})}
-                className="w-5 h-5 accent-blue-600"
+                className="w-6 h-6 accent-blue-600 cursor-pointer"
               />
-              <label className="text-sm font-medium text-slate-700">Option II</label>
+              <label htmlFor="opt2" className="text-base font-bold text-slate-700 cursor-pointer">Option II</label>
             </div>
 
-            <div className="col-span-5 flex items-center gap-4">
+            <div className="col-span-6 flex items-center gap-4 justify-end">
               <FormLabel>Round off digits</FormLabel>
               <input
                 type="number"
-                className="w-20 p-2.5 border border-slate-300 rounded-lg text-center text-sm focus:border-blue-500 focus:ring-1"
+                className="w-24 p-3 border border-slate-300 rounded-xl text-center text-lg font-bold focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all"
                 value={formData.round_off_digits ?? ''}
                 onChange={e => setFormData({...formData, round_off_digits: Number(e.target.value)})}
               />
@@ -350,7 +404,7 @@ const InvoiceTypeMaster = () => {
             <div className="col-span-4">
               <input
                 required
-                className="w-full p-2.5 border border-slate-300 rounded-lg uppercase font-semibold focus:border-blue-500 focus:ring-1"
+                className="w-full p-3 border border-slate-300 rounded-xl uppercase font-bold text-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
                 value={formData.type_name || ''}
                 onChange={e => setFormData({...formData, type_name: e.target.value.toUpperCase()})}
               />
@@ -359,11 +413,11 @@ const InvoiceTypeMaster = () => {
             <div className="col-span-2 flex justify-end"><FormLabel>Sales Type</FormLabel></div>
             <div className="col-span-4">
               <select
-                className="w-full p-2.5 border border-slate-300 rounded-lg focus:border-blue-500 focus:ring-1"
+                className="w-full p-3 border border-slate-300 rounded-xl font-bold text-slate-700 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none appearance-none bg-white"
                 value={formData.sales_type || ''}
                 onChange={e => setFormData({...formData, sales_type: e.target.value})}
               >
-                <option value="CST SALES">CST SALES</option>
+                <option value="DIRECT SALES">DIRECT SALES</option>
                 <option value="GST SALES">GST SALES</option>
                 <option value="DEPOT SALES">DEPOT SALES</option>
               </select>
@@ -372,300 +426,241 @@ const InvoiceTypeMaster = () => {
 
           <div className="grid grid-cols-12 gap-4 items-center bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
             <div className="col-span-2 flex justify-end"><FormLabel>Group Name</FormLabel></div>
-            <div className="col-span-5">
+            <div className="col-span-4">
               <input
-                className="w-full p-2.5 border border-slate-300 rounded-lg uppercase focus:border-blue-500 focus:ring-1"
+                className="w-full p-3 border border-slate-300 rounded-xl uppercase font-semibold focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
                 value={formData.group_name || ''}
                 onChange={e => setFormData({...formData, group_name: e.target.value.toUpperCase()})}
               />
             </div>
 
-            <div className="col-span-5 flex items-center gap-6">
-              <label className="flex items-center gap-2 text-sm font-medium text-slate-700 cursor-pointer">
+            <div className="col-span-6 flex items-center justify-center gap-6">
+              <label className="flex items-center gap-3 text-base font-bold text-slate-700 cursor-pointer bg-blue-50 px-6 py-2.5 rounded-xl border border-blue-100">
                 <input
                   type="checkbox"
                   checked={formData.account_posting}
                   onChange={e => setFormData({...formData, account_posting: e.target.checked})}
-                  className="w-5 h-5 accent-blue-600"
+                  className="w-6 h-6 accent-blue-600"
                 />
-                Account Posting
+                Enable Account Posting
               </label>
             </div>
           </div>
 
-          {/* Tax Mapping Table */}
-          <div className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-sm">
-            <div className="bg-blue-700 text-white grid grid-cols-12 py-3 px-4 font-semibold text-sm uppercase tracking-wide sticky top-0 z-10">
-              <div className="col-span-3">Description</div>
-              <div className="col-span-1 text-center">Enable</div>
-              <div className="col-span-1 text-center">%</div>
-              <div className="col-span-3">Formula</div>
-              <div className="col-span-2">Debit A/c</div>
-              <div className="col-span-2">Credit A/c</div>
-            </div>
+          {/* Tax Mapping Table Container */}
+<div className="border border-slate-200 rounded-2xl overflow-hidden bg-white shadow-md">
+    {/* HEADER */}
+    <div className="bg-slate-800 text-white grid grid-cols-12 py-4 px-6 font-bold text-sm uppercase tracking-widest sticky top-0 z-10">
+        <div className="col-span-2">Description</div>
+        <div className="col-span-1 text-center">Enable</div>
+        <div className="col-span-1 text-center">% / Val</div>
+        <div className="col-span-4 px-2 text-center">Calculation Formula</div>
+        <div className="col-span-2 px-1 text-center">Debit Account</div>
+        <div className="col-span-2 px-1 text-center">Credit Account</div>
+    </div>
 
-            {/* Assess Value */}
-            <div className="grid grid-cols-12 gap-3 px-4 py-3 border-b hover:bg-slate-50">
-              <div className="col-span-3 font-medium flex items-center">Assess Value</div>
-              <div className="col-span-1 flex justify-center items-center">
-                <input
-                  type="checkbox"
-                  checked={formData.assess_checked}
-                  onChange={e => setFormData({...formData, assess_checked: e.target.checked})}
-                  className="w-5 h-5 accent-blue-600"
-                />
-              </div>
-              <div className="col-span-1" />
-              <div className="col-span-3">
-                <input
-                  className="w-full p-2 border border-slate-300 rounded font-mono text-sm focus:border-blue-500"
-                  value={formData.assess_formula || ''}
-                  onChange={e => setFormData({...formData, assess_formula: e.target.value})}
-                  placeholder="[formula]"
-                />
-              </div>
-              <div className="col-span-2">
-                <input
-                  className="w-full p-2 border border-slate-300 rounded uppercase text-sm"
-                  value={formData.assess_account || ''}
-                  onChange={e => setFormData({...formData, assess_account: e.target.value.toUpperCase()})}
-                  placeholder="Debit A/c"
-                />
-              </div>
-              <div className="col-span-2">
-                <input
-                  className="w-full p-2 border border-slate-300 rounded uppercase text-sm"
-                  value={formData.assess_credit || ''}
-                  onChange={e => setFormData({...formData, assess_credit: e.target.value.toUpperCase()})}
-                  placeholder="Credit A/c"
-                />
-              </div>
-            </div>
+    {/* Assess Value Row */}
+    <div className="grid grid-cols-12 gap-4 px-6 py-4 border-b hover:bg-slate-50 items-center">
+        <div className="col-span-2 font-bold text-slate-700">Assess Value</div>
+        <div className="col-span-1 flex justify-center">
+            <input
+                type="checkbox"
+                checked={formData.assess_checked}
+                onChange={e => setFormData({...formData, assess_checked: e.target.checked})}
+                className="w-6 h-6 accent-blue-600 cursor-pointer"
+            />
+        </div>
+        <div className="col-span-1" />
+        <div className="col-span-4">
+            <input
+                className="w-full p-2 border border-slate-300 rounded-lg font-mono text-sm text-blue-700 bg-blue-50/30"
+                value={formData.assess_formula || ''}
+                onChange={e => setFormData({...formData, assess_formula: e.target.value})}
+                placeholder="[I]"
+            />
+        </div>
+        <div className="col-span-2">
+            <input
+                className="w-full p-2 border border-slate-300 rounded-lg uppercase text-xs font-bold"
+                value={formData.assess_account || ''}
+                onChange={e => setFormData({...formData, assess_account: e.target.value.toUpperCase()})}
+                placeholder="DEBIT A/C"
+            />
+        </div>
+        <div className="col-span-2">
+            <input
+                className="w-full p-2 border border-slate-300 rounded-lg uppercase text-xs font-bold"
+                value={formData.assess_credit || ''}
+                onChange={e => setFormData({...formData, assess_credit: e.target.value.toUpperCase()})}
+                placeholder="CREDIT A/C"
+            />
+        </div>
+    </div>
 
-            {/* Dynamic rows */}
-            {formData.rows?.map((row, idx) => (
-              <div key={row.id || idx} className="grid grid-cols-12 gap-3 px-4 py-3 border-b last:border-b-0 hover:bg-slate-50">
-                <div className="col-span-3 font-medium flex items-center">{row.label}</div>
-                <div className="col-span-1 flex justify-center items-center">
-                  <input
-                    type="checkbox"
-                    checked={row.checked}
-                    onChange={e => {
-                      const newRows = [...formData.rows];
-                      newRows[idx].checked = e.target.checked;
-                      setFormData({...formData, rows: newRows});
-                    }}
-                    className="w-5 h-5 accent-blue-600"
-                  />
-                </div>
-                <div className="col-span-1">
-                  <input
-                    type="number"
-                    step="0.01"
-                    className="w-full p-2 border border-slate-300 rounded text-center text-sm"
-                    value={row.val ?? ''}
-                    onChange={e => {
-                      const newRows = [...formData.rows];
-                      newRows[idx].val = e.target.value;
-                      setFormData({...formData, rows: newRows});
-                    }}
-                  />
-                </div>
-                <div className="col-span-3">
-                  <input
-                    className="w-full p-2 border border-slate-300 rounded font-mono text-sm focus:border-blue-500"
-                    value={row.formula || ''}
-                    onChange={e => {
-                      const newRows = [...formData.rows];
-                      newRows[idx].formula = e.target.value;
-                      setFormData({...formData, rows: newRows});
-                    }}
-                    placeholder="[formula]"
-                  />
-                </div>
-                <div className="col-span-2">
-                  <input
-                    className="w-full p-2 border border-slate-300 rounded uppercase text-sm"
-                    value={row.debit || ''}
-                    onChange={e => {
-                      const newRows = [...formData.rows];
-                      newRows[idx].debit = e.target.value.toUpperCase();
-                      setFormData({...formData, rows: newRows});
-                    }}
-                    placeholder="Debit A/c"
-                  />
-                </div>
-                <div className="col-span-2">
-                  <input
-                    className="w-full p-2 border border-slate-300 rounded uppercase text-sm"
-                    value={row.credit || ''}
-                    onChange={e => {
-                      const newRows = [...formData.rows];
-                      newRows[idx].credit = e.target.value.toUpperCase();
-                      setFormData({...formData, rows: newRows});
-                    }}
-                    placeholder="Credit A/c"
-                  />
-                </div>
-              </div>
-            ))}
+    {/* Map through TAX_ROWS_CONFIG rows */}
+    {formData.rows?.map((row, idx) => (
+        <TaxRow
+            key={row.id}
+            label={row.label}
+            checked={row.checked}
+            onCheck={(val) => {
+                const newRows = [...formData.rows];
+                newRows[idx].checked = val;
+                setFormData({...formData, rows: newRows});
+            }}
+            val={row.val}
+            onVal={(val) => {
+                const newRows = [...formData.rows];
+                newRows[idx].val = val;
+                setFormData({...formData, rows: newRows});
+            }}
+            formula={row.formula}
+            onFormula={(val) => {
+                const newRows = [...formData.rows];
+                newRows[idx].formula = val;
+                setFormData({...formData, rows: newRows});
+            }}
+            debit={row.debit}
+            onDebit={(val) => {
+                const newRows = [...formData.rows];
+                newRows[idx].debit = val;
+                setFormData({...formData, rows: newRows});
+            }}
+            credit={row.credit}
+            onCredit={(val) => {
+                const newRows = [...formData.rows];
+                newRows[idx].credit = val;
+                setFormData({...formData, rows: newRows});
+            }}
+        />
+    ))}
 
-            {/* GST / IGST compact */}
-            <div className="grid grid-cols-12 gap-4 px-4 py-4 bg-blue-50/50 border-t">
-              <div className="col-span-3 font-medium flex items-center justify-end">GST</div>
-              <div className="col-span-1 flex justify-center items-center">
-                <input
-                  type="checkbox"
-                  checked={formData.gst_checked}
-                  onChange={e => setFormData({...formData, gst_checked: e.target.checked})}
-                  className="w-5 h-5 accent-blue-600"
-                />
-              </div>
-              <div className="col-span-8 grid grid-cols-8 gap-3">
-                <div className="col-span-2 flex items-center gap-2">
-                  <span className="text-sm font-medium">SGST %</span>
-                  <input
-                    type="number"
-                    step="0.01"
-                    className="w-full p-2 border border-slate-300 rounded text-center text-sm"
-                    value={formData.sgst_percentage ?? ''}
-                    onChange={e => setFormData({...formData, sgst_percentage: Number(e.target.value)})}
-                  />
-                </div>
-                <div className="col-span-3">
-                  <input
-                    className="w-full p-2 border border-slate-300 rounded font-mono text-sm"
-                    value={formData.sgst_formula || ''}
-                    onChange={e => setFormData({...formData, sgst_formula: e.target.value})}
-                    placeholder="SGST formula"
-                  />
-                </div>
-                <div className="col-span-3">
-                  <input
-                    className="w-full p-2 border border-slate-300 rounded uppercase text-sm"
-                    value={formData.cgst_account || ''}
-                    onChange={e => setFormData({...formData, cgst_account: e.target.value.toUpperCase()})}
-                    placeholder="CGST A/c"
-                  />
-                </div>
-              </div>
-            </div>
+    {/* Individual Tax Sections */}
+    <TaxRow 
+        label="GST (General)" 
+        color="bg-slate-50"
+        checked={formData.gst_checked} 
+        onCheck={(v) => setFormData({...formData, gst_checked: v})}
+        val={formData.gst_percentage}
+        onVal={(v) => setFormData({...formData, gst_percentage: v})}
+        formula={formData.gst_formula}
+        onFormula={(v) => setFormData({...formData, gst_formula: v})}
+        debit={formData.gst_account}
+        onDebit={(v) => setFormData({...formData, gst_account: v})}
+    />
 
-            <div className="grid grid-cols-12 gap-4 px-4 py-4 bg-blue-50/50 border-t">
-              <div className="col-span-3 font-medium flex items-center justify-end">IGST</div>
-              <div className="col-span-1 flex justify-center items-center">
-                <input
-                  type="checkbox"
-                  checked={formData.igst_checked}
-                  onChange={e => setFormData({...formData, igst_checked: e.target.checked})}
-                  className="w-5 h-5 accent-blue-600"
-                />
-              </div>
-              <div className="col-span-8 grid grid-cols-8 gap-3">
-                <div className="col-span-2">
-                  <input
-                    type="number"
-                    step="0.01"
-                    className="w-full p-2 border border-slate-300 rounded text-center text-sm"
-                    value={formData.igst_percentage ?? ''}
-                    onChange={e => setFormData({...formData, igst_percentage: Number(e.target.value)})}
-                  />
-                </div>
-                <div className="col-span-3">
-                  <input
-                    className="w-full p-2 border border-slate-300 rounded font-mono text-sm"
-                    value={formData.igst_formula || ''}
-                    onChange={e => setFormData({...formData, igst_formula: e.target.value})}
-                    placeholder="IGST formula"
-                  />
-                </div>
-                <div className="col-span-3 flex gap-3">
-                  <input
-                    className="flex-1 p-2 border border-slate-300 rounded uppercase text-sm"
-                    value={formData.igst_account || ''}
-                    onChange={e => setFormData({...formData, igst_account: e.target.value.toUpperCase()})}
-                    placeholder="IGST Debit"
-                  />
-                  <input
-                    className="flex-1 p-2 border border-slate-300 rounded uppercase text-sm"
-                    value={formData.igst_credit || ''}
-                    onChange={e => setFormData({...formData, igst_credit: e.target.value.toUpperCase()})}
-                    placeholder="IGST Credit"
-                  />
-                </div>
-              </div>
-            </div>
+    <TaxRow 
+        label="SGST" 
+        color="bg-orange-50/20"
+        checked={formData.sgst_checked} 
+        onCheck={(v) => setFormData({...formData, sgst_checked: v})}
+        val={formData.sgst_percentage}
+        onVal={(v) => setFormData({...formData, sgst_percentage: v})}
+        formula={formData.sgst_formula}
+        onFormula={(v) => setFormData({...formData, sgst_formula: v})}
+        debit={formData.sgst_account}
+        onDebit={(v) => setFormData({...formData, sgst_account: v})}
+    />
+
+    <TaxRow 
+        label="CGST" 
+        color="bg-blue-50/20"
+        checked={formData.cgst_checked} 
+        onCheck={(v) => setFormData({...formData, cgst_checked: v})}
+        val={formData.cgst_percentage}
+        onVal={(v) => setFormData({...formData, cgst_percentage: v})}
+        formula={formData.cgst_formula}
+        onFormula={(v) => setFormData({...formData, cgst_formula: v})}
+        debit={formData.cgst_account}
+        onDebit={(v) => setFormData({...formData, cgst_account: v})}
+    />
+
+    <TaxRow 
+        label="IGST" 
+        color="bg-indigo-50/40"
+        checked={formData.igst_checked} 
+        onCheck={(v) => setFormData({...formData, igst_checked: v})}
+        val={formData.igst_percentage}
+        onVal={(v) => setFormData({...formData, igst_percentage: v})}
+        formula={formData.igst_formula}
+        onFormula={(v) => setFormData({...formData, igst_formula: v})}
+        debit={formData.igst_account}
+        onDebit={(v) => setFormData({...formData, igst_account: v})}
+        credit={formData.igst_credit}
+        onCredit={(v) => setFormData({...formData, igst_credit: v})}
+    />
+            
           </div>
 
           {/* Footer formulas */}
-          <div className="grid grid-cols-12 gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-            <div className="col-span-3 flex justify-end items-center"><FormLabel>Sub Total</FormLabel></div>
-            <div className="col-span-9">
+          <div className="grid grid-cols-12 gap-4 bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+            <div className="col-span-2 flex justify-end items-center font-bold text-slate-700">Sub Total</div>
+            <div className="col-span-10">
               <input
-                className="w-full p-2.5 border border-slate-300 rounded-lg font-mono focus:border-blue-500 focus:ring-1"
+                className="w-full p-4 border border-slate-300 rounded-xl font-mono text-lg font-bold text-blue-800 bg-slate-50 focus:ring-2 focus:ring-blue-200 outline-none"
                 value={formData.sub_total_formula || ''}
                 onChange={e => setFormData({...formData, sub_total_formula: e.target.value})}
               />
             </div>
 
-            <div className="col-span-3 flex justify-end items-center"><FormLabel>Total Value</FormLabel></div>
-            <div className="col-span-9">
+            <div className="col-span-2 flex justify-end items-center font-bold text-slate-700">Total Value</div>
+            <div className="col-span-10">
               <input
-                className="w-full p-2.5 border border-slate-300 rounded-lg font-mono focus:border-blue-500 focus:ring-1"
+                className="w-full p-4 border border-slate-300 rounded-xl font-mono text-lg font-bold text-emerald-800 bg-slate-50 focus:ring-2 focus:ring-emerald-200 outline-none"
                 value={formData.total_value_formula || ''}
                 onChange={e => setFormData({...formData, total_value_formula: e.target.value})}
               />
             </div>
 
-            <div className="col-span-3 flex justify-end items-center"><FormLabel>Round Off</FormLabel></div>
-            <div className="col-span-9 flex flex-col sm:flex-row gap-4 items-start sm:items-center">
-              <div className="flex gap-6">
-                <label className="flex items-center gap-2 text-sm">
+            <div className="col-span-2 flex justify-end items-center font-bold text-slate-700">Round Off</div>
+            <div className="col-span-10 flex flex-col md:flex-row gap-6 items-center">
+              <div className="flex gap-8 bg-slate-100 p-3 px-6 rounded-xl border border-slate-200">
+                <label className="flex items-center gap-3 text-base font-bold text-slate-600 cursor-pointer">
                   <input
                     type="radio"
                     value="Forward"
                     checked={formData.round_off_direction === 'Forward'}
                     onChange={e => setFormData({...formData, round_off_direction: e.target.value})}
-                    className="w-4 h-4"
+                    className="w-5 h-5 accent-blue-600"
                   />
                   Forward
                 </label>
-                <label className="flex items-center gap-2 text-sm">
+                <label className="flex items-center gap-3 text-base font-bold text-slate-600 cursor-pointer">
                   <input
                     type="radio"
                     value="Reverse"
                     checked={formData.round_off_direction === 'Reverse'}
                     onChange={e => setFormData({...formData, round_off_direction: e.target.value})}
-                    className="w-4 h-4"
+                    className="w-5 h-5 accent-blue-600"
                   />
                   Reverse
                 </label>
               </div>
               <input
-                className="flex-1 p-2.5 border border-slate-300 rounded-lg uppercase font-bold focus:border-blue-500 focus:ring-1"
+                className="flex-1 p-4 border border-slate-300 rounded-xl uppercase font-bold text-slate-700 focus:ring-2 focus:ring-blue-200 outline-none"
                 value={formData.round_off_account || ''}
                 onChange={e => setFormData({...formData, round_off_account: e.target.value.toUpperCase()})}
-                placeholder="ROUND OFF A/C"
+                placeholder="ROUND OFF LEDGER ACCOUNT"
               />
             </div>
 
-            <div className="col-span-3 flex justify-end items-center"><FormLabel>Lorry Freight</FormLabel></div>
-            <div className="col-span-9">
+            <div className="col-span-2 flex justify-end items-center font-bold text-slate-700">Lorry Freight</div>
+            <div className="col-span-10">
               <input
-                className="w-full p-2.5 border border-slate-300 rounded-lg uppercase font-bold focus:border-blue-500 focus:ring-1"
+                className="w-full p-4 border border-slate-300 rounded-xl uppercase font-bold text-slate-700 focus:ring-2 focus:ring-blue-200 outline-none"
                 value={formData.lorry_freight_account || ''}
                 onChange={e => setFormData({...formData, lorry_freight_account: e.target.value.toUpperCase()})}
-                placeholder="FREIGHT LEDGER"
+                placeholder="FREIGHT OUTWARD LEDGER"
               />
             </div>
           </div>
 
           {/* Action Buttons */}
-          <div className="flex justify-end gap-4 pt-6 border-t border-slate-200 mt-4">
+          <div className="flex justify-end gap-6 pt-8 border-t border-slate-200 mt-4">
             <button
               type="button"
               onClick={() => setIsModalOpen(false)}
-              className="px-8 py-3 border border-slate-400 rounded-xl text-slate-700 font-semibold hover:bg-slate-50 transition-colors"
+              className="px-10 py-4 border-2 border-slate-300 rounded-xl text-slate-600 font-bold hover:bg-slate-100 transition-all text-lg active:scale-95"
             >
               Cancel
             </button>
@@ -673,22 +668,22 @@ const InvoiceTypeMaster = () => {
               type="submit"
               disabled={submitLoading}
               className={`
-                px-10 py-3 rounded-xl font-semibold flex items-center gap-2 shadow-md min-w-[160px] justify-center
+                px-14 py-4 rounded-xl font-bold flex items-center gap-3 shadow-xl min-w-[220px] justify-center text-lg transition-all active:scale-95
                 ${submitLoading
                   ? 'bg-slate-400 text-white cursor-not-allowed'
-                  : 'bg-blue-600 hover:bg-blue-700 text-white'
+                  : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-blue-200'
                 }
               `}
             >
               {submitLoading ? (
                 <>
-                  <Loader2 className="animate-spin" size={18} />
-                  Saving...
+                  <Loader2 className="animate-spin" size={24} />
+                  Saving Changes...
                 </>
               ) : (
                 <>
-                  <Save size={18} />
-                  {formData.id ? 'Update' : 'Save'}
+                  <Save size={24} />
+                  {formData.id ? 'Update Record' : 'Save Record'}
                 </>
               )}
             </button>

@@ -41,11 +41,11 @@ const SalesWithoutOrder = () => {
     const emptyRow = {
         product_id: '',
         packing_type: '', 
-        rate_cr: 0,          
-        rate_imm: 0,      
-        rate_per: 0,
-        qty: 0,
-        bag_wt: 0         
+        rate_cr:'',          
+        rate_imm: '',      
+        rate_per: '',
+        qty: '',
+        bag_wt: ''         
     };
 
     const [formData, setFormData] = useState(emptyHeader);

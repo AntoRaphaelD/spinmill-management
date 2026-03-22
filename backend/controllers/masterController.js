@@ -96,10 +96,26 @@ const sanitizeData = (data) => {
         'invoice_type_id', 'load_id'
     ];
 
-    const numericFields = [
+   const numericFields = [
         'packs', 'total_kgs', 'avg_content', 'rate', 'broker_percentage',
         'qty', 'bag_wt', 'rate_cr', 'rate_imm', 'rate_per_val',
-        'opening_credit', 'opening_debit', 'weight_per_bag', 'freight_charges'
+        'opening_credit', 'opening_debit', 'weight_per_bag', 'freight_charges',
+        'round_off_digits', // Added
+        'gst_percentage',   // Added
+        'sgst_percentage',  // Added
+        'cgst_percentage',  // Added
+        'igst_percentage',  // Added
+        'charity_value',    // Added
+        'vat_percentage',   // Added
+        'duty_percentage',  // Added
+        'cess_percentage',  // Added
+        'hr_sec_cess_percentage', // Added
+        'tcs_percentage',   // Added
+        'cst_percentage',   // Added
+        'cenvat_percentage',
+        'gst_per', 'sgst_per', 'cgst_per', 'igst_per',
+        'gst_amt', 'sgst_amt', 'cgst_amt', 'igst_amt',
+        'total_gst', 'total_sgst', 'total_cgst', 'total_igst'
     ];
 
     // 🔵 NEW ADDRESS FIELDS
@@ -113,6 +129,13 @@ const sanitizeData = (data) => {
             sanitized[field] = null;
         }
     });
+    const booleanFields = [
+        'is_option_ii', 'account_posting', 'assess_checked',
+        'gst_checked', 'sgst_checked', 'cgst_checked', 'igst_checked',
+        'charity_checked', 'vat_checked', 'duty_checked', 'cess_checked',
+        'hr_sec_cess_checked', 'tcs_checked', 'cst_checked', 'cenvat_checked'
+    ];
+
 
     numericFields.forEach(field => {
         if (sanitized[field] === '' || sanitized[field] === undefined || sanitized[field] === null) {
@@ -126,6 +149,13 @@ const sanitizeData = (data) => {
     textFields.forEach(field => {
         if (sanitized[field] === undefined || sanitized[field] === '') {
             sanitized[field] = null;
+        }
+    });
+    booleanFields.forEach(field => {
+        if (sanitized[field] === undefined || sanitized[field] === '' || sanitized[field] === null) {
+            sanitized[field] = false; // Ensure it's never an empty string
+        } else {
+            sanitized[field] = !!sanitized[field]; // Convert to true/false
         }
     });
 
@@ -231,27 +261,30 @@ invoiceCtrl.create = async (req, res) => {
             let ctx = {
                 H: H,
                 A: A,
-
                 "Total Kgs": num(item.total_kgs),
                 Rate: num(item.rate),
                 CharityRs: num(product?.charity_rs),
-
-                igstper: num(item.igst_per || config.igst_percentage),
+                
+                // Add these to context so formulas can use them
+                gstper: num(item.gst_per || config.gst_percentage),
                 sgstper: num(item.sgst_per || config.sgst_percentage),
                 cgstper: num(item.cgst_per || config.cgst_percentage),
-
-                round_digits: num(config.round_off_digits)  // ✅ IMPORTANT
+                igstper: num(item.igst_per || config.igst_percentage),
+                
+                round_digits: num(config.round_off_digits)
             };
             console.log("IGST FORMULA:", config.igst_formula);
             console.log("CTX:", ctx);
             // 3. TAXES ON A
             const charity = config.charity_checked ? evaluateFormula(config.charity_formula, ctx) : 0;
-            const igst = config.igst_checked ? evaluateFormula(config.igst_formula, ctx) : 0;
-            const sgst = config.gst_checked ? (ctx.sgstper * A / 100) : 0;
-            const cgst = config.gst_checked ? (ctx.cgstper * A / 100) : 0;
+            const gst     = config.gst_checked     ? evaluateFormula(config.gst_formula, ctx)     : 0;
+            const sgst    = config.sgst_checked    ? evaluateFormula(config.sgst_formula, ctx)    : 0;
+            const cgst    = config.cgst_checked    ? evaluateFormula(config.cgst_formula, ctx)    : 0;
+            const igst    = config.igst_checked    ? evaluateFormula(config.igst_formula, ctx)    : 0;
+
 
             // 4. DEDUCTIONS ON (A + TAX)
-            const postTaxBasis = A + igst + sgst + cgst + charity;
+            const postTaxBasis = A + gst + sgst + cgst + igst + charity;
             const discAmt = (parseFloat(item.discount_per || 0) * postTaxBasis / 100);
             const brokAmt = (parseFloat(item.broker_per || 0) * postTaxBasis / 100);
 
@@ -260,9 +293,10 @@ invoiceCtrl.create = async (req, res) => {
 
             hTotals.assess += A;
             hTotals.charity += charity;
-            hTotals.igst += igst;
+            hTotals.gst  += gst;
             hTotals.sgst += sgst;
             hTotals.cgst += cgst;
+            hTotals.igst += igst;
             hTotals.disc += discAmt;
             hTotals.brok += brokAmt;
             hTotals.net += rowFinal;
@@ -285,6 +319,7 @@ invoiceCtrl.create = async (req, res) => {
             invoice_type_id,
             total_assessable: hTotals.assess,
             total_charity: hTotals.charity,
+            total_gst: hTotals.gst,
             total_igst: hTotals.igst,
             total_sgst: hTotals.sgst,
             total_cgst: hTotals.cgst,
@@ -332,7 +367,16 @@ const productionCtrl = createMasterController(RG1Production, [{ model: Product }
 productionCtrl.create = async (req, res) => {
     const t = await sequelize.transaction();
     try {
-        const { date, product_id, packing_type_id, weight_per_bag, prev_closing_kgs, production_kgs } = req.body;
+        const { date, product_id, packing_type_id, weight_per_bag, production_kgs } = req.body;
+        const last = await RG1Production.findOne({
+    where: { product_id },
+    order: [['id','DESC']],
+    transaction: t
+});
+
+const product = await Product.findByPk(product_id, { transaction: t });
+
+const prev_closing_kgs = parseFloat(product.mill_stock || 0);
 
         const invSum = await InvoiceDetail.sum('total_kgs', {
             include: [{ model: InvoiceHeader, where: { date }, attributes: [] }],
@@ -345,7 +389,9 @@ productionCtrl.create = async (req, res) => {
         }) || 0;
 
         const total_invoiced = parseFloat(invSum) + parseFloat(directSum);
-        const closing_stock = parseFloat(prev_closing_kgs || 0) + parseFloat(production_kgs || 0) - total_invoiced;
+        const closing_stock =
+    prev_closing_kgs +
+    parseFloat(production_kgs || 0);
         const bag_weight = parseFloat(weight_per_bag || 0);
 
         const prod = await RG1Production.create({
