@@ -216,141 +216,121 @@ const invoiceCtrl = createMasterController(InvoiceHeader, [
 // SECOND: Overwrite the .create method with the dynamic formula logic
 invoiceCtrl.create = async (req, res) => {
     const t = await sequelize.transaction();
+
     try {
+
         const { Details, invoice_type_id, freight_charges, ...headerData } = req.body;
 
         const config = await InvoiceType.findByPk(invoice_type_id);
-        if (!config) throw new Error("Invoice Type logic not found.");
 
         let hTotals = {
-            assess: 0, charity: 0, igst: 0, sgst: 0, cgst: 0, disc: 0, brok: 0, net: 0, gst: 0
+            assess: 0,
+            charity: 0,
+            freight: 0,
+            igst: 0,
+            net: 0
         };
 
         const processedRows = [];
 
+        // Total bags for freight distribution
+        const totalBags = Details.reduce((sum, r) => sum + num(r.packs), 0);
+        const freightPerBag = totalBags > 0 ? num(freight_charges) / totalBags : 0;
+
         for (const item of Details) {
-            const product = await Product.findByPk(item.product_id);
 
-            // 1. CALCULATE BASE H (Gross inclusive/total as per your manual note)
-            // H = Rate * Total Kgs (In your note: 2236.5 * 500)
-            const H = num(item.rate) * num(item.total_kgs);
+            const packs = num(item.packs);
+            const avgContent = num(item.avg_content);
+            const rate = num(item.rate);
 
-            // 2. PREPARE REVERSE TAX MATH 
-            // We need these to evaluate formulas like [H] - [igstamt]
-            const igst_per = num(item.igst_per || config.igst_percentage);
-            const sgst_per = num(item.sgst_per || config.sgst_percentage);
-            const cgst_per = num(item.cgst_per || config.cgst_percentage);
-            const total_tax_per = igst_per + sgst_per + cgst_per;
+            const totalKgs = packs * avgContent;
 
-            // Mathematical Reverse GST Amount (Tax component hidden inside H)
-            const reverse_tax_amt = H * (total_tax_per / (100 + total_tax_per));
-            const row_freight = num(item.freight_amt || 0);
+            const igst_per = num(item.igst_per || config?.igst_percentage || 5);
 
-            // 3. DEFINE ASSESSABLE VALUE (A)
-            // ... (previous logic for calculating H and reverse_tax_amt) ...
+            // STEP 1 — Assessable value
+            const assessable = totalKgs * rate;
 
-            let A = 0;
-            
-            console.log(`\n--- [ROW CALCULATION START: Product ID ${item.product_id}] ---`);
-            console.log(`BASE GROSS [H]: ${H}`);
+            // STEP 2 — Charity (₹3 per kg)
+            const charity = totalKgs * 3;
 
-            // Check if a custom formula exists in the Master
-            if (config.assess_checked && config.assess_formula && config.assess_formula !== '-') {
-                
-                const assess_ctx = {
-                    H: H,
-                    igstamt: reverse_tax_amt, 
-                    Lorryfright: row_freight,
-                    Rate: num(item.rate),
-                    "Total Kgs": num(item.total_kgs),
-                    round_digits: num(config.round_off_digits)
-                };
+            // STEP 3 — Freight per row
+            const rowFreight = packs * freightPerBag;
 
-                A = evaluateFormula(config.assess_formula, assess_ctx);
+            // STEP 4 — Taxable value
+            const taxableValue = assessable + charity + rowFreight;
 
-                // ⭐ CONSOLE LOG FOR CUSTOM FORMULA
-                console.log(`%c MODE: CUSTOM FORMULA APPLIED`, "color: cyan; font-weight: bold;");
-                console.log(`FORMULA USED: ${config.assess_formula}`);
-                console.log(`CONTEXT VARS: H=${H}, TaxAmt=${reverse_tax_amt.toFixed(2)}, Freight=${row_freight}`);
-                console.log(`RESULTING ASSESSABLE VALUE [A]: ${A}`);
+            // STEP 5 — GST calculation
+            const rowIGST = taxableValue * (igst_per / 100);
 
-            } else {
-                // FALLBACK: Standard formula
-                A = H - num(item.resale) + num(item.convert_to_hank) - num(item.convert_to_cone);
-                
-                // ⭐ CONSOLE LOG FOR FALLBACK
-                console.log(`%c MODE: STANDARD FALLBACK APPLIED`, "color: yellow; font-weight: bold;");
-                console.log(`LOGIC: H(${H}) - Resale(${item.resale}) + Hank(${item.convert_to_hank}) - Cone(${item.convert_to_cone})`);
-                console.log(`RESULTING ASSESSABLE VALUE [A]: ${A}`);
-            }
+            // STEP 6 — Final row value
+            const finalValue = taxableValue + rowIGST;
 
-            console.log(`--- [ROW CALCULATION END] ---\n`);
-
-            // 4. CALCULATE TAXES BASED ON % (Straight calculation on A)
-            // Just take the percentage given and calculate it as requested
-            const charity = config.charity_checked ? (num(product?.charity_rs || 3) * num(item.packs || 0)) : 0;
-            const igst    = config.igst_checked    ? (A * igst_per / 100) : 0;
-            const sgst    = config.sgst_checked    ? (A * sgst_per / 100) : 0;
-            const cgst    = config.cgst_checked    ? (A * cgst_per / 100) : 0;
-            const gst     = config.gst_checked     ? (A * num(item.gst_per || config.gst_percentage) / 100) : 0;
-
-            // 5. DEDUCTIONS & FINAL ROW VALUE
-            const postTaxBasis = A + gst + sgst + cgst + igst + charity + row_freight;
-            const discAmt = (num(item.discount_per) * postTaxBasis / 100);
-            const brokAmt = (num(item.broker_per) * postTaxBasis / 100);
-
-            const rowFinal = postTaxBasis - discAmt - brokAmt;
-
-            // Accumulate Header Totals
-            hTotals.assess += A;
+            // Accumulate header totals
+            hTotals.assess += assessable;
             hTotals.charity += charity;
-            hTotals.gst  += gst;
-            hTotals.sgst += sgst;
-            hTotals.cgst += cgst;
-            hTotals.igst += igst;
-            hTotals.disc += discAmt;
-            hTotals.brok += brokAmt;
-            hTotals.net += rowFinal;
+            hTotals.freight += rowFreight;
+            hTotals.igst += rowIGST;
+            hTotals.net += finalValue;
 
             processedRows.push({
                 ...sanitizeData(item),
-                assessable_value: A,
+
+                total_kgs: totalKgs,
+                assessable_value: assessable,
                 charity_amt: charity,
-                igst_amt: igst,
-                sgst_amt: sgst,
-                cgst_amt: cgst,
-                discount_amt: discAmt,
-                broker_amt: brokAmt,
-                final_value: rowFinal
+                freight_amt: rowFreight,
+                igst_amt: rowIGST,
+                final_value: finalValue
             });
         }
 
-        // 6. SAVE HEADER & DETAILS
+        // Create header
         const header = await InvoiceHeader.create({
             ...sanitizeData(headerData),
-            invoice_type_id,
+
             total_assessable: hTotals.assess,
             total_charity: hTotals.charity,
-            total_gst: hTotals.gst,
+            freight_charges: freight_charges,
             total_igst: hTotals.igst,
-            total_sgst: hTotals.sgst,
-            total_cgst: hTotals.cgst,
-            total_discount: hTotals.disc,
-            total_broker: hTotals.brok,
-            freight_charges: num(freight_charges),
+
             net_amount: Math.round(hTotals.net)
+
         }, { transaction: t });
 
+
+        // Insert rows
         for (const row of processedRows) {
-            await InvoiceDetail.create({ ...row, invoice_id: header.id }, { transaction: t });
-            await Product.decrement('mill_stock', { by: row.total_kgs, where: { id: row.product_id }, transaction: t });
+
+            await InvoiceDetail.create({
+                ...row,
+                invoice_id: header.id
+            }, { transaction: t });
+
+            await Product.decrement(
+                'mill_stock',
+                {
+                    by: row.total_kgs,
+                    where: { id: row.product_id },
+                    transaction: t
+                }
+            );
         }
 
         await t.commit();
-        res.status(201).json({ success: true, data: header });
+
+        res.status(201).json({
+            success: true,
+            data: header
+        });
+
     } catch (err) {
+
         if (t) await t.rollback();
-        res.status(500).json({ success: false, error: err.message });
+
+        res.status(500).json({
+            success: false,
+            error: err.message
+        });
     }
 };
 // Add these to make sure approve/reject are not undefined

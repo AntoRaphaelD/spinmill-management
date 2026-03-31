@@ -523,128 +523,95 @@ const filteredInvoiceTypes = useMemo(() => {
             return 0;
         }
     };
-    const runCalculations = useCallback((rows, typeId, hFreight = formData.freight_charges, salesType = formData.sales_type) => {
-        if (!typeId) return rows;
+    const runCalculations = useCallback((rows, typeId, hFreight = formData.freight_charges) => {
 
-        const config = listData.types.find(t => t.id === parseInt(typeId));
-        if (!config) return rows;
+    if (!typeId) return rows;
 
-        // 1. Freight Per Bag Calculation
-        const load = listData.loads.find(l => l.id === parseInt(formData.load_id));
-        const totalBagsInLoad = num(load?.no_of_bags) || rows.reduce((sum, r) => sum + num(r.packs), 0);
-        const freightPerBag = totalBagsInLoad > 0 ? num(hFreight) / totalBagsInLoad : 0;
+    const config = listData.types.find(t => t.id === parseInt(typeId));
+    if (!config) return rows;
 
-        let hTotals = {
-            assess: 0, charity: 0, vat: 0, cenvat: 0, duty: 0, cess: 0, 
-            hcess: 0, tcs: 0, gst: 0, sgst: 0, cgst: 0, igst: 0, other: 0, net: 0
-        };
+    const totalBags = rows.reduce((sum, r) => sum + num(r.packs), 0);
 
-        const updatedRows = rows.map((item, index) => {
-            const product = listData.products.find(p => p.id === parseInt(item.product_id));
+    const freightPerBag = totalBags > 0 ? num(hFreight) / totalBags : 0;
 
-            // --- STEP 1: ASSESSABLE VALUE ---
-            // Total Net Weight * Rate
-            const assessableValue = num(item.total_kgs) * num(item.rate); 
+    let hTotals = {
+        assess: 0,
+        charity: 0,
+        freight: 0,
+        igst: 0,
+        net: 0
+    };
 
-            // --- STEP 2: CHARITY CALCULATION (NEW LOGIC) ---
-            let rowCharity = 0;
-            if (salesType === 'GST SALES') {
-                // Force 3% of Assessable Value regardless of Master settings
-                rowCharity = (assessableValue * 3) / 100;
-                console.log(`Row ${index + 1}: Forced 3% Charity for GST SALES: ${rowCharity.toFixed(2)}`);
-            } else {
-                // Standard Logic: Multiplier/Rate from Product Master per Kg
-                const charityRate = num(product?.charity_rs);
-                rowCharity = config.charity_checked ? (charityRate * num(item.total_kgs)) : 0;
-            }
+    const updatedRows = rows.map((item) => {
 
-            // --- STEP 3: FREIGHT CALCULATION ---
-            const rowFreight = num(item.packs) * freightPerBag;
+    const packs = num(item.packs);
+    const avgContent = num(item.avg_content);
+    const rate = num(item.rate);
 
-            // --- STEP 4: TAXABLE BASIS ---
-            // Taxable Base = Goods Value + Charity + Freight
-            const taxableBasis = assessableValue + rowCharity + rowFreight;
+    const igst_per = num(item.igst_per || config.igst_percentage || 5);
 
-            // --- STEP 5: CALCULATE GST ON TAXABLE BASIS ---
-            const igst = (taxableBasis * num(item.igst_per || config.igst_percentage || 0)) / 100;
-            const sgst = (taxableBasis * num(item.sgst_per || config.sgst_percentage || 0)) / 100;
-            const cgst = (taxableBasis * num(item.cgst_per || config.cgst_percentage || 0)) / 100;
-            const gst  = (taxableBasis * num(item.gst_per  || config.gst_percentage  || 0)) / 100;
+    // STEP 1 — rate with GST
+    const rateWithGST = rate + (rate * igst_per / 100);
 
-            const vat    = (taxableBasis * num(item.vat_per)) / 100;
-            const duty   = (taxableBasis * num(item.duty_per)) / 100;
-            const cess   = (taxableBasis * num(item.cess_per)) / 100;
-            const hcess  = (taxableBasis * num(item.hcess_per)) / 100;
+    const totalKgs = packs * avgContent;
 
-            // --- STEP 6: TOTAL BEFORE TCS ---
-            const totalBeforeTcs = taxableBasis + igst + sgst + cgst + gst + vat + duty + cess + hcess;
+    // charity
+    const charity = totalKgs * 3;
 
-            // --- STEP 7: CALCULATE TCS (Final tax on Gross) ---
-            const tcs = (totalBeforeTcs * num(item.tcs_per || config.tcs_percentage || 0)) / 100;
+    // freight
+    const rowFreight = packs * freightPerBag;
 
-            // FINAL ROW TOTAL
-            const rowFinal = totalBeforeTcs + tcs + num(item.other_amt);
+    // STEP 2 — total with GST
+    const multiplier = item.product_description?.includes("68") ? 10 : 1;
+    const totalWithGST = packs * multiplier * rateWithGST;
 
-            // Accumulate Header Totals
-            hTotals.assess  += assessableValue;
-            hTotals.charity += rowCharity;
-            hTotals.gst     += gst;
-            hTotals.sgst    += sgst;
-            hTotals.cgst    += cgst;
-            hTotals.igst    += igst;
-            hTotals.vat     += vat;
-            hTotals.duty    += duty;
-            hTotals.cess    += cess;
-            hTotals.hcess   += hcess;
-            hTotals.tcs     += tcs;
-            hTotals.other   += num(item.other_amt);
-            hTotals.net     += rowFinal;
+    // STEP 3 — taxable value
+    const taxableValue = Math.round(totalWithGST / (1 + igst_per / 100));
 
-            return {
-                ...item,
-                assessable_value: assessableValue,
-                charity_amt: rowCharity,
-                freight_amt: rowFreight,
-                vat_amt: vat, 
-                duty_amt: duty, 
-                cess_amt: cess, 
-                hr_sec_cess_amt: hcess, 
-                tcs_amt: tcs, 
-                gst_amt: gst, 
-                sgst_amt: sgst, 
-                cgst_amt: cgst, 
-                igst_amt: igst,
-                sub_total: taxableBasis, 
-                final_value: rowFinal
-            };
-        });
+    // STEP 4 — igst
+    const igst = taxableValue * igst_per / 100;
 
-        // 8. FINAL ROUNDING & HEADER SYNC
-        const roundDigits = num(config.round_off_digits);
-        const finalNetTotal = Math.round(hTotals.net);
+    // STEP 5 — assessable
+    const assessable = taxableValue - charity - rowFreight;
 
-        setFormData(prev => ({
-            ...prev,
-            total_assessable: money(hTotals.assess),
-            total_charity: money(hTotals.charity),
-            total_gst: money(hTotals.gst),
-            total_sgst: money(hTotals.sgst),
-            total_cgst: money(hTotals.cgst),
-            total_igst: money(hTotals.igst),
-            total_vat: money(hTotals.vat),
-            total_cenvat: money(hTotals.cenvat),
-            total_duty: money(hTotals.duty),
-            total_cess: money(hTotals.cess),
-            total_hr_sec_cess: money(hTotals.hcess),
-            total_tcs: money(hTotals.tcs),
-            freight_charges: num(hFreight),
-            sub_total: money(hTotals.net),
-            round_off: money(finalNetTotal - hTotals.net),
-            net_amount: finalNetTotal
-        }));
+    hTotals.assess += assessable;
+    hTotals.charity += charity;
+    hTotals.freight += rowFreight;
+    hTotals.igst += igst;
+    hTotals.net += totalWithGST;
 
-        return updatedRows;
-    }, [listData.types, listData.products, formData.freight_charges, formData.sales_type, formData.load_id]);
+    return {
+        ...item,
+        total_kgs: totalKgs,
+        assessable_value: assessable,
+        charity_amt: charity,
+        freight_amt: rowFreight,
+        igst_amt: igst,
+        final_value: totalWithGST
+    };
+});
+
+    const finalNetTotal = Math.ceil(hTotals.net);
+
+    setFormData(prev => ({
+        ...prev,
+
+        total_assessable: money(hTotals.assess),
+        total_charity: money(hTotals.charity),
+        freight_charges: num(hFreight),
+        total_igst: money(hTotals.igst),
+
+        sub_total: money(hTotals.net),
+        round_off: money(finalNetTotal - hTotals.net),
+        net_amount: finalNetTotal
+    }));
+
+    return updatedRows;
+
+}, [
+    listData.types,
+    formData.freight_charges
+]);
 
     // ==========================================
     // 3. INITIAL LOAD
