@@ -213,124 +213,188 @@ const invoiceCtrl = createMasterController(InvoiceHeader, [
     { model: InvoiceDetail, include: [{ model: Product }] }
 ]);
 
+const calculateInvoiceBreakdown = ({ Details = [], config, freight_charges, sales_type }) => {
+    const gstPercentage = num(config?.gst_percentage);
+    const sgstPercentage = num(config?.sgst_percentage);
+    const cgstPercentage = num(config?.cgst_percentage);
+    const igstPercentage = num(config?.igst_percentage);
+    const charityPercentage = num(config?.charity_value);
+    const taxPercentage =
+        igstPercentage > 0
+            ? igstPercentage
+            : (gstPercentage > 0 ? gstPercentage : (sgstPercentage + cgstPercentage));
+
+    const totalBags = Details.reduce((sum, r) => sum + num(r.packs), 0);
+    const freightPerBag = totalBags > 0 ? num(freight_charges) / totalBags : 0;
+    const divisor = 100 + taxPercentage;
+    const isGstSale = String(sales_type || '').trim().toUpperCase() === 'GST SALES';
+
+    const totals = {
+        assess: 0,
+        charity: 0,
+        freight: 0,
+        gst: 0,
+        sgst: 0,
+        cgst: 0,
+        igst: 0,
+        net: 0
+    };
+
+    const processedRows = Details.map((item) => {
+        const packs = num(item.packs);
+        const totalKgs = num(item.total_kgs);
+        const rateAfterTax = num(item.rate);
+        const rowFreight = packs * freightPerBag;
+        const totalInvoiceAmount = 10 * packs * rateAfterTax;
+        const charity = isGstSale
+            ? totalKgs * 3
+            : (totalInvoiceAmount * charityPercentage) / 100;
+        const adjustedAmount = totalInvoiceAmount - rowFreight - charity;
+        const baseAmount = divisor > 0 ? (adjustedAmount / divisor) * 100 : adjustedAmount;
+        const gstAmount = (baseAmount * taxPercentage) / 100;
+        const assessableValue = totalInvoiceAmount - rowFreight - charity - gstAmount;
+        const rowSgst = sgstPercentage > 0 ? gstAmount / 2 : 0;
+        const rowCgst = cgstPercentage > 0 ? gstAmount / 2 : 0;
+        const rowIgst = igstPercentage > 0 ? gstAmount : 0;
+        const rowGst = gstPercentage > 0 ? gstAmount : 0;
+
+        totals.assess += assessableValue;
+        totals.charity += charity;
+        totals.freight += rowFreight;
+        totals.gst += gstAmount;
+        totals.sgst += rowSgst;
+        totals.cgst += rowCgst;
+        totals.igst += rowIgst;
+        totals.net += totalInvoiceAmount;
+
+        return {
+            ...sanitizeData(item),
+            charity_amt: charity,
+            freight_amt: rowFreight,
+            assessable_value: assessableValue,
+            gst_per: gstPercentage,
+            gst_amt: rowGst,
+            sgst_per: sgstPercentage,
+            sgst_amt: rowSgst,
+            cgst_per: cgstPercentage,
+            cgst_amt: rowCgst,
+            igst_per: igstPercentage,
+            igst_amt: rowIgst,
+            final_value: totalInvoiceAmount
+        };
+    });
+
+    return { processedRows, totals };
+};
+
 // SECOND: Overwrite the .create method with the dynamic formula logic
 invoiceCtrl.create = async (req, res) => {
     const t = await sequelize.transaction();
-
     try {
-
-        const { Details, invoice_type_id, freight_charges, ...headerData } = req.body;
-
+        const { Details, invoice_type_id, freight_charges, sales_type, ...headerData } = req.body;
         const config = await InvoiceType.findByPk(invoice_type_id);
+        if (!config) throw new Error("Invoice type not found");
 
-        let hTotals = {
-            assess: 0,
-            charity: 0,
-            freight: 0,
-            igst: 0,
-            net: 0
-        };
+        const { processedRows, totals } = calculateInvoiceBreakdown({
+            Details,
+            config,
+            freight_charges,
+            sales_type
+        });
 
-        const processedRows = [];
-
-        // Total bags for freight distribution
-        const totalBags = Details.reduce((sum, r) => sum + num(r.packs), 0);
-        const freightPerBag = totalBags > 0 ? num(freight_charges) / totalBags : 0;
-
-        for (const item of Details) {
-
-            const packs = num(item.packs);
-            const avgContent = num(item.avg_content);
-            const rate = num(item.rate);
-
-            const totalKgs = packs * avgContent;
-
-            const igst_per = num(item.igst_per || config?.igst_percentage || 5);
-
-            // STEP 1 — Assessable value
-            const assessable = totalKgs * rate;
-
-            // STEP 2 — Charity (₹3 per kg)
-            const charity = totalKgs * 3;
-
-            // STEP 3 — Freight per row
-            const rowFreight = packs * freightPerBag;
-
-            // STEP 4 — Taxable value
-            const taxableValue = assessable + charity + rowFreight;
-
-            // STEP 5 — GST calculation
-            const rowIGST = taxableValue * (igst_per / 100);
-
-            // STEP 6 — Final row value
-            const finalValue = taxableValue + rowIGST;
-
-            // Accumulate header totals
-            hTotals.assess += assessable;
-            hTotals.charity += charity;
-            hTotals.freight += rowFreight;
-            hTotals.igst += rowIGST;
-            hTotals.net += finalValue;
-
-            processedRows.push({
-                ...sanitizeData(item),
-
-                total_kgs: totalKgs,
-                assessable_value: assessable,
-                charity_amt: charity,
-                freight_amt: rowFreight,
-                igst_amt: rowIGST,
-                final_value: finalValue
-            });
-        }
-
-        // Create header
         const header = await InvoiceHeader.create({
             ...sanitizeData(headerData),
-
-            total_assessable: hTotals.assess,
-            total_charity: hTotals.charity,
+            invoice_type_id,
+            total_assessable: totals.assess,
+            total_charity: totals.charity,
             freight_charges: freight_charges,
-            total_igst: hTotals.igst,
-
-            net_amount: Math.round(hTotals.net)
-
+            total_gst: totals.gst,
+            total_sgst: totals.sgst,
+            total_cgst: totals.cgst,
+            total_igst: totals.igst,
+            sub_total: totals.net,
+            round_off: Math.ceil(totals.net) - totals.net,
+            net_amount: Math.ceil(totals.net)
         }, { transaction: t });
 
-
-        // Insert rows
         for (const row of processedRows) {
-
-            await InvoiceDetail.create({
-                ...row,
-                invoice_id: header.id
-            }, { transaction: t });
-
-            await Product.decrement(
-                'mill_stock',
-                {
-                    by: row.total_kgs,
-                    where: { id: row.product_id },
-                    transaction: t
-                }
-            );
+            await InvoiceDetail.create({ ...row, invoice_id: header.id }, { transaction: t });
+            await Product.decrement('mill_stock', { by: row.total_kgs, where: { id: row.product_id }, transaction: t });
         }
 
         await t.commit();
-
-        res.status(201).json({
-            success: true,
-            data: header
-        });
-
+        res.status(201).json({ success: true, data: header });
     } catch (err) {
-
         if (t) await t.rollback();
+        res.status(500).json({ success: false, error: err.message });
+    }
+};
 
-        res.status(500).json({
-            success: false,
-            error: err.message
+invoiceCtrl.update = async (req, res) => {
+    const t = await sequelize.transaction();
+    try {
+        const { id } = req.params;
+        const { Details, invoice_type_id, freight_charges, sales_type, ...headerData } = req.body;
+        const config = await InvoiceType.findByPk(invoice_type_id, { transaction: t });
+        if (!config) throw new Error("Invoice type not found");
+
+        const existingDetails = await InvoiceDetail.findAll({
+            where: { invoice_id: id },
+            transaction: t
         });
+
+        for (const item of existingDetails) {
+            await Product.increment('mill_stock', {
+                by: num(item.total_kgs),
+                where: { id: item.product_id },
+                transaction: t
+            });
+        }
+
+        await InvoiceDetail.destroy({
+            where: { invoice_id: id },
+            transaction: t
+        });
+
+        const { processedRows, totals } = calculateInvoiceBreakdown({
+            Details,
+            config,
+            freight_charges,
+            sales_type
+        });
+
+        await InvoiceHeader.update({
+            ...sanitizeData(headerData),
+            invoice_type_id,
+            total_assessable: totals.assess,
+            total_charity: totals.charity,
+            freight_charges: freight_charges,
+            total_gst: totals.gst,
+            total_sgst: totals.sgst,
+            total_cgst: totals.cgst,
+            total_igst: totals.igst,
+            sub_total: totals.net,
+            round_off: Math.ceil(totals.net) - totals.net,
+            net_amount: Math.ceil(totals.net)
+        }, {
+            where: { id },
+            transaction: t
+        });
+
+        for (const row of processedRows) {
+            await InvoiceDetail.create({ ...row, invoice_id: id }, { transaction: t });
+            await Product.decrement('mill_stock', {
+                by: num(row.total_kgs),
+                where: { id: row.product_id },
+                transaction: t
+            });
+        }
+
+        await t.commit();
+        res.json({ success: true });
+    } catch (err) {
+        if (t) await t.rollback();
+        res.status(500).json({ success: false, error: err.message });
     }
 };
 // Add these to make sure approve/reject are not undefined

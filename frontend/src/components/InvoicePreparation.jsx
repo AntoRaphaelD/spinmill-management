@@ -107,12 +107,12 @@ const ModernPrintView = ({ data, listData, getHSN }) => {
             <div className="grid grid-cols-2 gap-12 mb-10 border border-slate-300 p-6 rounded-2xl">
                 <div>
                     <div className="uppercase text-blue-700 text-[10px] font-black tracking-widest mb-1">Bill To</div>
-                        <div className="font-black text-lg">{data.Party?.account_name}</div>
-                        <div className="text-xs mt-2 leading-tight">
-                            {data.addr1}<br/>
-                            {data.addr2}<br/>
-                            {data.addr3}
-                        </div>
+                    <div className="font-black text-lg">{data.Party?.account_name}</div>
+                    <div className="text-xs mt-2 leading-tight">
+                        {data.addr1}<br />
+                        {data.addr2}<br />
+                        {data.addr3}
+                    </div>
                     <div className="mt-4 text-xs font-bold">GST No: <span className="font-mono">{data.Party?.gst_no || 'N/A'}</span></div>
                 </div>
 
@@ -221,7 +221,7 @@ const InvoicePreparation = () => {
     // ==========================================
     const emptyInvoice = {
         id: null, invoice_no: '', load_id: '', date: new Date().toISOString().split('T')[0],
-        sales_type: 'GST SALES', invoice_type_id: '', party_id: '', addr1: '', addr2: '', addr3: '',del1: '', del2: '', del3: '',
+        sales_type: 'GST SALES', invoice_type_id: '', party_id: '', addr1: '', addr2: '', addr3: '', del1: '', del2: '', del3: '',
         credit_days: 0, interest_percentage: 0, transport_id: '', lr_no: '',
         delivery: '', lr_date: new Date().toISOString().split('T')[0], ebill_no: '',
         vehicle_no: '', remarks: '', removal_time: '12:00', prepare_time: '12:00',
@@ -229,7 +229,7 @@ const InvoicePreparation = () => {
         // Header Totals
         total_assessable: 0, total_charity: 0, total_vat: 0, total_cenvat: 0,
         total_duty: 0, total_cess: 0, total_hr_sec_cess: 0, total_tcs: 0,
-        total_gst: 0, total_igst: 0, total_discount: 0, total_broker: 0,
+        total_gst: 0, total_sgst: 0, total_cgst: 0, total_igst: 0, total_discount: 0, total_broker: 0,
         total_other: 0, freight_charges: 0, sub_total: 0, round_off: 0, net_amount: 0
     };
 
@@ -252,16 +252,16 @@ const InvoicePreparation = () => {
     // SEARCH FILTER ENGINE
     // ==========================================
     // Filter Invoice Types with Exclusion Logic to prevent overlap
-const filteredInvoiceTypes = useMemo(() => {
-    // If no sales type is selected in the header, hide all invoice types
-    if (!formData.sales_type) return [];
+    const filteredInvoiceTypes = useMemo(() => {
+        // If no sales type is selected in the header, hide all invoice types
+        if (!formData.sales_type) return [];
 
-    return listData.types.filter(type => {
-        // This matches the 'sales_type' field from your tbl_InvoiceTypes model
-        // directly against the 'sales_type' selected on the screen.
-        return String(type.sales_type).trim().toUpperCase() === String(formData.sales_type).trim().toUpperCase();
-    });
-}, [listData.types, formData.sales_type]);
+        return listData.types.filter(type => {
+            // This matches the 'sales_type' field from your tbl_InvoiceTypes model
+            // directly against the 'sales_type' selected on the screen.
+            return String(type.sales_type).trim().toUpperCase() === String(formData.sales_type).trim().toUpperCase();
+        });
+    }, [listData.types, formData.sales_type]);
     const filteredInvoices = useMemo(() => {
 
         let result = [...listData.history];
@@ -462,34 +462,34 @@ const filteredInvoiceTypes = useMemo(() => {
         doc.save(`Kayaar_TAX_INVOICE_${data.invoice_no}.pdf`);
     };
     const exportToJSON = () => {
-    // 1. Prepare the data object
-    const exportData = {
-        ...formData,
-        Details: gridRows // Include the line items
+        // 1. Prepare the data object
+        const exportData = {
+            ...formData,
+            Details: gridRows // Include the line items
+        };
+
+        // 2. Convert to JSON string (with 2-space indentation for readability)
+        const jsonString = JSON.stringify(exportData, null, 2);
+
+        // 3. Create a Blob from the JSON string
+        const blob = new Blob([jsonString], { type: "application/json" });
+
+        // 4. Create a temporary download link
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+
+        // 5. Set the filename as [invoiceNumber].json
+        const fileName = formData.invoice_no ? `${formData.invoice_no}.json` : 'invoice.json';
+
+        link.href = url;
+        link.download = fileName;
+
+        // 6. Trigger the download and cleanup
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
     };
-
-    // 2. Convert to JSON string (with 2-space indentation for readability)
-    const jsonString = JSON.stringify(exportData, null, 2);
-
-    // 3. Create a Blob from the JSON string
-    const blob = new Blob([jsonString], { type: "application/json" });
-
-    // 4. Create a temporary download link
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-
-    // 5. Set the filename as [invoiceNumber].json
-    const fileName = formData.invoice_no ? `${formData.invoice_no}.json` : 'invoice.json';
-    
-    link.href = url;
-    link.download = fileName;
-
-    // 6. Trigger the download and cleanup
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-};
 
     // ==========================================
     // 2. MATH ENGINE (Strict Logic: H -> A -> Tax -> Deductions)
@@ -524,94 +524,113 @@ const filteredInvoiceTypes = useMemo(() => {
         }
     };
     const runCalculations = useCallback((rows, typeId, hFreight = formData.freight_charges) => {
+        if (!typeId) return rows;
 
-    if (!typeId) return rows;
+        const config = listData.types.find(t => t.id === parseInt(typeId));
+        if (!config) return rows;
 
-    const config = listData.types.find(t => t.id === parseInt(typeId));
-    if (!config) return rows;
+        // 1. FLOW: Get Tax and TCS Percentages
+        const sgstPer = num(config.sgst_percentage);
+        const cgstPer = num(config.cgst_percentage);
+        const igstPer = num(config.igst_percentage);
+        const tcsPer = num(config.tcs_percentage || 0);
 
-    const totalBags = rows.reduce((sum, r) => sum + num(r.packs), 0);
+        // Total tax percentage (Sum of SGST+CGST or just IGST)
+        const taxPercentage = igstPer > 0 ? igstPer : (sgstPer + cgstPer);
 
-    const freightPerBag = totalBags > 0 ? num(hFreight) / totalBags : 0;
+        const totalBags = rows.reduce((sum, r) => sum + num(r.packs), 0);
+        const freightPerBag = totalBags > 0 ? num(hFreight) / totalBags : 0;
 
-    let hTotals = {
-        assess: 0,
-        charity: 0,
-        freight: 0,
-        igst: 0,
-        net: 0
-    };
+        console.log(`%c >>> CALCULATION START [Tax: ${taxPercentage}%, TCS: ${tcsPer}%] <<< `, "background: #000; color: #fff;");
 
-    const updatedRows = rows.map((item) => {
+        let hTotals = { assess: 0, charity: 0, freight: 0, gst: 0, tcs: 0, gross: 0 };
 
-    const packs = num(item.packs);
-    const avgContent = num(item.avg_content);
-    const rate = num(item.rate);
+        const updatedRows = rows.map((item, idx) => {
+            const packs = num(item.packs);
+            const totalKgs = num(item.total_kgs);
+            const rateInput = num(item.rate);
+            const rowFreight = packs * freightPerBag;
 
-    const igst_per = num(item.igst_per || config.igst_percentage || 5);
+            // 2. FLOW: rate_after_tax
+            const rateAfterTax = rateInput + (rateInput * taxPercentage / 100);
 
-    // STEP 1 — rate with GST
-    const rateWithGST = rate + (rate * igst_per / 100);
+            // 3. FLOW: total_invoice_amount (Inlcusive of Tax)
+            const totalInvoiceAmount = 10 * packs * rateAfterTax;
 
-    const totalKgs = packs * avgContent;
+            // 4. FLOW: charity
+            let charity = 0;
+            if (formData.sales_type === 'GST SALES') {
+                charity = totalKgs * 3;
+            } else {
+                charity = (packs * 10 * rateAfterTax) * (num(config.charity_value || 0) / 100);
+            }
 
-    // charity
-    const charity = totalKgs * 3;
+            // 5. FLOW: divisor and base_amount (Back-calculating Taxable value)
+            const divisor = 100 + taxPercentage;
+            const baseAmount = (totalInvoiceAmount / divisor) * 100;
 
-    // freight
-    const rowFreight = packs * freightPerBag;
+            // 6. FLOW: gst_amount
+            const gstAmount = (baseAmount * taxPercentage) / 100;
 
-    // STEP 2 — total with GST
-    const multiplier = item.product_description?.includes("68") ? 10 : 1;
-    const totalWithGST = packs * multiplier * rateWithGST;
+            // 7. FLOW: TCS Amount (Calculated from Gross Invoice Amount)
+            const tcsAmount = (totalInvoiceAmount * tcsPer) / 100;
 
-    // STEP 3 — taxable value
-    const taxableValue = Math.round(totalWithGST / (1 + igst_per / 100));
+            // 8. FLOW: accessible_value (Stripping components from Total)
+            const accessibleValue = totalInvoiceAmount - rowFreight - charity - gstAmount;
 
-    // STEP 4 — igst
-    const igst = taxableValue * igst_per / 100;
+            hTotals.assess += accessibleValue;
+            hTotals.charity += charity;
+            hTotals.freight += rowFreight;
+            hTotals.gst += gstAmount;
+            hTotals.tcs += tcsAmount;
+            hTotals.gross += totalInvoiceAmount;
 
-    // STEP 5 — assessable
-    const assessable = taxableValue - charity - rowFreight;
+            return {
+                ...item,
+                charity_amt: money(charity),
+                freight_amt: money(rowFreight),
+                // Handle SGST/CGST split or IGST
+                igst_amt: igstPer > 0 ? money(gstAmount) : 0,
+                sgst_amt: sgstPer > 0 ? money(gstAmount / 2) : 0,
+                cgst_amt: cgstPer > 0 ? money(gstAmount / 2) : 0,
+                gst_amt: igstPer === 0 ? money(gstAmount) : 0,
+                tcs_amt: money(tcsAmount),
+                assessable_value: money(accessibleValue),
+                final_value: money(totalInvoiceAmount)
+            };
+        });
 
-    hTotals.assess += assessable;
-    hTotals.charity += charity;
-    hTotals.freight += rowFreight;
-    hTotals.igst += igst;
-    hTotals.net += totalWithGST;
+        // 9. GRAND TOTAL (Net Amount): Gross Invoice Amount MINUS TCS
+        const finalGross = hTotals.gross;
+        const amountAfterTcs = finalGross - hTotals.tcs;
+        const finalNetAmount = Math.ceil(amountAfterTcs);
+        const calculatedRoundOff = finalNetAmount - amountAfterTcs;
 
-    return {
-        ...item,
-        total_kgs: totalKgs,
-        assessable_value: assessable,
-        charity_amt: charity,
-        freight_amt: rowFreight,
-        igst_amt: igst,
-        final_value: totalWithGST
-    };
-});
+        setFormData(prev => ({
+            ...prev,
+            total_assessable: money(hTotals.assess),
+            total_charity: money(hTotals.charity),
+            freight_charges: num(hFreight),
+            // 🟢 Display full tax in "GST (Gen)" field
+            total_gst: money(hTotals.gst),
+            total_igst: igstPer > 0 ? money(hTotals.gst) : 0,
+            total_sgst: sgstPer > 0 ? money(hTotals.gst / 2) : 0,
+            total_cgst: cgstPer > 0 ? money(hTotals.gst / 2) : 0,
+            total_tcs: money(hTotals.tcs),
+            sub_total: money(finalGross),
+            // 🟢 Round off is calculated after TCS deduction
+            round_off: money(calculatedRoundOff),
+            net_amount: finalNetAmount
+        }));
 
-    const finalNetTotal = Math.ceil(hTotals.net);
 
-    setFormData(prev => ({
-        ...prev,
+        return updatedRows;
+    }, [listData.types, formData.freight_charges, formData.sales_type]);
 
-        total_assessable: money(hTotals.assess),
-        total_charity: money(hTotals.charity),
-        freight_charges: num(hFreight),
-        total_igst: money(hTotals.igst),
-
-        sub_total: money(hTotals.net),
-        round_off: money(finalNetTotal - hTotals.net),
-        net_amount: finalNetTotal
-    }));
-
-    return updatedRows;
-
-}, [
-    listData.types,
-    formData.freight_charges
-]);
+    useEffect(() => {
+        if (!formData.invoice_type_id || gridRows.length === 0) return;
+        setGridRows(prev => runCalculations(prev, formData.invoice_type_id, formData.freight_charges));
+    }, [formData.invoice_type_id, formData.sales_type, formData.freight_charges, runCalculations]);
 
     // ==========================================
     // 3. INITIAL LOAD
@@ -650,13 +669,13 @@ const filteredInvoiceTypes = useMemo(() => {
     };
 
     useEffect(() => { init(); }, []);
-    
-// ==========================================
+
+    // ==========================================
     // 4. HANDLERS
     // ==========================================
-    
+
     // FIX: Restoring missing handleLoadSync to stop the ReferenceError
-        const handleAccountSync = (accId) => {
+    const handleAccountSync = (accId) => {
         const partyId = parseInt(accId);
         const acc = listData.parties.find(a => a.id === partyId);
         if (!acc) return;
@@ -669,7 +688,7 @@ const filteredInvoiceTypes = useMemo(() => {
             addr3: acc.addr3 || ''
         }));
     };
-const handleLoadSync = (loadId) => {
+    const handleLoadSync = (loadId) => {
         const load = listData.loads.find(l => l.id === parseInt(loadId));
         if (!load) return;
 
@@ -706,94 +725,94 @@ const handleLoadSync = (loadId) => {
     // 4. HANDLERS
     // ==========================================
     const handleOrderSync = (e) => {
-    const val = e.target.value;
-    if (!val) return;
+        const val = e.target.value;
+        if (!val) return;
 
-    const [source, orderNo] = val.split('|');
-    const order = source === 'WITH' 
-        ? listData.orders.find(o => o.order_no === orderNo) 
-        : listData.directOrders.find(o => o.order_no === orderNo);
+        const [source, orderNo] = val.split('|');
+        const order = source === 'WITH'
+            ? listData.orders.find(o => o.order_no === orderNo)
+            : listData.directOrders.find(o => o.order_no === orderNo);
 
-    const config = listData.types.find(t => t.id === parseInt(formData.invoice_type_id));
-    if (!config) { alert("Select Invoice Type first."); e.target.value = ""; return; }
+        const config = listData.types.find(t => t.id === parseInt(formData.invoice_type_id));
+        if (!config) { alert("Select Invoice Type first."); e.target.value = ""; return; }
 
-    const load = listData.loads.find(l => l.id === parseInt(formData.load_id));
-    const details = source === 'WITH' ? order.OrderDetails || [] : order.DirectInvoiceDetails || [];
+        const load = listData.loads.find(l => l.id === parseInt(formData.load_id));
+        const details = source === 'WITH' ? order.OrderDetails || [] : order.DirectInvoiceDetails || [];
 
-    console.log(`%c 📑 SYNCING ORDER: ${orderNo} `, "background: #2563eb; color: #fff; font-weight: bold; padding: 4px;");
-    console.log("Raw Order Details from DB:", details);
+        console.log(`%c 📑 SYNCING ORDER: ${orderNo} `, "background: #2563eb; color: #fff; font-weight: bold; padding: 4px;");
+        console.log("Raw Order Details from DB:", details);
 
-    const newRows = details.map((d, index) => {
-        const broker = listData.brokers.find(b => b.id === order.broker_id);
-        
-        // 1. Weight Logic
-        const weightPerBag = num(d.bag_wt) > 0 ? num(d.bag_wt) : num(d.Product?.pack_nett_wt);
-        
-        // 2. Packs Logic
-        const rowPacks = num(load?.no_of_bags) > 0 ? num(load?.no_of_bags) : num(d.packs);
-        
-        // 3. Total Kgs
-        const rowKgs = weightPerBag * rowPacks;
-        
-        // 4. Avg Content
-        const rowAvg = rowPacks > 0 ? (rowKgs / rowPacks) : weightPerBag;
+        const newRows = details.map((d, index) => {
+            const broker = listData.brokers.find(b => b.id === order.broker_id);
 
-        console.group(`Row ${index + 1}: ${d.Product?.product_name}`);
-        console.log(`Weight Source: ${num(d.bag_wt) > 0 ? 'Order Detail' : 'Product Master'}`);
-        console.log(`Packs Source: ${num(load?.no_of_bags) > 0 ? 'Load/Despatch' : 'Order Detail'}`);
-        console.log(`Calculation: ${weightPerBag}kg x ${rowPacks} packs = ${rowKgs}kg`);
-        console.groupEnd();
+            // 1. Weight Logic
+            const weightPerBag = num(d.bag_wt) > 0 ? num(d.bag_wt) : num(d.Product?.pack_nett_wt);
 
-        return {
-            order_no: orderNo,
-            order_type: source === 'WITH' ? 'WITH_ORDER' : 'WITHOUT_ORDER',
-            product_id: d.product_id,
-            product_description: d.Product?.product_name || '',
-            packing_type: d.packing_type || d.Product?.packing_type || 'BAGS',
-            packs: rowPacks,
-            total_kgs: rowKgs,
-            avg_content: rowAvg.toFixed(3), 
-            broker_code: broker?.broker_code || '',
-            broker_percentage: broker?.commission_pct || 0,
-            rate: d.rate_cr || d.rate || 0,
-            rate_per: d.rate_per || d.Product?.rate_per || 'KG',
-            resale: 0, convert_to_hank: 0, convert_to_cone: 0,
-            vat_per: num(config.vat_percentage),
-            gst_per: num(config.gst_percentage),
-            sgst_per: num(config.sgst_percentage),
-            cgst_per: num(config.cgst_percentage),
-            igst_per: num(config.igst_percentage),
-            discount_percentage: 0, other_amt: 0, freight_amt: 0
-        };
-    });
+            // 2. Packs Logic
+            const rowPacks = num(load?.no_of_bags) > 0 ? num(load?.no_of_bags) : num(d.packs);
 
-    setGridRows(runCalculations([...gridRows, ...newRows], formData.invoice_type_id));
-    e.target.value = "";
-};
+            // 3. Total Kgs
+            const rowKgs = weightPerBag * rowPacks;
+
+            // 4. Avg Content
+            const rowAvg = rowPacks > 0 ? (rowKgs / rowPacks) : weightPerBag;
+
+            console.group(`Row ${index + 1}: ${d.Product?.product_name}`);
+            console.log(`Weight Source: ${num(d.bag_wt) > 0 ? 'Order Detail' : 'Product Master'}`);
+            console.log(`Packs Source: ${num(load?.no_of_bags) > 0 ? 'Load/Despatch' : 'Order Detail'}`);
+            console.log(`Calculation: ${weightPerBag}kg x ${rowPacks} packs = ${rowKgs}kg`);
+            console.groupEnd();
+
+            return {
+                order_no: orderNo,
+                order_type: source === 'WITH' ? 'WITH_ORDER' : 'WITHOUT_ORDER',
+                product_id: d.product_id,
+                product_description: d.Product?.product_name || '',
+                packing_type: d.packing_type || d.Product?.packing_type || 'BAGS',
+                packs: rowPacks,
+                total_kgs: rowKgs,
+                avg_content: rowAvg.toFixed(3),
+                broker_code: broker?.broker_code || '',
+                broker_percentage: broker?.commission_pct || 0,
+                rate: d.rate_cr || d.rate || 0,
+                rate_per: d.rate_per || d.Product?.rate_per || 'KG',
+                resale: 0, convert_to_hank: 0, convert_to_cone: 0,
+                vat_per: num(config.vat_percentage),
+                gst_per: num(config.gst_percentage),
+                sgst_per: num(config.sgst_percentage),
+                cgst_per: num(config.cgst_percentage),
+                igst_per: num(config.igst_percentage),
+                discount_percentage: 0, other_amt: 0, freight_amt: 0
+            };
+        });
+
+        setGridRows(runCalculations([...gridRows, ...newRows], formData.invoice_type_id));
+        e.target.value = "";
+    };
 
     const updateGrid = (idx, field, val) => {
-    setGridRows(prev => {
-        const updated = [...prev];
-        const row = { ...updated[idx], [field]: val };
+        setGridRows(prev => {
+            const updated = [...prev];
+            const row = { ...updated[idx], [field]: val };
 
-        if (field === 'packs') {
-            row.total_kgs = num(val) * num(row.avg_content);
-            console.log(`%c PACKS CHANGED: ${row.product_description}`, "color: #f59e0b;");
-            console.log(`New Kgs: ${val} packs x ${row.avg_content}kg = ${row.total_kgs}`);
-        }
-        
-        if (field === 'total_kgs') {
-            const p = num(row.packs);
-            row.avg_content = p > 0 ? (num(val) / p).toFixed(3) : 0;
-            console.log(`%c KGS CHANGED: ${row.product_description}`, "color: #f59e0b;");
-            console.log(`New Avg Content: ${val}kg / ${p} packs = ${row.avg_content}`);
-        }
+            if (field === 'packs') {
+                row.total_kgs = num(val) * num(row.avg_content);
+                console.log(`%c PACKS CHANGED: ${row.product_description}`, "color: #f59e0b;");
+                console.log(`New Kgs: ${val} packs x ${row.avg_content}kg = ${row.total_kgs}`);
+            }
 
-        updated[idx] = row;
-        return runCalculations(updated, formData.invoice_type_id);
-    });
-};
-      const handleSave = async () => {
+            if (field === 'total_kgs') {
+                const p = num(row.packs);
+                row.avg_content = p > 0 ? (num(val) / p).toFixed(3) : 0;
+                console.log(`%c KGS CHANGED: ${row.product_description}`, "color: #f59e0b;");
+                console.log(`New Avg Content: ${val}kg / ${p} packs = ${row.avg_content}`);
+            }
+
+            updated[idx] = row;
+            return runCalculations(updated, formData.invoice_type_id);
+        });
+    };
+    const handleSave = async () => {
 
         setSubmitLoading(true);
 
@@ -944,7 +963,7 @@ const handleLoadSync = (loadId) => {
                                         const res = await transactionsAPI.invoices.getById(item.id);
                                         const invoice = res.data.data;
                                         const party = invoice.Party;
-                                        
+
 
                                         setFormData({
                                             ...invoice,
@@ -1025,32 +1044,32 @@ const handleLoadSync = (loadId) => {
                                             <RowSelect label="Load No" value={formData.load_id} options={listData.loads.map(l => ({ value: l.id, label: l.load_no }))} onChange={e => handleLoadSync(e.target.value)} width="w-44" />
                                         </div>
                                         <RowInput label="Date" type="date" value={formData.date} onChange={e => setFormData({ ...formData, date: e.target.value })} width="w-44" />
-                                        <RowSelect 
-    label="Sales Type" 
-    value={formData.sales_type} 
-    options={[
-        { value: 'GST SALES', label: 'GST SALES' }, 
-        { value: 'DEPOT SALES', label: 'DEPOT SALES' }, 
-        { value: 'DIRECT SALES', label: 'DIRECT SALES' }
-    ]} 
-    onChange={e => setFormData({ 
-        ...formData, 
-        sales_type: e.target.value, 
-        invoice_type_id: '' // 🟢 Clear selected ID when type changes
-    })} 
-/>
-                                        <RowSelect 
-    label="Invoice Type" 
-    value={formData.invoice_type_id} 
-    options={filteredInvoiceTypes.map(t => ({ 
-        value: t.id, 
-        label: t.type_name 
-    }))} 
-    onChange={e => setFormData({ 
-        ...formData, 
-        invoice_type_id: e.target.value 
-    })} 
-/>
+                                        <RowSelect
+                                            label="Sales Type"
+                                            value={formData.sales_type}
+                                            options={[
+                                                { value: 'GST SALES', label: 'GST SALES' },
+                                                { value: 'DEPOT SALES', label: 'DEPOT SALES' },
+                                                { value: 'DIRECT SALES', label: 'DIRECT SALES' }
+                                            ]}
+                                            onChange={e => setFormData({
+                                                ...formData,
+                                                sales_type: e.target.value,
+                                                invoice_type_id: '' // 🟢 Clear selected ID when type changes
+                                            })}
+                                        />
+                                        <RowSelect
+                                            label="Invoice Type"
+                                            value={formData.invoice_type_id}
+                                            options={filteredInvoiceTypes.map(t => ({
+                                                value: t.id,
+                                                label: t.type_name
+                                            }))}
+                                            onChange={e => setFormData({
+                                                ...formData,
+                                                invoice_type_id: e.target.value
+                                            })}
+                                        />
                                         <RowSelect label="Party name" value={formData.party_id} options={listData.parties.map(p => ({ value: p.id, label: p.account_name }))} onChange={e => handleAccountSync(e.target.value)} />
                                         <div className="flex flex-col gap-1 ml-[120px]">
                                             <input readOnly value={formData.addr1} className="border border-slate-300 p-1 text-[11px] bg-[#F5F8FA] font-bold outline-none" />
@@ -1097,30 +1116,46 @@ const handleLoadSync = (loadId) => {
                                         <RowInput label="EPCG No" value={formData.epcg_no} onChange={e => setFormData({ ...formData, epcg_no: e.target.value })} />
                                     </div>
                                     <div className="col-span-4 bg-[#F5F8FA] border border-slate-300 p-4 flex flex-col gap-1 rounded shadow-inner">
-    <h3 className="text-xs font-black text-slate-500 mb-2 border-b border-slate-300 pb-1 uppercase tracking-tight">Invoice Summary</h3>
-    <TotalRow label="Assessable Value" value={formData.total_assessable} />
-    <TotalRow label="Charity" value={formData.total_charity} />
-    <TotalRow label="VAT" value={formData.total_vat} />
-    <TotalRow label="CENVAT" value={formData.total_cenvat} />
-    <TotalRow label="Duty" value={formData.total_duty} />
-    <TotalRow label="CESS" value={formData.total_cess} />
-    <TotalRow label="H.S. CESS" value={formData.total_hr_sec_cess} />
-    <TotalRow label="GST (Gen)" value={formData.total_gst} />
-    <TotalRow label="SGST" value={formData.total_sgst} />
-    <TotalRow label="CGST" value={formData.total_cgst} />
-    <TotalRow label="IGST" value={formData.total_igst} />
-    <TotalRow label="TCS" value={formData.total_tcs} />
-    <TotalRow label="Freight" value={formData.freight_charges} />
-    <TotalRow label="Other" value={formData.total_other} />
-    <div className="mt-auto pt-4 border-t-2 border-slate-400 space-y-1.5">
-        <TotalRow label="Gross Total" value={formData.sub_total} />
-        <TotalRow label="Round off" value={formData.round_off} />
-        <div className="flex justify-between items-center py-2 px-2 bg-white border border-slate-400 mt-2 shadow-sm">
-            <span className="text-[11px] font-black uppercase text-slate-700">Net Amount</span>
-            <span className="text-xl font-black font-mono text-blue-700">₹ {num(formData.net_amount).toLocaleString()}</span>
-        </div>
-    </div>
-</div>
+                                        <h3 className="text-xs font-black text-slate-500 mb-2 border-b border-slate-300 pb-1 uppercase tracking-tight">Invoice Summary</h3>
+                                        <TotalRow label="Assessable Value" value={formData.total_assessable} />
+                                        <TotalRow label="Charity" value={formData.total_charity} />
+                                        <TotalRow label="VAT" value={formData.total_vat} />
+                                        <TotalRow label="CENVAT" value={formData.total_cenvat} />
+                                        <TotalRow label="Duty" value={formData.total_duty} />
+                                        <TotalRow label="CESS" value={formData.total_cess} />
+                                        <TotalRow label="H.S. CESS" value={formData.total_hr_sec_cess} />
+
+                                        {/* 🟢 This now shows the total tax amount (IGST or SGST+CGST combined) */}
+                                        <TotalRow label="GST (CGST + SGST)" value={formData.total_gst} />
+
+                                        <TotalRow label="SGST" value={formData.total_sgst} />
+                                        <TotalRow label="CGST" value={formData.total_cgst} />
+                                        <TotalRow label="IGST" value={formData.total_igst} />
+
+                                        <TotalRow label="Freight" value={formData.freight_charges} />
+                                        <TotalRow label="Other" value={formData.total_other} />
+
+                                        <div className="mt-auto pt-4 border-t-2 border-slate-400 space-y-1.5">
+                                            <TotalRow label="Gross Total" value={formData.sub_total} />
+
+                                            {/* 🟢 TCS moved here to show it is part of the final deduction process */}
+                                            <div className="flex justify-between items-center text-[11px] py-0.5 px-1 bg-red-50 rounded">
+                                                <span className="font-black text-red-600 uppercase tracking-tighter">(-) TCS</span>
+                                                <input
+                                                    readOnly
+                                                    value={num(formData.total_tcs).toLocaleString()}
+                                                    className="w-28 border border-red-200 text-right p-0.5 font-mono bg-white outline-none font-black text-red-600"
+                                                />
+                                            </div>
+
+                                            <TotalRow label="Round off" value={formData.round_off} />
+
+                                            <div className="flex justify-between items-center py-2 px-2 bg-white border border-slate-400 mt-2 shadow-sm">
+                                                <span className="text-[11px] font-black uppercase text-slate-700">Net Amount</span>
+                                                <span className="text-xl font-black font-mono text-blue-700">₹ {num(formData.net_amount).toLocaleString()}</span>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             ) : (
                                 /* TAB 2: DETAIL MATRIX */
@@ -1143,91 +1178,91 @@ const handleLoadSync = (loadId) => {
                                     </div>
 
                                     <div className="flex-1 border border-slate-300 overflow-x-auto bg-[#F5F8FA]">
-    <table className="min-w-[8000px] text-[11px] border-collapse bg-white">
-        <thead className="bg-[#F5F8FA] sticky top-0 z-10 border-b border-slate-300 text-slate-600">
-            {/* Row 1: Main Headers */}
-            <tr className="h-10">
-                <th className="p-3 border-r w-10"></th>
-                <th className="p-3 border-r w-32 text-left">Order No</th>
-                <th className="p-3 border-r w-80 text-left">Product</th>
-                <th className="p-3 border-r w-32 text-center">Packing Type</th>
-                <th className="p-3 border-r w-24 text-center">Packs</th>
-                <th className="p-3 border-r w-32 text-center">Avg. Content</th>
-                <th className="p-3 border-r w-32 text-center">Total Kgs</th>
-                <th className="p-3 border-r w-32 text-center">Rate</th>
-                <th className="p-3 border-r w-32 text-center">Charity</th>
-                
-                {/* TAX HEADERS (Span 2 columns each) */}
-                <th colSpan="2" className="border-r text-center bg-blue-50">GST</th>
-                <th colSpan="2" className="border-r text-center bg-slate-50">SGST</th>
-                <th colSpan="2" className="border-r text-center bg-blue-50">CGST</th>
-                <th colSpan="2" className="border-r text-center bg-slate-50">IGST</th>
-                <th colSpan="2" className="border-r text-center bg-blue-50">VAT</th>
-                <th colSpan="2" className="border-r text-center bg-slate-50">CENVAT</th>
-                <th colSpan="2" className="border-r text-center bg-blue-50">DUTY</th>
-                <th colSpan="2" className="border-r text-center bg-slate-50">CESS</th>
-                <th colSpan="2" className="border-r text-center bg-blue-50">H.CESS</th>
-                <th colSpan="2" className="border-r text-center bg-slate-50">TCS</th>
-                <th colSpan="2" className="border-r text-center bg-rose-50">Discount</th>
-                
-                <th className="p-3 border-r w-32 text-center">Other Amt</th>
-                <th className="p-3 border-r w-32 text-center">Freight</th>
-                <th className="p-3 border-r w-40 text-center">ID Mark</th>
-                <th className="p-3 text-center w-24">Action</th>
-            </tr>
-            {/* Row 2: Sub-headers for % and Amt */}
-            <tr className="bg-slate-200 text-[9px] uppercase font-bold">
-                <th colSpan="9"></th>
-                {[...Array(11)].map((_, i) => (
-                    <React.Fragment key={i}>
-                        <th className="border-r p-1 w-16 text-blue-700">Percent %</th>
-                        <th className="border-r p-1 w-24 text-slate-600">Amount ₹</th>
-                    </React.Fragment>
-                ))}
-                <th colSpan="4"></th>
-            </tr>
-        </thead>
-        <tbody className="divide-y divide-slate-200">
-    {gridRows.map((r, i) => (
-        <tr key={i} className="hover:bg-blue-50 font-black">
-            {/* 1. Selector Icon (Fixed) */}
-            <td className="p-2 border-r text-center text-slate-300">▶</td>
+                                        <table className="min-w-[8000px] text-[11px] border-collapse bg-white">
+                                            <thead className="bg-[#F5F8FA] sticky top-0 z-10 border-b border-slate-300 text-slate-600">
+                                                {/* Row 1: Main Headers */}
+                                                <tr className="h-10">
+                                                    <th className="p-3 border-r w-10"></th>
+                                                    <th className="p-3 border-r w-32 text-left">Order No</th>
+                                                    <th className="p-3 border-r w-80 text-left">Product</th>
+                                                    <th className="p-3 border-r w-32 text-center">Packing Type</th>
+                                                    <th className="p-3 border-r w-24 text-center">Packs</th>
+                                                    <th className="p-3 border-r w-32 text-center">Avg. Content</th>
+                                                    <th className="p-3 border-r w-32 text-center">Total Kgs</th>
+                                                    <th className="p-3 border-r w-32 text-center">Rate</th>
+                                                    <th className="p-3 border-r w-32 text-center">Charity</th>
 
-            {/* 2. Order No (Fixed) */}
-            <td className="p-2 border-r text-blue-700 font-mono bg-slate-50">{r.order_no}</td>
+                                                    {/* TAX HEADERS (Span 2 columns each) */}
+                                                    <th colSpan="2" className="border-r text-center bg-blue-50">GST</th>
+                                                    <th colSpan="2" className="border-r text-center bg-slate-50">SGST</th>
+                                                    <th colSpan="2" className="border-r text-center bg-blue-50">CGST</th>
+                                                    <th colSpan="2" className="border-r text-center bg-slate-50">IGST</th>
+                                                    <th colSpan="2" className="border-r text-center bg-blue-50">VAT</th>
+                                                    <th colSpan="2" className="border-r text-center bg-slate-50">CENVAT</th>
+                                                    <th colSpan="2" className="border-r text-center bg-blue-50">DUTY</th>
+                                                    <th colSpan="2" className="border-r text-center bg-slate-50">CESS</th>
+                                                    <th colSpan="2" className="border-r text-center bg-blue-50">H.CESS</th>
+                                                    <th colSpan="2" className="border-r text-center bg-slate-50">TCS</th>
+                                                    <th colSpan="2" className="border-r text-center bg-rose-50">Discount</th>
 
-            {/* 3. Product Description (Fixed) */}
-            <td className="p-2 border-r uppercase text-slate-600 bg-slate-50">{r.product_description}</td>
-             <td className="p-0 border-r w-32">
-                <input 
-                    type="text" 
-                    className="w-full h-full p-2 text-center bg-white outline-none uppercase font-bold" 
-                    value={r.packing_type} 
-                    onChange={e => updateGrid(i, 'packing_type', e.target.value)} 
-                />
-            </td>
-            {/* <td className="p-0 border-r w-32">
+                                                    <th className="p-3 border-r w-32 text-center">Other Amt</th>
+                                                    <th className="p-3 border-r w-32 text-center">Freight</th>
+                                                    <th className="p-3 border-r w-40 text-center">ID Mark</th>
+                                                    <th className="p-3 text-center w-24">Action</th>
+                                                </tr>
+                                                {/* Row 2: Sub-headers for % and Amt */}
+                                                <tr className="bg-slate-200 text-[9px] uppercase font-bold">
+                                                    <th colSpan="9"></th>
+                                                    {[...Array(11)].map((_, i) => (
+                                                        <React.Fragment key={i}>
+                                                            <th className="border-r p-1 w-16 text-blue-700">Percent %</th>
+                                                            <th className="border-r p-1 w-24 text-slate-600">Amount ₹</th>
+                                                        </React.Fragment>
+                                                    ))}
+                                                    <th colSpan="4"></th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-200">
+                                                {gridRows.map((r, i) => (
+                                                    <tr key={i} className="hover:bg-blue-50 font-black">
+                                                        {/* 1. Selector Icon (Fixed) */}
+                                                        <td className="p-2 border-r text-center text-slate-300">▶</td>
+
+                                                        {/* 2. Order No (Fixed) */}
+                                                        <td className="p-2 border-r text-blue-700 font-mono bg-slate-50">{r.order_no}</td>
+
+                                                        {/* 3. Product Description (Fixed) */}
+                                                        <td className="p-2 border-r uppercase text-slate-600 bg-slate-50">{r.product_description}</td>
+                                                        <td className="p-0 border-r w-32">
+                                                            <input
+                                                                type="text"
+                                                                className="w-full h-full p-2 text-center bg-white outline-none uppercase font-bold"
+                                                                value={r.packing_type}
+                                                                onChange={e => updateGrid(i, 'packing_type', e.target.value)}
+                                                            />
+                                                        </td>
+                                                        {/* <td className="p-0 border-r w-32">
                 <input type="text" className="w-full h-full p-2 text-center bg-white outline-none uppercase" 
                        value={r.packing_type} onChange={e => updateGrid(i, 'packing_type', e.target.value)} />
             </td> */}
 
-            {/* 4. Packs (Editable) */}
-            <td className="p-0 border-r w-24">
-                <input 
-                    type="number" 
-                    className="w-full h-full p-2 text-center bg-pink-50 outline-none focus:bg-pink-100 font-black" 
-                    value={r.packs} 
-                    onChange={e => updateGrid(i, 'packs', e.target.value)} 
-                />
-            </td>
+                                                        {/* 4. Packs (Editable) */}
+                                                        <td className="p-0 border-r w-24">
+                                                            <input
+                                                                type="number"
+                                                                className="w-full h-full p-2 text-center bg-pink-50 outline-none focus:bg-pink-100 font-black"
+                                                                value={r.packs}
+                                                                onChange={e => updateGrid(i, 'packs', e.target.value)}
+                                                            />
+                                                        </td>
 
-            <td className="p-0 border-r w-32">
-                <input type="number" className="w-full h-full p-2 text-center bg-emerald-50 text-emerald-700 outline-none font-black" 
-                       value={r.avg_content} readOnly />
-            </td>
+                                                        <td className="p-0 border-r w-32">
+                                                            <input type="number" className="w-full h-full p-2 text-center bg-emerald-50 text-emerald-700 outline-none font-black"
+                                                                value={r.avg_content} readOnly />
+                                                        </td>
 
-            {/* 5. Bag Weight / avg_content (Editable) - NEW */}
-            {/* <td className="p-0 border-r w-24">
+                                                        {/* 5. Bag Weight / avg_content (Editable) - NEW */}
+                                                        {/* <td className="p-0 border-r w-24">
                 <input 
                     type="number" 
                     className="w-full h-full p-2 text-center bg-white outline-none focus:bg-yellow-50 font-black text-blue-600" 
@@ -1236,67 +1271,67 @@ const handleLoadSync = (loadId) => {
                 />
             </td> */}
 
-            {/* 6. Total Kgs (Editable / Auto-calculated) */}
-            <td className="p-0 border-r w-32">
-                <input 
-                    type="number" 
-                    className="w-full h-full p-2 text-center text-blue-700 font-black outline-none bg-blue-50" 
-                    value={r.total_kgs} 
-                    onChange={e => updateGrid(i, 'total_kgs', e.target.value)} 
-                />
-            </td>
+                                                        {/* 6. Total Kgs (Editable / Auto-calculated) */}
+                                                        <td className="p-0 border-r w-32">
+                                                            <input
+                                                                type="number"
+                                                                className="w-full h-full p-2 text-center text-blue-700 font-black outline-none bg-blue-50"
+                                                                value={r.total_kgs}
+                                                                onChange={e => updateGrid(i, 'total_kgs', e.target.value)}
+                                                            />
+                                                        </td>
 
-            {/* 7. Rate (Editable) */}
-            <td className="p-0 border-r w-32">
-                <input 
-                    type="number" 
-                    className="w-full h-full p-2 text-center outline-none bg-white font-black" 
-                    value={r.rate} 
-                    onChange={e => updateGrid(i, 'rate', e.target.value)} 
-                />
-            </td>
+                                                        {/* 7. Rate (Editable) */}
+                                                        <td className="p-0 border-r w-32">
+                                                            <input
+                                                                type="number"
+                                                                className="w-full h-full p-2 text-center outline-none bg-white font-black"
+                                                                value={r.rate}
+                                                                onChange={e => updateGrid(i, 'rate', e.target.value)}
+                                                            />
+                                                        </td>
 
-            
 
-            {/* 9. Charity (Editable) */}
-            <td className="p-0 border-r w-32">
-                <input 
-                    type="number" 
-                    className="w-full h-full p-2 text-center text-orange-600 outline-none bg-white font-black" 
-                    value={num(r.charity_amt)} 
-                    onChange={e => updateGrid(i, 'charity_amt', e.target.value)} 
-                />
-            </td>
 
-            {/* TAX PAIRS (Handled by helper) */}
-            {renderPairCell(r, i, 'gst_per', 'gst_amt', true, updateGrid)}
-            {renderPairCell(r, i, 'sgst_per', 'sgst_amt', true, updateGrid)}
-            {renderPairCell(r, i, 'cgst_per', 'cgst_amt', true, updateGrid)}
-            {renderPairCell(r, i, 'igst_per', 'igst_amt', true, updateGrid)}
-            {renderPairCell(r, i, 'vat_per', 'vat_amt', true, updateGrid)}
-            {renderPairCell(r, i, 'cenvat_per', 'cenvat_amt', true, updateGrid)}
-            {renderPairCell(r, i, 'duty_per', 'duty_amt', true, updateGrid)}
-            {renderPairCell(r, i, 'cess_per', 'cess_amt', true, updateGrid)}
-            {renderPairCell(r, i, 'hcess_per', 'hr_sec_cess_amt', true, updateGrid)}
-            {renderPairCell(r, i, 'tcs_per', 'tcs_amt', true, updateGrid)}
-            {renderPairCell(r, i, 'discount_percentage', 'discount_amt', true, updateGrid, "text-rose-600")}
+                                                        {/* 9. Charity (Editable) */}
+                                                        <td className="p-0 border-r w-32">
+                                                            <input
+                                                                type="number"
+                                                                className="w-full h-full p-2 text-center text-orange-600 outline-none bg-white font-black"
+                                                                value={num(r.charity_amt)}
+                                                                onChange={e => updateGrid(i, 'charity_amt', e.target.value)}
+                                                            />
+                                                        </td>
 
-            {/* Footer Row fields (Already Editable in your code) */}
-            <td className="p-1 border-r"><input type="number" className="w-full p-2 text-center outline-none" value={r.other_amt} onChange={e => updateGrid(i, 'other_amt', e.target.value)} /></td>
-            <td className="p-1 border-r"><input type="number" className="w-full p-2 text-center outline-none" value={r.freight_amt} onChange={e => updateGrid(i, 'freight_amt', e.target.value)} /></td>
-            <td className="p-1 border-r"><input type="text" className="w-full p-2 text-xs border rounded font-black uppercase text-center" value={r.identification_mark} onChange={e => updateGrid(i, 'identification_mark', e.target.value)} /></td>
-            
-            {/* Action Button */}
-            <td className="p-2 text-center">
-                <button onClick={() => setGridRows(gridRows.filter((_, idx) => idx !== i))}>
-                    <MinusCircle size={22} className="text-red-500 hover:scale-110 transition-transform" />
-                </button>
-            </td>
-        </tr>
-    ))}
-</tbody>
-    </table>
-</div>
+                                                        {/* TAX PAIRS (Handled by helper) */}
+                                                        {renderPairCell(r, i, 'gst_per', 'gst_amt', true, updateGrid)}
+                                                        {renderPairCell(r, i, 'sgst_per', 'sgst_amt', true, updateGrid)}
+                                                        {renderPairCell(r, i, 'cgst_per', 'cgst_amt', true, updateGrid)}
+                                                        {renderPairCell(r, i, 'igst_per', 'igst_amt', true, updateGrid)}
+                                                        {renderPairCell(r, i, 'vat_per', 'vat_amt', true, updateGrid)}
+                                                        {renderPairCell(r, i, 'cenvat_per', 'cenvat_amt', true, updateGrid)}
+                                                        {renderPairCell(r, i, 'duty_per', 'duty_amt', true, updateGrid)}
+                                                        {renderPairCell(r, i, 'cess_per', 'cess_amt', true, updateGrid)}
+                                                        {renderPairCell(r, i, 'hcess_per', 'hr_sec_cess_amt', true, updateGrid)}
+                                                        {renderPairCell(r, i, 'tcs_per', 'tcs_amt', true, updateGrid)}
+                                                        {renderPairCell(r, i, 'discount_percentage', 'discount_amt', true, updateGrid, "text-rose-600")}
+
+                                                        {/* Footer Row fields (Already Editable in your code) */}
+                                                        <td className="p-1 border-r"><input type="number" className="w-full p-2 text-center outline-none" value={r.other_amt} onChange={e => updateGrid(i, 'other_amt', e.target.value)} /></td>
+                                                        <td className="p-1 border-r"><input type="number" className="w-full p-2 text-center outline-none" value={r.freight_amt} onChange={e => updateGrid(i, 'freight_amt', e.target.value)} /></td>
+                                                        <td className="p-1 border-r"><input type="text" className="w-full p-2 text-xs border rounded font-black uppercase text-center" value={r.identification_mark} onChange={e => updateGrid(i, 'identification_mark', e.target.value)} /></td>
+
+                                                        {/* Action Button */}
+                                                        <td className="p-2 text-center">
+                                                            <button onClick={() => setGridRows(gridRows.filter((_, idx) => idx !== i))}>
+                                                                <MinusCircle size={22} className="text-red-500 hover:scale-110 transition-transform" />
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
                                 </div>
                             )}
                         </div>
@@ -1314,13 +1349,13 @@ const handleLoadSync = (loadId) => {
                                 <FooterBtn icon={<Hash size={14} />} label="GST" />
                                 <FooterBtn icon={<Database size={14} />} label="A4" />
                                 <FooterBtn icon={<Printer size={14} />} label="Report [A80]" />
-                                <button 
-    onClick={exportToJSON}
-    className="bg-indigo-600 text-white border border-indigo-700 px-4 py-1.5 text-[10px] font-black flex items-center gap-1.5 hover:bg-indigo-700 shadow-sm transition-all rounded active:scale-95"
->
-    <FileJson size={14} className="text-indigo-100" /> 
-    EXPORT JSON
-</button>
+                                <button
+                                    onClick={exportToJSON}
+                                    className="bg-indigo-600 text-white border border-indigo-700 px-4 py-1.5 text-[10px] font-black flex items-center gap-1.5 hover:bg-indigo-700 shadow-sm transition-all rounded active:scale-95"
+                                >
+                                    <FileJson size={14} className="text-indigo-100" />
+                                    EXPORT JSON
+                                </button>
                             </div>
                             <div className="flex gap-3">
 
@@ -1449,7 +1484,7 @@ const renderPairCell = (row, idx, perKey, amtKey, isEditable, updateGrid, color 
     <>
         <td className="p-1 border-r bg-white">
             <input
-                type="number" 
+                type="number"
                 step="0.01"
                 disabled={!isEditable}
                 className={`w-full p-2 text-center font-bold border-none outline-none focus:bg-yellow-50 ${color} disabled:bg-slate-50`}
