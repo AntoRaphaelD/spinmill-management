@@ -423,44 +423,45 @@ const productionCtrl = createMasterController(RG1Production, [{ model: Product }
 productionCtrl.create = async (req, res) => {
     const t = await sequelize.transaction();
     try {
-        const { date, product_id, packing_type_id, weight_per_bag, production_kgs } = req.body;
-        const last = await RG1Production.findOne({
-    where: { product_id },
-    order: [['id','DESC']],
-    transaction: t
-});
+        const {
+            date,
+            product_id,
+            packing_type_id,
+            weight_per_bag,
+            prev_closing_kgs,
+            production_kgs,
+            invoice_kgs,
+            stock_kgs,
+            stock_bags,
+            stock_loose_kgs
+        } = req.body;
 
-const product = await Product.findByPk(product_id, { transaction: t });
+        const toNumber = (value, fallback = 0) => {
+            if (value === undefined || value === null || value === '') return fallback;
+            const parsed = parseFloat(value);
+            return Number.isNaN(parsed) ? fallback : parsed;
+        };
 
-const prev_closing_kgs = parseFloat(product.mill_stock || 0);
+        const product = await Product.findByPk(product_id, { transaction: t });
 
-        const invSum = await InvoiceDetail.sum('total_kgs', {
-            include: [{ model: InvoiceHeader, where: { date }, attributes: [] }],
-            where: { product_id }, transaction: t
-        }) || 0;
-
-        const directSum = await DirectInvoiceDetail.sum('qty', {
-            include: [{ model: DirectInvoiceHeader, as: 'Header', where: { date }, attributes: [] }],
-            where: { product_id }, transaction: t
-        }) || 0;
-
-        const total_invoiced = parseFloat(invSum) + parseFloat(directSum);
-        const closing_stock =
-    prev_closing_kgs +
-    parseFloat(production_kgs || 0);
-        const bag_weight = parseFloat(weight_per_bag || 0);
+        const prevClosingKgs = toNumber(prev_closing_kgs, toNumber(product?.mill_stock));
+        const productionKgs = toNumber(production_kgs);
+        const invoiceKgs = toNumber(invoice_kgs);
+        const calculatedStockKgs = prevClosingKgs + productionKgs - invoiceKgs;
+        const stockKgs = toNumber(stock_kgs, calculatedStockKgs);
+        const bag_weight = toNumber(weight_per_bag);
 
         const prod = await RG1Production.create({
             date, product_id, packing_type_id, weight_per_bag: bag_weight,
-            prev_closing_kgs: parseFloat(prev_closing_kgs || 0),
-            production_kgs: parseFloat(production_kgs || 0),
-            invoice_kgs: total_invoiced,
-            stock_kgs: parseFloat(closing_stock.toFixed(3)),
-            stock_bags: bag_weight > 0 ? Math.floor(closing_stock / bag_weight) : 0,
-            stock_loose_kgs: bag_weight > 0 ? parseFloat((closing_stock % bag_weight).toFixed(3)) : closing_stock
+            prev_closing_kgs: parseFloat(prevClosingKgs.toFixed(3)),
+            production_kgs: parseFloat(productionKgs.toFixed(3)),
+            invoice_kgs: parseFloat(invoiceKgs.toFixed(3)),
+            stock_kgs: parseFloat(stockKgs.toFixed(3)),
+            stock_bags: toNumber(stock_bags),
+            stock_loose_kgs: parseFloat(toNumber(stock_loose_kgs).toFixed(3))
         }, { transaction: t });
 
-        await Product.update({ mill_stock: parseFloat(closing_stock.toFixed(3)) }, { where: { id: product_id }, transaction: t });
+        await Product.update({ mill_stock: parseFloat(stockKgs.toFixed(3)) }, { where: { id: product_id }, transaction: t });
 
         await t.commit();
         res.status(201).json({ success: true, data: prod });

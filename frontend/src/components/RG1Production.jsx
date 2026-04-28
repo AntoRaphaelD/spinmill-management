@@ -47,6 +47,16 @@ const RG1Production = () => {
 
     // --- 2. Auto-Calculation Stock Logic ---
     useEffect(() => {
+        const hasStockInput = [formData.production_kgs, formData.prev_closing_kgs, formData.invoice_kgs]
+            .some(value => value !== undefined && value !== null && value !== '');
+
+        if (!hasStockInput) {
+            setFormData(prevForm => ({
+                ...prevForm,
+                stock_kgs: ''
+            }));
+            return;
+        }
 
         const prod = parseFloat(formData.production_kgs) || 0;
         const prev = parseFloat(formData.prev_closing_kgs) || 0;
@@ -104,9 +114,9 @@ const RG1Production = () => {
         ...prev,
         product_id: productId,
         packing_type_id: pType ? pType.id : '',
-        weight_per_bag: product.pack_nett_wt || 0,
+        weight_per_bag: product.pack_nett_wt ?? '',
         // 🟢 This mill_stock must be updated by the backend during the previous save
-        prev_closing_kgs: product.mill_stock || 0
+        prev_closing_kgs: product.mill_stock ?? ''
     }));
 };
 
@@ -149,8 +159,10 @@ const RG1Production = () => {
  product_id: formData.product_id,
  packing_type_id: formData.packing_type_id,
  weight_per_bag: formData.weight_per_bag,
+ prev_closing_kgs: formData.prev_closing_kgs,
  production_kgs: formData.production_kgs,
  invoice_kgs: formData.invoice_kgs,
+ stock_kgs: formData.stock_kgs,
  stock_bags: formData.stock_bags,
  stock_loose_kgs: formData.stock_loose_kgs
 };
@@ -229,7 +241,7 @@ await transactionsAPI.production.create(payload);
                     <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Value</label>
                     <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
-                        <input type="text" value={searchValue} onChange={(e) => setSearchValue(e.target.value)} className="w-full border pl-9 pr-4 py-2 rounded-xl text-[13px] outline-none focus:ring-1 focus:ring-blue-500 font-bold" placeholder="Dynamic filter..." />
+                        <input type="text" value={searchValue} onChange={(e) => setSearchValue(e.target.value)} className="w-full border pl-9 pr-4 py-2 rounded-xl text-[13px] outline-none focus:ring-1 focus:ring-blue-500 font-bold" />
                     </div>
                 </div>
 
@@ -362,7 +374,7 @@ await transactionsAPI.production.create(payload);
                 type="text"
                 readOnly
                 className="w-full p-3.5 border border-slate-300 bg-slate-100 text-slate-700 font-semibold rounded-lg outline-none cursor-default shadow-sm"
-                value={packingTypes.find(t => t.id == formData.packing_type_id)?.packing_type || '-'}
+                value={packingTypes.find(t => t.id == formData.packing_type_id)?.packing_type || ''}
               />
             </div>
             <div className="col-span-2 flex justify-end">
@@ -373,28 +385,29 @@ await transactionsAPI.production.create(payload);
                 type="text"
                 readOnly
                 className="w-full p-3.5 border border-slate-300 bg-slate-100 text-slate-700 font-semibold text-center rounded-lg outline-none cursor-default shadow-sm"
-                value={formData.weight_per_bag || '-'}
+                value={formData.weight_per_bag ?? ''}
               />
             </div>
           </div>
 
           {/* Prev Day Closing & Production Kgs */}
           <div className="grid grid-cols-12 items-center gap-6">
-            <div className="col-span-4 flex justify-end">
+            <div className="col-span-3 flex justify-end">
               <FormLabel>Prv. Day Closing</FormLabel>
             </div>
-            <div className="col-span-4">
+            <div className="col-span-3">
               <input
-                type="text"
-                readOnly
-                className="w-full p-3.5 border border-slate-300 bg-slate-100 text-slate-800 font-bold text-right rounded-lg outline-none cursor-default shadow-sm"
-                value={formData.prev_closing_kgs || '0.000'}
+                type="number"
+                step="0.01"
+                className="w-full p-3.5 border border-blue-400 bg-white text-blue-800 font-black text-base text-right rounded-lg outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-400/30 shadow-sm"
+                value={formData.prev_closing_kgs ?? ''}
+                onChange={e => setFormData({ ...formData, prev_closing_kgs: e.target.value })}
               />
             </div>
-            <div className="col-span-2 flex justify-end">
+            <div className="col-span-3 flex justify-end">
               <FormLabel>Production Kgs</FormLabel>
             </div>
-            <div className="col-span-2">
+            <div className="col-span-3">
               <input
                 type="number"
                 step="0.01"
@@ -407,10 +420,10 @@ await transactionsAPI.production.create(payload);
 
           {/* Invoice Kgs & Stock Kgs */}
           <div className="grid grid-cols-12 items-center gap-6">
-            <div className="col-span-4 flex justify-end">
+            <div className="col-span-3 flex justify-end">
               <FormLabel>Invoice Kgs</FormLabel>
             </div>
-            <div className="col-span-4">
+            <div className="col-span-3">
               <input
                 type="number"
                 step="0.01"
@@ -419,10 +432,10 @@ await transactionsAPI.production.create(payload);
                 onChange={e => setFormData({ ...formData, invoice_kgs: e.target.value })}
               />
             </div>
-            <div className="col-span-2 flex justify-end">
+            <div className="col-span-3 flex justify-end">
               <FormLabel>Stock Kgs</FormLabel>
             </div>
-            <div className="col-span-2">
+            <div className="col-span-3">
               <input
                 type="number"
                 step="0.01"
@@ -435,23 +448,22 @@ await transactionsAPI.production.create(payload);
 
           {/* Stock Bags & Stock Loose – Stock Bags is now editable */}
           <div className="grid grid-cols-12 items-center gap-6">
-            <div className="col-span-4 flex justify-end">
+            <div className="col-span-3 flex justify-end">
               <FormLabel>Stock Bags</FormLabel>
             </div>
-            <div className="col-span-4">
+            <div className="col-span-3">
               <input
                 type="number"
                 step="0.01"
                 className="w-full p-3.5 border border-blue-400 bg-white text-blue-800 font-black text-base text-right rounded-lg outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-400/30 shadow-sm"
                 value={formData.stock_bags ?? ''}
                 onChange={e => setFormData({ ...formData, stock_bags: e.target.value })}
-                placeholder="Enter stock bags"
               />
             </div>
-            <div className="col-span-2 flex justify-end">
+            <div className="col-span-3 flex justify-end">
               <FormLabel>Stock Loose</FormLabel>
             </div>
-            <div className="col-span-2">
+            <div className="col-span-3">
               <input
                 type="number"
                 step="0.01"
