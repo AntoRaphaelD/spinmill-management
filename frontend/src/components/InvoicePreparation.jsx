@@ -4,7 +4,8 @@ import {
     Save, FileText, Calculator, RefreshCw, X, Plus,
     Database, MinusCircle, Box, Layers, Activity, Lock,
     ShoppingCart, ChevronDown, Clock, Truck, User,
-    Search, Hash, Info, MapPin, Printer, FileJson
+    Search, Hash, Info, MapPin, Printer, FileJson,
+    ChevronLeft, ChevronRight
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -248,6 +249,8 @@ const InvoicePreparation = () => {
     const [searchCondition, setSearchCondition] = useState('Like');
     const [searchValue, setSearchValue] = useState('');
     const [printData, setPrintData] = useState(null);
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 10;
     // ==========================================
     // SEARCH FILTER ENGINE
     // ==========================================
@@ -306,6 +309,17 @@ const InvoicePreparation = () => {
         return result;
 
     }, [listData.history, searchField, searchCondition, searchValue]);
+
+    const totalPages = Math.ceil(filteredInvoices.length / itemsPerPage) || 1;
+    const currentItems = filteredInvoices.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchField, searchCondition, searchValue]);
+
+    useEffect(() => {
+        if (currentPage > totalPages) setCurrentPage(totalPages);
+    }, [currentPage, totalPages]);
 
     // =====================================================
     // PROFESSIONAL EXPORT TO PDF - MATCHES PRINT VIEW 100%
@@ -523,7 +537,7 @@ const InvoicePreparation = () => {
             return 0;
         }
     };
-    const runCalculations = useCallback((rows, typeId, hFreight = formData.freight_charges) => {
+    const runCalculations = useCallback((rows, typeId, hFreight = formData.freight_charges, salesType = formData.sales_type) => {
         if (!typeId) return rows;
 
         const config = listData.types.find(t => t.id === parseInt(typeId));
@@ -569,7 +583,7 @@ const InvoicePreparation = () => {
 
             // 4. FLOW: charity
             let charity = 0;
-            if (formData.sales_type === 'GST SALES') {
+            if (salesType === 'GST SALES') {
                 charity = totalKgs * 3;
             } else {
                 charity = totalInvoiceAmount * (num(config.charity_value || 0) / 100);
@@ -642,7 +656,7 @@ const InvoicePreparation = () => {
 
     useEffect(() => {
         if (!formData.invoice_type_id || gridRows.length === 0) return;
-        setGridRows(prev => runCalculations(prev, formData.invoice_type_id, formData.freight_charges));
+        setGridRows(prev => runCalculations(prev, formData.invoice_type_id, formData.freight_charges, formData.sales_type));
     }, [formData.invoice_type_id, formData.sales_type, formData.freight_charges, runCalculations]);
 
     // ==========================================
@@ -730,7 +744,7 @@ const InvoicePreparation = () => {
                     avg_content: bags > 0 ? (kgs / bags).toFixed(3) : 0
                 };
             });
-            return runCalculations(updatedRows, updatedForm.invoice_type_id, load.freight);
+            return runCalculations(updatedRows, updatedForm.invoice_type_id, load.freight, updatedForm.sales_type);
         });
     };
 
@@ -799,7 +813,7 @@ const InvoicePreparation = () => {
             };
         });
 
-        setGridRows(runCalculations([...gridRows, ...newRows], formData.invoice_type_id));
+        setGridRows(runCalculations([...gridRows, ...newRows], formData.invoice_type_id, formData.freight_charges, formData.sales_type));
         e.target.value = "";
     };
 
@@ -822,9 +836,62 @@ const InvoicePreparation = () => {
             }
 
             updated[idx] = row;
-            return runCalculations(updated, formData.invoice_type_id);
+            return runCalculations(updated, formData.invoice_type_id, formData.freight_charges, formData.sales_type);
         });
     };
+
+    const valueOrFallback = (value, fallback = '') => (
+        value === undefined || value === null || value === '' ? fallback : value
+    );
+
+    const hydrateInvoiceForEdit = (invoice) => {
+        const party = invoice.Party || listData.parties.find(p => p.id === parseInt(invoice.party_id));
+        const load = listData.loads.find(l => l.id === parseInt(invoice.load_id));
+        const invoiceType = listData.types.find(t => t.id === parseInt(invoice.invoice_type_id));
+        const salesType = valueOrFallback(invoice.sales_type, invoiceType?.sales_type || emptyInvoice.sales_type);
+
+        const header = {
+            ...invoice,
+            sales_type: salesType,
+            invoice_type_id: valueOrFallback(invoice.invoice_type_id, ''),
+            addr1: valueOrFallback(invoice.addr1, party?.addr1 || ''),
+            addr2: valueOrFallback(invoice.addr2, party?.addr2 || ''),
+            addr3: valueOrFallback(invoice.addr3, party?.addr3 || ''),
+            transport_id: valueOrFallback(invoice.transport_id, load?.transport_id || ''),
+            vehicle_no: valueOrFallback(invoice.vehicle_no, load?.vehicle_no || ''),
+            delivery: valueOrFallback(invoice.delivery, load?.delivery || ''),
+            lr_no: valueOrFallback(invoice.lr_no, load?.lr_no || ''),
+            lr_date: valueOrFallback(invoice.lr_date, load?.lr_date || ''),
+            ebill_no: valueOrFallback(invoice.ebill_no, load?.insurance_no || ''),
+            freight_charges: valueOrFallback(invoice.freight_charges, load ? num(load.freight) : 0),
+            removal_time: valueOrFallback(invoice.removal_time, load?.out_time || ''),
+            prepare_time: valueOrFallback(invoice.prepare_time, load?.in_time || '')
+        };
+
+        const details = (
+            invoice.InvoiceDetails ||
+            invoice.Details ||
+            invoice.details ||
+            []
+        ).map(row => {
+            const product = row.Product || listData.products.find(p => p.id === parseInt(row.product_id));
+            const packs = num(row.packs);
+            const totalKgs = num(row.total_kgs);
+
+            return {
+                ...row,
+                product_description: valueOrFallback(row.product_description, product?.product_name || ''),
+                packing_type: valueOrFallback(row.packing_type, product?.packing_type || ''),
+                avg_content: valueOrFallback(
+                    row.avg_content,
+                    packs > 0 ? (totalKgs / packs).toFixed(3) : valueOrFallback(product?.pack_nett_wt, 0)
+                )
+            };
+        });
+
+        return { header, details };
+    };
+
     const handleSave = async () => {
 
         setSubmitLoading(true);
@@ -967,7 +1034,7 @@ const InvoicePreparation = () => {
                         <tr><th className="p-6">InvoiceNo</th><th className="p-6">Date</th><th className="p-6">Party</th></tr>
                     </thead>
                     <tbody className="divide-y text-sm font-mono">
-                        {filteredInvoices.map(item => (
+                        {currentItems.map(item => (
                             <tr
                                 key={item.id}
                                 className="hover:bg-blue-50 cursor-pointer"
@@ -975,29 +1042,17 @@ const InvoicePreparation = () => {
                                     try {
                                         const res = await transactionsAPI.invoices.getById(item.id);
                                         const invoice = res.data.data;
-                                        const party = invoice.Party;
-
-
-                                        setFormData({
-                                            ...invoice,
-                                            addr1: invoice.addr1 || party?.addr1 || '',
-                                            addr2: invoice.addr2 || party?.addr2 || '',
-                                            addr3: invoice.addr3 || party?.addr3 || ''
-                                        });
-
-                                        const details =
-                                            invoice.InvoiceDetails ||
-                                            invoice.Details ||
-                                            invoice.details ||
-                                            [];
+                                        const { header, details } = hydrateInvoiceForEdit(invoice);
 
                                         setGridRows(
                                             runCalculations(
                                                 details,
-                                                invoice.invoice_type_id,
-                                                invoice.freight_charges
+                                                header.invoice_type_id,
+                                                header.freight_charges,
+                                                header.sales_type
                                             )
                                         );
+                                        setFormData(header);
 
                                         setIsModalOpen(true);
 
@@ -1023,6 +1078,32 @@ const InvoicePreparation = () => {
                         ))}
                     </tbody>
                 </table>
+                <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
+                    <span className="text-xs text-slate-500 font-bold uppercase tracking-wide">
+                        Showing {filteredInvoices.length === 0 ? 0 : ((currentPage - 1) * itemsPerPage) + 1}
+                        {' '}to {Math.min(currentPage * itemsPerPage, filteredInvoices.length)}
+                        {' '}of {filteredInvoices.length} entries
+                    </span>
+                    <div className="flex items-center gap-2">
+                        <button
+                            disabled={currentPage === 1}
+                            onClick={() => setCurrentPage(p => p - 1)}
+                            className="p-2 border border-slate-300 rounded bg-white disabled:opacity-40 hover:bg-blue-50 transition-colors"
+                        >
+                            <ChevronLeft size={16} />
+                        </button>
+                        <span className="px-3 text-xs font-black text-slate-600">
+                            Page {currentPage} of {totalPages}
+                        </span>
+                        <button
+                            disabled={currentPage === totalPages}
+                            onClick={() => setCurrentPage(p => p + 1)}
+                            className="p-2 border border-slate-300 rounded bg-white disabled:opacity-40 hover:bg-blue-50 transition-colors"
+                        >
+                            <ChevronRight size={16} />
+                        </button>
+                    </div>
+                </div>
             </div>
 
             {/* PREPARATION MODAL */}

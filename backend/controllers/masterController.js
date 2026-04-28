@@ -304,6 +304,7 @@ invoiceCtrl.create = async (req, res) => {
 
         const header = await InvoiceHeader.create({
             ...sanitizeData(headerData),
+            sales_type,
             invoice_type_id,
             total_assessable: totals.assess,
             total_charity: totals.charity,
@@ -365,6 +366,7 @@ invoiceCtrl.update = async (req, res) => {
 
         await InvoiceHeader.update({
             ...sanitizeData(headerData),
+            sales_type,
             invoice_type_id,
             total_assessable: totals.assess,
             total_charity: totals.charity,

@@ -28,6 +28,8 @@ const RG1Production = () => {
     // Master Data
     const [products, setProducts] = useState([]);
     const [packingTypes, setPackingTypes] = useState([]);
+    const [invoices, setInvoices] = useState([]);
+    const [directInvoices, setDirectInvoices] = useState([]);
 
     const emptyState = { 
         id: null,
@@ -45,7 +47,79 @@ const RG1Production = () => {
 
     const [formData, setFormData] = useState(emptyState);
 
-    // --- 2. Auto-Calculation Stock Logic ---
+    const num = (value) => {
+        const parsed = parseFloat(value);
+        return Number.isNaN(parsed) ? 0 : parsed;
+    };
+
+    const getPreviousDate = (dateValue) => {
+        if (!dateValue) return '';
+        const [year, month, day] = dateValue.split('-').map(Number);
+        const date = new Date(year, month - 1, day);
+        date.setDate(date.getDate() - 1);
+        const yyyy = date.getFullYear();
+        const mm = String(date.getMonth() + 1).padStart(2, '0');
+        const dd = String(date.getDate()).padStart(2, '0');
+        return `${yyyy}-${mm}-${dd}`;
+    };
+
+    const getProduct = (productId) => products.find(p => p.id === parseInt(productId));
+
+    const getPreviousDayInvoiceKgs = (productId, dateValue) => {
+        const previousDate = getPreviousDate(dateValue);
+        if (!productId || !previousDate) return '';
+
+        const invoiceKgs = invoices.reduce((sum, invoice) => {
+            if (invoice.date !== previousDate) return sum;
+            const details = invoice.InvoiceDetails || invoice.Details || invoice.details || [];
+            return sum + details.reduce((detailSum, detail) => (
+                parseInt(detail.product_id) === parseInt(productId)
+                    ? detailSum + num(detail.total_kgs)
+                    : detailSum
+            ), 0);
+        }, 0);
+
+        const directKgs = directInvoices.reduce((sum, invoice) => {
+            if (invoice.date !== previousDate) return sum;
+            const details = invoice.DirectInvoiceDetails || invoice.Details || invoice.details || [];
+            return sum + details.reduce((detailSum, detail) => (
+                parseInt(detail.product_id) === parseInt(productId)
+                    ? detailSum + num(detail.qty)
+                    : detailSum
+            ), 0);
+        }, 0);
+
+        return (invoiceKgs + directKgs).toFixed(3);
+    };
+
+    // --- 2. Auto-Calculation Logic ---
+    useEffect(() => {
+        const product = getProduct(formData.product_id);
+        const hasProductionInput = [formData.stock_bags, formData.stock_loose_kgs]
+            .some(value => value !== undefined && value !== null && value !== '');
+
+        const nextProduction = hasProductionInput
+            ? ((num(formData.stock_bags) * num(formData.weight_per_bag)) + (num(formData.stock_loose_kgs) * num(product?.wt_per_cone))).toFixed(3)
+            : '';
+
+        if (formData.production_kgs !== nextProduction) {
+            setFormData(prevForm => ({
+                ...prevForm,
+                production_kgs: nextProduction
+            }));
+        }
+    }, [formData.stock_bags, formData.stock_loose_kgs, formData.weight_per_bag, formData.product_id, products]);
+
+    useEffect(() => {
+        const nextInvoiceKgs = getPreviousDayInvoiceKgs(formData.product_id, formData.date);
+        if (nextInvoiceKgs !== '' && formData.invoice_kgs !== nextInvoiceKgs) {
+            setFormData(prevForm => ({
+                ...prevForm,
+                invoice_kgs: nextInvoiceKgs
+            }));
+        }
+    }, [formData.product_id, formData.date, invoices, directInvoices]);
+
     useEffect(() => {
         const hasStockInput = [formData.production_kgs, formData.prev_closing_kgs, formData.invoice_kgs]
             .some(value => value !== undefined && value !== null && value !== '');
@@ -58,16 +132,19 @@ const RG1Production = () => {
             return;
         }
 
-        const prod = parseFloat(formData.production_kgs) || 0;
-        const prev = parseFloat(formData.prev_closing_kgs) || 0;
-        const inv = parseFloat(formData.invoice_kgs) || 0;
+        const prod = num(formData.production_kgs);
+        const prev = num(formData.prev_closing_kgs);
+        const inv = num(formData.invoice_kgs);
 
         const closingKgs = (prev + prod) - inv;
+        const nextStockKgs = closingKgs.toFixed(3);
 
-        setFormData(prevForm => ({
-            ...prevForm,
-            stock_kgs: closingKgs.toFixed(2)
-        }));
+        if (formData.stock_kgs !== nextStockKgs) {
+            setFormData(prevForm => ({
+                ...prevForm,
+                stock_kgs: nextStockKgs
+            }));
+        }
 
     }, [formData.production_kgs, formData.prev_closing_kgs, formData.invoice_kgs]);
 
@@ -79,12 +156,16 @@ const RG1Production = () => {
 
     const fetchMasters = async () => {
         try {
-            const [productsRes, packingTypesRes] = await Promise.all([
+            const [productsRes, packingTypesRes, invoicesRes, directInvoicesRes] = await Promise.all([
                 mastersAPI.products.getAll(),
-                mastersAPI.packingTypes.getAll()
+                mastersAPI.packingTypes.getAll(),
+                transactionsAPI.invoices.getAll(),
+                transactionsAPI.directInvoices.getAll()
             ]);
             setProducts(Array.isArray(productsRes.data.data) ? productsRes.data.data : []);
             setPackingTypes(Array.isArray(packingTypesRes.data.data) ? packingTypesRes.data.data : []);
+            setInvoices(Array.isArray(invoicesRes.data.data) ? invoicesRes.data.data : []);
+            setDirectInvoices(Array.isArray(directInvoicesRes.data.data) ? directInvoicesRes.data.data : []);
         } catch (err) { console.error(err); }
     };
 
@@ -399,9 +480,9 @@ await transactionsAPI.production.create(payload);
               <input
                 type="number"
                 step="0.01"
-                className="w-full p-3.5 border border-blue-400 bg-white text-blue-800 font-black text-base text-right rounded-lg outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-400/30 shadow-sm"
+                readOnly
+                className="w-full p-3.5 border border-slate-300 bg-slate-100 text-slate-800 font-black text-base text-right rounded-lg outline-none cursor-default shadow-sm"
                 value={formData.prev_closing_kgs ?? ''}
-                onChange={e => setFormData({ ...formData, prev_closing_kgs: e.target.value })}
               />
             </div>
             <div className="col-span-3 flex justify-end">
@@ -411,9 +492,9 @@ await transactionsAPI.production.create(payload);
               <input
                 type="number"
                 step="0.01"
-                className="w-full p-3.5 border-2 border-blue-500 bg-white text-blue-800 font-black text-base text-right rounded-lg outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-400/30 shadow-sm"
+                readOnly
+                className="w-full p-3.5 border-2 border-slate-300 bg-slate-100 text-blue-800 font-black text-base text-right rounded-lg outline-none cursor-default shadow-sm"
                 value={formData.production_kgs ?? ''}
-                onChange={e => setFormData({ ...formData, production_kgs: e.target.value })}
               />
             </div>
           </div>
@@ -427,9 +508,9 @@ await transactionsAPI.production.create(payload);
               <input
                 type="number"
                 step="0.01"
-                className="w-full p-3.5 border border-slate-300 bg-white text-slate-800 font-bold text-base text-right rounded-lg outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-400/30 shadow-sm"
+                readOnly
+                className="w-full p-3.5 border border-slate-300 bg-slate-100 text-slate-800 font-bold text-base text-right rounded-lg outline-none cursor-default shadow-sm"
                 value={formData.invoice_kgs ?? ''}
-                onChange={e => setFormData({ ...formData, invoice_kgs: e.target.value })}
               />
             </div>
             <div className="col-span-3 flex justify-end">
@@ -439,9 +520,9 @@ await transactionsAPI.production.create(payload);
               <input
                 type="number"
                 step="0.01"
-                className="w-full p-3.5 border border-blue-400 bg-white text-blue-800 font-black text-base text-right rounded-lg outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-400/30 shadow-sm"
+                readOnly
+                className="w-full p-3.5 border border-slate-300 bg-slate-100 text-blue-800 font-black text-base text-right rounded-lg outline-none cursor-default shadow-sm"
                 value={formData.stock_kgs ?? ''}
-                onChange={e => setFormData({ ...formData, stock_kgs: e.target.value })}
               />
             </div>
           </div>
