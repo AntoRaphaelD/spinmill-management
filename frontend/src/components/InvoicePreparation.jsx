@@ -544,21 +544,30 @@ const InvoicePreparation = () => {
         if (!config) return rows;
 
         // 1. FLOW: Get Tax and TCS Percentages
+        const gstPer = num(config.gst_percentage);
         const sgstPer = num(config.sgst_percentage);
         const cgstPer = num(config.cgst_percentage);
         const igstPer = num(config.igst_percentage);
+        const cenvatPer = num(config.cenvat_percentage);
+        const dutyPer = num(config.duty_percentage);
+        const cessPer = num(config.cess_percentage);
+        const hcessPer = num(config.hr_sec_cess_percentage);
         const tcsPer = num(config.tcs_percentage || 0);
 
         // Total tax percentage (Sum of SGST+CGST or just IGST)
-        const taxPercentage = igstPer > 0 ? igstPer : (sgstPer + cgstPer);
-        const hasSplitGst = sgstPer > 0 && cgstPer > 0;
+        const splitGstPer = sgstPer + cgstPer;
+        const taxPercentage = igstPer > 0 ? igstPer : (splitGstPer > 0 ? splitGstPer : gstPer);
+        const displayGstPer = splitGstPer > 0 ? splitGstPer : gstPer;
 
         const totalBags = rows.reduce((sum, r) => sum + num(r.packs), 0);
         const freightPerBag = totalBags > 0 ? num(hFreight) / totalBags : 0;
 
         console.log(`%c >>> CALCULATION START [Tax: ${taxPercentage}%, TCS: ${tcsPer}%] <<< `, "background: #000; color: #fff;");
 
-        let hTotals = { assess: 0, charity: 0, freight: 0, gst: 0, tcs: 0, gross: 0 };
+        let hTotals = {
+            assess: 0, charity: 0, freight: 0, gst: 0, tcs: 0, gross: 0,
+            cenvat: 0, duty: 0, cess: 0, hcess: 0, other: 0
+        };
 
         const updatedRows = rows.map((item, idx) => {
             const packs = num(item.packs);
@@ -583,10 +592,13 @@ const InvoicePreparation = () => {
 
             // 4. FLOW: charity
             let charity = 0;
+            const charityPerBale = salesType === 'GST SALES'
+                ? 3
+                : num(item.charity_per_bale || config.charity_value || 0);
             if (salesType === 'GST SALES') {
-                charity = totalKgs * 3;
+                charity = totalKgs * charityPerBale;
             } else {
-                charity = totalInvoiceAmount * (num(config.charity_value || 0) / 100);
+                charity = totalInvoiceAmount * (charityPerBale / 100);
             }
 
             // 5. FLOW: divisor and base_amount (Back-calculating Taxable value)
@@ -603,6 +615,19 @@ const InvoicePreparation = () => {
             // 8. FLOW: accessible_value (Stripping components from Total)
             const rawAccessibleValue = totalInvoiceAmount - rowFreight - charity - gstAmount;
             const accessibleValue = is68Product ? rawAccessibleValue : Math.round(rawAccessibleValue);
+            const vatPer = num(item.vat_per || config.vat_percentage);
+            const cenvatRowPer = num(item.cenvat_per || cenvatPer);
+            const dutyRowPer = num(item.duty_per || dutyPer);
+            const cessRowPer = num(item.cess_per || cessPer);
+            const hcessRowPer = num(item.hcess_per || hcessPer);
+            const vatAmount = (accessibleValue * vatPer) / 100;
+            const cenvatAmount = (accessibleValue * cenvatRowPer) / 100;
+            const dutyAmount = (accessibleValue * dutyRowPer) / 100;
+            const cessAmount = (accessibleValue * cessRowPer) / 100;
+            const hcessAmount = (accessibleValue * hcessRowPer) / 100;
+            const otherAmount = num(item.other_per) > 0
+                ? (accessibleValue * num(item.other_per)) / 100
+                : num(item.other_amt);
 
             hTotals.assess += accessibleValue;
             hTotals.charity += charity;
@@ -610,19 +635,43 @@ const InvoicePreparation = () => {
             hTotals.gst += gstAmount;
             hTotals.tcs += tcsAmount;
             hTotals.gross += totalInvoiceAmount;
+            hTotals.vat = (hTotals.vat || 0) + vatAmount;
+            hTotals.cenvat += cenvatAmount;
+            hTotals.duty += dutyAmount;
+            hTotals.cess += cessAmount;
+            hTotals.hcess += hcessAmount;
+            hTotals.other += otherAmount;
 
             return {
                 ...item,
                 total_kgs: money(totalKgs),
+                charity_per_bale: money(charityPerBale),
+                gst_per: displayGstPer,
+                sgst_per: sgstPer,
+                cgst_per: cgstPer,
+                igst_per: igstPer,
+                vat_per: vatPer,
+                cenvat_per: cenvatRowPer,
+                duty_per: dutyRowPer,
+                cess_per: cessRowPer,
+                hcess_per: hcessRowPer,
+                tcs_per: tcsPer,
                 charity_amt: money(charity),
                 freight_amt: money(rowFreight),
                 // Handle SGST/CGST split or IGST
                 igst_amt: igstPer > 0 ? money(gstAmount) : 0,
                 sgst_amt: sgstPer > 0 ? money(gstAmount / 2) : 0,
                 cgst_amt: cgstPer > 0 ? money(gstAmount / 2) : 0,
-                gst_amt: hasSplitGst ? money(gstAmount) : 0,
+                gst_amt: igstPer > 0 ? 0 : money(gstAmount),
+                vat_amt: money(vatAmount),
+                cenvat_amt: money(cenvatAmount),
+                duty_amt: money(dutyAmount),
+                cess_amt: money(cessAmount),
+                hr_sec_cess_amt: money(hcessAmount),
                 tcs_amt: money(tcsAmount),
+                other_amt: money(otherAmount),
                 assessable_value: money(accessibleValue),
+                rounded_off: num(item.rounded_off || 0),
                 final_value: money(totalInvoiceAmount)
             };
         });
@@ -638,12 +687,18 @@ const InvoicePreparation = () => {
             total_assessable: money(hTotals.assess),
             total_charity: money(hTotals.charity),
             freight_charges: num(hFreight),
-            // 🟢 Display full tax in "GST (Gen)" field
-            total_gst: hasSplitGst ? money(hTotals.gst) : 0,
+            // Display full GST amount as the combined CGST + SGST value.
+            total_gst: igstPer > 0 ? 0 : money(hTotals.gst),
             total_igst: igstPer > 0 ? money(hTotals.gst) : 0,
             total_sgst: sgstPer > 0 ? money(hTotals.gst / 2) : 0,
             total_cgst: cgstPer > 0 ? money(hTotals.gst / 2) : 0,
+            total_vat: money(hTotals.vat || 0),
+            total_cenvat: money(hTotals.cenvat),
+            total_duty: money(hTotals.duty),
+            total_cess: money(hTotals.cess),
+            total_hr_sec_cess: money(hTotals.hcess),
             total_tcs: money(hTotals.tcs),
+            total_other: money(hTotals.other),
             sub_total: money(finalGross),
             // 🟢 Round off is calculated after TCS deduction
             round_off: money(calculatedRoundOff),
@@ -751,69 +806,45 @@ const InvoicePreparation = () => {
     // ==========================================
     // 4. HANDLERS
     // ==========================================
-    const handleOrderSync = (e) => {
+    const handleOrderSync = async (e) => {
         const val = e.target.value;
         if (!val) return;
 
         const [source, orderNo] = val.split('|');
-        const order = source === 'WITH'
-            ? listData.orders.find(o => o.order_no === orderNo)
-            : listData.directOrders.find(o => o.order_no === orderNo);
+        let order = source === 'WITH'
+            ? listData.orders.find(o => String(o.order_no) === String(orderNo))
+            : listData.directOrders.find(o => String(o.order_no) === String(orderNo));
+        if (!order) {
+            alert("Selected order could not be found.");
+            e.target.value = "";
+            return;
+        }
 
         const config = listData.types.find(t => t.id === parseInt(formData.invoice_type_id));
         if (!config) { alert("Select Invoice Type first."); e.target.value = ""; return; }
 
         const load = listData.loads.find(l => l.id === parseInt(formData.load_id));
-        const details = source === 'WITH' ? order.OrderDetails || [] : order.DirectInvoiceDetails || [];
+        let details = source === 'WITH' ? order.OrderDetails || [] : order.DirectInvoiceDetails || [];
+        if (details.length === 0 && order.id) {
+            const res = source === 'WITH'
+                ? await transactionsAPI.orders.getById(order.id)
+                : await transactionsAPI.directInvoices.getById(order.id);
+            order = res.data.data || order;
+            details = source === 'WITH' ? order.OrderDetails || [] : order.DirectInvoiceDetails || [];
+        }
+        if (details.length === 0) {
+            alert("No detail rows found for this order.");
+            e.target.value = "";
+            return;
+        }
 
         console.log(`%c 📑 SYNCING ORDER: ${orderNo} `, "background: #2563eb; color: #fff; font-weight: bold; padding: 4px;");
         console.log("Raw Order Details from DB:", details);
 
-        const newRows = details.map((d, index) => {
-            const broker = listData.brokers.find(b => b.id === order.broker_id);
-
-            // 1. Weight Logic
-            const weightPerBag = num(d.bag_wt) > 0 ? num(d.bag_wt) : num(d.Product?.pack_nett_wt);
-
-            // 2. Packs Logic
-            const rowPacks = num(load?.no_of_bags) > 0 ? num(load?.no_of_bags) : num(d.packs);
-
-            // 3. Total Kgs
-            const rowKgs = weightPerBag * rowPacks;
-
-            // 4. Avg Content
-            const rowAvg = rowPacks > 0 ? (rowKgs / rowPacks) : weightPerBag;
-
-            console.group(`Row ${index + 1}: ${d.Product?.product_name}`);
-            console.log(`Weight Source: ${num(d.bag_wt) > 0 ? 'Order Detail' : 'Product Master'}`);
-            console.log(`Packs Source: ${num(load?.no_of_bags) > 0 ? 'Load/Despatch' : 'Order Detail'}`);
-            console.log(`Calculation: ${weightPerBag}kg x ${rowPacks} packs = ${rowKgs}kg`);
-            console.groupEnd();
-
-            return {
-                order_no: orderNo,
-                order_type: source === 'WITH' ? 'WITH_ORDER' : 'WITHOUT_ORDER',
-                product_id: d.product_id,
-                product_description: d.Product?.product_name || '',
-                packing_type: d.packing_type || d.Product?.packing_type || 'BAGS',
-                packs: rowPacks,
-                total_kgs: rowKgs,
-                avg_content: rowAvg.toFixed(3),
-                broker_code: broker?.broker_code || '',
-                broker_percentage: broker?.commission_pct || 0,
-                rate: d.rate_cr || d.rate || 0,
-                rate_per: d.rate_per || d.Product?.rate_per || 'KG',
-                resale: 0, convert_to_hank: 0, convert_to_cone: 0,
-                vat_per: num(config.vat_percentage),
-                gst_per: num(config.gst_percentage),
-                sgst_per: num(config.sgst_percentage),
-                cgst_per: num(config.cgst_percentage),
-                igst_per: num(config.igst_percentage),
-                discount_percentage: 0, other_amt: 0, freight_amt: 0
-            };
-        });
+        const newRows = details.map(d => normalizeInvoiceRow(d, { order, source, config, load }));
 
         setGridRows(runCalculations([...gridRows, ...newRows], formData.invoice_type_id, formData.freight_charges, formData.sales_type));
+        setActiveTab('detail');
         e.target.value = "";
     };
 
@@ -835,6 +866,10 @@ const InvoicePreparation = () => {
                 console.log(`New Avg Content: ${val}kg / ${p} packs = ${row.avg_content}`);
             }
 
+            if (field === 'broker_code1') {
+                row.broker_code = val;
+            }
+
             updated[idx] = row;
             return runCalculations(updated, formData.invoice_type_id, formData.freight_charges, formData.sales_type);
         });
@@ -843,6 +878,75 @@ const InvoicePreparation = () => {
     const valueOrFallback = (value, fallback = '') => (
         value === undefined || value === null || value === '' ? fallback : value
     );
+
+    const firstValue = (...values) => {
+        for (const value of values) {
+            if (value !== undefined && value !== null && value !== '') return value;
+        }
+        return '';
+    };
+
+    const findProductForRow = (row) => (
+        row.Product ||
+        row.product ||
+        row.ProductDetail ||
+        listData.products.find(p => String(p.id) === String(row.product_id))
+    );
+
+    const normalizeInvoiceRow = (row, options = {}) => {
+        const { order = {}, source = '', config = {}, load = null } = options;
+        const product = findProductForRow(row);
+        const broker = listData.brokers.find(b => String(b.id) === String(order.broker_id));
+        const orderNo = firstValue(row.order_no, order.order_no);
+        const orderType = firstValue(row.order_type, source === 'WITH' ? 'WITH_ORDER' : source === 'WITHOUT' ? 'WITHOUT_ORDER' : '');
+        const packs = num(load?.no_of_bags) > 0
+            ? num(load.no_of_bags)
+            : (num(firstValue(row.packs, row.qty, row.quantity)) || 0);
+        const avgContent = num(firstValue(row.avg_content, row.bag_wt, product?.pack_nett_wt));
+        const totalKgs = num(firstValue(row.total_kgs, row.kgs, row.net_weight)) || (packs * avgContent);
+
+        return {
+            ...row,
+            order_no: orderNo,
+            order_type: orderType,
+            product_id: firstValue(row.product_id, product?.id),
+            product_description: firstValue(row.product_description, product?.product_name, product?.short_description),
+            packs,
+            packing_type: firstValue(row.packing_type, product?.packing_type, 'BAGS'),
+            total_kgs: totalKgs,
+            avg_content: packs > 0 ? (totalKgs / packs).toFixed(3) : num(avgContent).toFixed(3),
+            rate: num(firstValue(row.rate, row.rate_cr, row.rate_imm)),
+            rate_per: firstValue(row.rate_per, product?.rate_per, 'KG'),
+            identification_mark: firstValue(row.identification_mark, ''),
+            charity_per_bale: num(firstValue(row.charity_per_bale, formData.sales_type === 'GST SALES' ? 3 : config.charity_value)),
+            broker_code: firstValue(row.broker_code, row.broker_code1, broker?.broker_code),
+            broker_code1: firstValue(row.broker_code1, row.broker_code, broker?.broker_code),
+            broker_code2: firstValue(row.broker_code2, ''),
+            broker_percentage: num(firstValue(row.broker_percentage, broker?.commission_pct)),
+            broker_percentage2: num(firstValue(row.broker_percentage2, 0)),
+            from_no: firstValue(row.from_no, ''),
+            to_no: firstValue(row.to_no, ''),
+            lot_no: firstValue(row.lot_no, ''),
+            resale: num(firstValue(row.resale, 0)),
+            convert_to_hank: num(firstValue(row.convert_to_hank, 0)),
+            convert_to_cone: num(firstValue(row.convert_to_cone, 0)),
+            gst_per: num(firstValue(row.gst_per, config.gst_percentage)),
+            sgst_per: num(firstValue(row.sgst_per, config.sgst_percentage)),
+            cgst_per: num(firstValue(row.cgst_per, config.cgst_percentage)),
+            igst_per: num(firstValue(row.igst_per, config.igst_percentage)),
+            vat_per: num(firstValue(row.vat_per, config.vat_percentage)),
+            cenvat_per: num(firstValue(row.cenvat_per, config.cenvat_percentage)),
+            duty_per: num(firstValue(row.duty_per, config.duty_percentage)),
+            cess_per: num(firstValue(row.cess_per, config.cess_percentage)),
+            hcess_per: num(firstValue(row.hcess_per, config.hr_sec_cess_percentage)),
+            tcs_per: num(firstValue(row.tcs_per, config.tcs_percentage)),
+            other_per: num(firstValue(row.other_per, 0)),
+            other_amt: num(firstValue(row.other_amt, 0)),
+            freight_amt: num(firstValue(row.freight_amt, 0)),
+            rounded_off: num(firstValue(row.rounded_off, 0)),
+            discount_percentage: num(firstValue(row.discount_percentage, 0))
+        };
+    };
 
     const hydrateInvoiceForEdit = (invoice) => {
         const party = invoice.Party || listData.parties.find(p => p.id === parseInt(invoice.party_id));
@@ -873,21 +977,7 @@ const InvoicePreparation = () => {
             invoice.Details ||
             invoice.details ||
             []
-        ).map(row => {
-            const product = row.Product || listData.products.find(p => p.id === parseInt(row.product_id));
-            const packs = num(row.packs);
-            const totalKgs = num(row.total_kgs);
-
-            return {
-                ...row,
-                product_description: valueOrFallback(row.product_description, product?.product_name || ''),
-                packing_type: valueOrFallback(row.packing_type, product?.packing_type || ''),
-                avg_content: valueOrFallback(
-                    row.avg_content,
-                    packs > 0 ? (totalKgs / packs).toFixed(3) : valueOrFallback(product?.pack_nett_wt, 0)
-                )
-            };
-        });
+        ).map(row => normalizeInvoiceRow(row, { config: invoiceType, load }));
 
         return { header, details };
     };
@@ -960,7 +1050,7 @@ const InvoicePreparation = () => {
             {/* Dashboard View */}
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-2xl font-black uppercase tracking-tighter flex items-center gap-3"><FileText className="text-blue-600" /> Dashboard</h1>
-                <button onClick={() => { setFormData({ ...emptyInvoice, invoice_no: (listData.history.length + 1).toString() }); setGridRows([]); setIsModalOpen(true); }} className="bg-blue-600 text-white px-8 py-2 rounded-xl font-bold shadow-lg hover:bg-blue-700 transition-all uppercase text-xs flex items-center gap-2"><Plus size={18} /> New Invoice</button>
+                <button onClick={() => { setFormData({ ...emptyInvoice, invoice_no: (listData.history.length + 1).toString() }); setGridRows([]); setActiveTab('head'); setIsModalOpen(true); }} className="bg-blue-600 text-white px-8 py-2 rounded-xl font-bold shadow-lg hover:bg-blue-700 transition-all uppercase text-xs flex items-center gap-2"><Plus size={18} /> New Invoice</button>
             </div>
             {/* SEARCH FILTER BAR */}
             <div className="bg-white p-4 rounded-xl border border-slate-300 shadow-sm mb-4">
@@ -1053,6 +1143,7 @@ const InvoicePreparation = () => {
                                             )
                                         );
                                         setFormData(header);
+                                        setActiveTab('detail');
 
                                         setIsModalOpen(true);
 
@@ -1116,14 +1207,14 @@ const InvoicePreparation = () => {
                             <button onClick={() => setIsModalOpen(false)} className="text-white bg-red-500 hover:bg-red-600 px-2 rounded font-bold">×</button>
                         </div> */}
 
-                        <div className="bg-[#5A8DEE] p-3 text-white">
-                            <h2 className="text-base font-bold">Invoice</h2>
-                            <p className="text-[11px] opacity-90 uppercase font-bold tracking-widest">To Add, Modify Invoice details.</p>
+                        <div className="bg-[#2557A7] p-4 text-white">
+                            <h2 className="text-xl font-black">Invoice</h2>
+                            <p className="text-[13px] opacity-95 uppercase font-bold tracking-wide">To Add, Modify Invoice details.</p>
                         </div>
 
                         <div className="flex bg-[#D9E5F7] pt-2 px-4 gap-1">
                             {['head', 'detail'].map(t => (
-                                <button key={t} onClick={() => setActiveTab(t)} className={`px-5 py-1.5 text-xs font-bold border border-b-0 rounded-t-md transition-all ${activeTab === t ? 'bg-white text-blue-700 border-slate-400 shadow-sm' : 'bg-[#EBF2FA] text-slate-500 border-slate-300'}`}>
+                                <button key={t} onClick={() => setActiveTab(t)} className={`px-6 py-2 text-sm font-black border border-b-0 rounded-t-md transition-all ${activeTab === t ? 'bg-white text-blue-800 border-slate-500 shadow-sm' : 'bg-[#EBF2FA] text-slate-700 border-slate-300'}`}>
                                     {t.toUpperCase()}
                                 </button>
                             ))}
@@ -1166,13 +1257,13 @@ const InvoicePreparation = () => {
                                         />
                                         <RowSelect label="Party name" value={formData.party_id} options={listData.parties.map(p => ({ value: p.id, label: p.account_name }))} onChange={e => handleAccountSync(e.target.value)} />
                                         <div className="flex flex-col gap-1 ml-[120px]">
-                                            <input readOnly value={formData.addr1} className="border border-slate-300 p-1 text-[11px] bg-[#F5F8FA] font-bold outline-none" />
-                                            <input readOnly value={formData.addr2} className="border border-slate-300 p-1 text-[11px] bg-[#F5F8FA] font-bold outline-none" />
-                                            <input readOnly value={formData.addr3} className="border border-slate-300 p-1 text-[11px] bg-[#F5F8FA] font-bold outline-none" />
+                                            <input readOnly value={formData.addr1} className="border border-slate-400 p-2 text-[13px] bg-[#F5F8FA] font-bold outline-none text-center" />
+                                            <input readOnly value={formData.addr2} className="border border-slate-400 p-2 text-[13px] bg-[#F5F8FA] font-bold outline-none text-center" />
+                                            <input readOnly value={formData.addr3} className="border border-slate-400 p-2 text-[13px] bg-[#F5F8FA] font-bold outline-none text-center" />
                                         </div>
                                         <div className="flex items-center gap-8 ml-[120px] py-1">
-                                            <div className="flex items-center gap-2"><span className="text-[11px] font-bold text-slate-700">Credit days</span><input type="number" className="border border-slate-300 w-16 p-1 text-xs font-black" value={formData.credit_days} onChange={e => setFormData({ ...formData, credit_days: e.target.value })} /></div>
-                                            <div className="flex items-center gap-2"><span className="text-[11px] font-bold text-slate-700">Interest %</span><input type="number" className="border border-slate-300 w-16 p-1 text-xs font-black" value={formData.interest_percentage} onChange={e => setFormData({ ...formData, interest_percentage: e.target.value })} /></div>
+                                            <div className="flex items-center gap-2"><span className="text-[13px] font-black text-slate-800">Credit days</span><input type="number" className="border border-slate-400 w-20 p-2 text-sm text-center font-black" value={formData.credit_days} onChange={e => setFormData({ ...formData, credit_days: e.target.value })} /></div>
+                                            <div className="flex items-center gap-2"><span className="text-[13px] font-black text-slate-800">Interest %</span><input type="number" className="border border-slate-400 w-20 p-2 text-sm text-center font-black" value={formData.interest_percentage} onChange={e => setFormData({ ...formData, interest_percentage: e.target.value })} /></div>
                                         </div>
                                         <RowSelect
                                             label="Broker"
@@ -1209,8 +1300,8 @@ const InvoicePreparation = () => {
                                         <RowInput label="Sales Against" value={formData.sales_against} onChange={e => setFormData({ ...formData, sales_against: e.target.value })} color="bg-rose-50" />
                                         <RowInput label="EPCG No" value={formData.epcg_no} onChange={e => setFormData({ ...formData, epcg_no: e.target.value })} />
                                     </div>
-                                    <div className="col-span-4 bg-[#F5F8FA] border border-slate-300 p-4 flex flex-col gap-1 rounded shadow-inner">
-                                        <h3 className="text-xs font-black text-slate-500 mb-2 border-b border-slate-300 pb-1 uppercase tracking-tight">Invoice Summary</h3>
+                                    <div className="col-span-4 bg-[#F5F8FA] border border-slate-400 p-5 flex flex-col gap-1.5 rounded shadow-inner">
+                                        <h3 className="text-sm font-black text-slate-800 mb-2 border-b border-slate-400 pb-2 uppercase tracking-wide text-center">Invoice Summary</h3>
                                         <TotalRow label="Assessable Value" value={formData.total_assessable} />
                                         <TotalRow label="Charity" value={formData.total_charity} />
                                         <TotalRow label="VAT" value={formData.total_vat} />
@@ -1219,11 +1310,7 @@ const InvoicePreparation = () => {
                                         <TotalRow label="CESS" value={formData.total_cess} />
                                         <TotalRow label="H.S. CESS" value={formData.total_hr_sec_cess} />
 
-                                        {/* 🟢 This now shows the total tax amount (IGST or SGST+CGST combined) */}
-                                        <TotalRow label="GST (CGST + SGST)" value={formData.total_gst} />
-
-                                        <TotalRow label="SGST" value={formData.total_sgst} />
-                                        <TotalRow label="CGST" value={formData.total_cgst} />
+                                        <TotalRow label="GST" value={formData.total_gst} />
                                         <TotalRow label="IGST" value={formData.total_igst} />
 
                                         <TotalRow label="Freight" value={formData.freight_charges} />
@@ -1233,20 +1320,20 @@ const InvoicePreparation = () => {
                                             <TotalRow label="Gross Total" value={formData.sub_total} />
 
                                             {/* 🟢 TCS moved here to show it is part of the final deduction process */}
-                                            <div className="flex justify-between items-center text-[11px] py-0.5 px-1 bg-red-50 rounded">
+                                            <div className="flex justify-between items-center text-[13px] py-1 px-2 bg-red-50 rounded border border-red-200">
                                                 <span className="font-black text-red-600 uppercase tracking-tighter">(-) TCS</span>
                                                 <input
                                                     readOnly
                                                     value={num(formData.total_tcs).toLocaleString()}
-                                                    className="w-28 border border-red-200 text-right p-0.5 font-mono bg-white outline-none font-black text-red-600"
+                                                    className="w-32 border border-red-300 text-center p-1.5 font-mono bg-white outline-none font-black text-red-600"
                                                 />
                                             </div>
 
                                             <TotalRow label="Round off" value={formData.round_off} />
 
                                             <div className="flex justify-between items-center py-2 px-2 bg-white border border-slate-400 mt-2 shadow-sm">
-                                                <span className="text-[11px] font-black uppercase text-slate-700">Net Amount</span>
-                                                <span className="text-xl font-black font-mono text-blue-700">₹ {num(formData.net_amount).toLocaleString()}</span>
+                                                <span className="text-sm font-black uppercase text-slate-800">Net Amount</span>
+                                                <span className="text-2xl font-black font-mono text-blue-800">₹ {num(formData.net_amount).toLocaleString()}</span>
                                             </div>
                                         </div>
                                     </div>
@@ -1256,15 +1343,15 @@ const InvoicePreparation = () => {
                                 <div className="space-y-4 h-full flex flex-col overflow-hidden">
                                     <div className="bg-[#EBF2FA] p-3 border border-slate-300 flex items-center justify-between rounded shadow-sm">
                                         <div className="flex items-center gap-3">
-                                            <span className="text-[11px] font-black text-slate-700">Select with order No.</span>
-                                            <select className="border border-slate-300 text-xs p-1 min-w-[180px] font-black outline-none" onChange={handleOrderSync}>
+                                            <span className="text-[13px] font-black text-slate-800">Select with order No.</span>
+                                            <select className="border border-slate-400 text-sm p-2 min-w-[200px] font-black outline-none text-center bg-white" onChange={handleOrderSync}>
                                                 <option value="">-- Order No --</option>
                                                 {listData.orders.map(o => <option key={o.id} value={`WITH|${o.order_no}`}>{o.order_no}</option>)}
                                             </select>
                                         </div>
                                         <div className="flex items-center gap-3">
-                                            <span className="text-[11px] font-black text-slate-700">Select without order No.</span>
-                                            <select className="border border-slate-300 text-xs p-1 min-w-[180px] font-black outline-none" onChange={handleOrderSync}>
+                                            <span className="text-[13px] font-black text-slate-800">Select without order No.</span>
+                                            <select className="border border-slate-400 text-sm p-2 min-w-[200px] font-black outline-none text-center bg-white" onChange={handleOrderSync}>
                                                 <option value="">-- Direct Doc --</option>
                                                 {listData.directOrders.map(o => <option key={o.id} value={`WITHOUT|${o.order_no}`}>{o.order_no}</option>)}
                                             </select>
@@ -1272,75 +1359,67 @@ const InvoicePreparation = () => {
                                     </div>
 
                                     <div className="flex-1 border border-slate-300 overflow-x-auto bg-[#F5F8FA]">
-                                        <table className="min-w-[8000px] text-[11px] border-collapse bg-white">
-                                            <thead className="bg-[#F5F8FA] sticky top-0 z-10 border-b border-slate-300 text-slate-600">
-                                                {/* Row 1: Main Headers */}
-                                                <tr className="h-10">
+                                        <table className="min-w-[9800px] text-[13px] border-collapse bg-white">
+                                            <thead className="bg-blue-50 sticky top-0 z-10 border-b-2 border-slate-500 text-slate-900">
+                                                <tr className="h-12">
                                                     <th className="p-3 border-r w-10"></th>
-                                                    <th className="p-3 border-r w-32 text-left">Order No</th>
-                                                    <th className="p-3 border-r w-80 text-left">Product</th>
-                                                    <th className="p-3 border-r w-32 text-center">Packing Type</th>
+                                                    <th className="p-3 border-r w-32 text-center">OrderNo</th>
+                                                    <th className="p-3 border-r w-80 text-center">Product Description</th>
                                                     <th className="p-3 border-r w-24 text-center">Packs</th>
-                                                    <th className="p-3 border-r w-32 text-center">Avg. Content</th>
+                                                    <th className="p-3 border-r w-32 text-center">Packing Type</th>
                                                     <th className="p-3 border-r w-32 text-center">Total Kgs</th>
+                                                    <th className="p-3 border-r w-32 text-center">Avg Content</th>
                                                     <th className="p-3 border-r w-32 text-center">Rate</th>
+                                                    <th className="p-3 border-r w-24 text-center">Rate Per</th>
+                                                    <th className="p-3 border-r w-40 text-center">Identification Marks</th>
+                                                    <th className="p-3 border-r w-32 text-center">Assess Value</th>
+                                                    <th className="p-3 border-r w-28 text-center">Charity / Bale</th>
                                                     <th className="p-3 border-r w-32 text-center">Charity</th>
-
-                                                    {/* TAX HEADERS (Span 2 columns each) */}
-                                                    <th colSpan="2" className="border-r text-center bg-blue-50">GST</th>
-                                                    <th colSpan="2" className="border-r text-center bg-slate-50">SGST</th>
-                                                    <th colSpan="2" className="border-r text-center bg-blue-50">CGST</th>
-                                                    <th colSpan="2" className="border-r text-center bg-slate-50">IGST</th>
-                                                    <th colSpan="2" className="border-r text-center bg-blue-50">VAT</th>
-                                                    <th colSpan="2" className="border-r text-center bg-slate-50">CENVAT</th>
-                                                    <th colSpan="2" className="border-r text-center bg-blue-50">DUTY</th>
-                                                    <th colSpan="2" className="border-r text-center bg-slate-50">CESS</th>
-                                                    <th colSpan="2" className="border-r text-center bg-blue-50">H.CESS</th>
-                                                    <th colSpan="2" className="border-r text-center bg-slate-50">TCS</th>
-                                                    <th colSpan="2" className="border-r text-center bg-rose-50">Discount</th>
-
-                                                    <th className="p-3 border-r w-32 text-center">Other Amt</th>
+                                                    <th className="p-3 border-r w-24 text-center">GST%</th>
+                                                    <th className="p-3 border-r w-32 text-center">GST</th>
+                                                    <th className="p-3 border-r w-24 text-center">SGST%</th>
+                                                    <th className="p-3 border-r w-32 text-center">SGST</th>
+                                                    <th className="p-3 border-r w-24 text-center">CGST%</th>
+                                                    <th className="p-3 border-r w-32 text-center">CGST</th>
+                                                    <th className="p-3 border-r w-24 text-center">IGST%</th>
+                                                    <th className="p-3 border-r w-32 text-center">IGST</th>
+                                                    <th className="p-3 border-r w-24 text-center">Tax%</th>
+                                                    <th className="p-3 border-r w-32 text-center">Tax</th>
+                                                    <th className="p-3 border-r w-24 text-center">CENVAT%</th>
+                                                    <th className="p-3 border-r w-32 text-center">CENVAT</th>
+                                                    <th className="p-3 border-r w-24 text-center">Duty%</th>
+                                                    <th className="p-3 border-r w-32 text-center">Duty</th>
+                                                    <th className="p-3 border-r w-24 text-center">Cess%</th>
+                                                    <th className="p-3 border-r w-32 text-center">Cess</th>
                                                     <th className="p-3 border-r w-32 text-center">Freight</th>
-                                                    <th className="p-3 border-r w-40 text-center">ID Mark</th>
+                                                    <th className="p-3 border-r w-24 text-center">H.S.Cess%</th>
+                                                    <th className="p-3 border-r w-32 text-center">H.S.Cess</th>
+                                                    <th className="p-3 border-r w-24 text-center">TCS%</th>
+                                                    <th className="p-3 border-r w-32 text-center">TCS</th>
+                                                    <th className="p-3 border-r w-24 text-center">Others%</th>
+                                                    <th className="p-3 border-r w-32 text-center">Others</th>
+                                                    <th className="p-3 border-r w-32 text-center">Round Off</th>
+                                                    <th className="p-3 border-r w-32 text-center">Total Value</th>
+                                                    <th className="p-3 border-r w-36 text-center">Order Type</th>
+                                                    <th className="p-3 border-r w-28 text-center">Broker1 %</th>
+                                                    <th className="p-3 border-r w-28 text-center">Broker2 %</th>
+                                                    <th className="p-3 border-r w-28 text-center">From No</th>
+                                                    <th className="p-3 border-r w-28 text-center">To No</th>
+                                                    <th className="p-3 border-r w-28 text-center">Lot No</th>
+                                                    <th className="p-3 border-r w-32 text-center">BrokerCode1</th>
+                                                    <th className="p-3 border-r w-32 text-center">BrokerCode2</th>
+                                                    <th className="p-3 border-r w-28 text-center">Re Sale</th>
+                                                    <th className="p-3 border-r w-32 text-center">Conv To Hank</th>
+                                                    <th className="p-3 border-r w-32 text-center">Conv To Cone</th>
                                                     <th className="p-3 text-center w-24">Action</th>
                                                 </tr>
-                                                {/* Row 2: Sub-headers for % and Amt */}
-                                                <tr className="bg-slate-200 text-[9px] uppercase font-bold">
-                                                    <th colSpan="9"></th>
-                                                    {[...Array(11)].map((_, i) => (
-                                                        <React.Fragment key={i}>
-                                                            <th className="border-r p-1 w-16 text-blue-700">Percent %</th>
-                                                            <th className="border-r p-1 w-24 text-slate-600">Amount ₹</th>
-                                                        </React.Fragment>
-                                                    ))}
-                                                    <th colSpan="4"></th>
-                                                </tr>
                                             </thead>
-                                            <tbody className="divide-y divide-slate-200">
+                                            <tbody className="divide-y divide-slate-300">
                                                 {gridRows.map((r, i) => (
-                                                    <tr key={i} className="hover:bg-blue-50 font-black">
-                                                        {/* 1. Selector Icon (Fixed) */}
-                                                        <td className="p-2 border-r text-center text-slate-300">▶</td>
-
-                                                        {/* 2. Order No (Fixed) */}
-                                                        <td className="p-2 border-r text-blue-700 font-mono bg-slate-50">{r.order_no}</td>
-
-                                                        {/* 3. Product Description (Fixed) */}
-                                                        <td className="p-2 border-r uppercase text-slate-600 bg-slate-50">{r.product_description}</td>
-                                                        <td className="p-0 border-r w-32">
-                                                            <input
-                                                                type="text"
-                                                                className="w-full h-full p-2 text-center bg-white outline-none uppercase font-bold"
-                                                                value={r.packing_type}
-                                                                onChange={e => updateGrid(i, 'packing_type', e.target.value)}
-                                                            />
-                                                        </td>
-                                                        {/* <td className="p-0 border-r w-32">
-                <input type="text" className="w-full h-full p-2 text-center bg-white outline-none uppercase" 
-                       value={r.packing_type} onChange={e => updateGrid(i, 'packing_type', e.target.value)} />
-            </td> */}
-
-                                                        {/* 4. Packs (Editable) */}
+                                                    <tr key={i} className="h-12 hover:bg-blue-50 font-black text-slate-900">
+                                                        <td className="p-2 border-r text-center text-slate-300">›</td>
+                                                        <td className="p-2 border-r text-center text-blue-800 font-mono bg-slate-50">{r.order_no}</td>
+                                                        <td className="p-2 border-r text-center uppercase text-slate-800 bg-slate-50">{r.product_description}</td>
                                                         <td className="p-0 border-r w-24">
                                                             <input
                                                                 type="number"
@@ -1349,23 +1428,14 @@ const InvoicePreparation = () => {
                                                                 onChange={e => updateGrid(i, 'packs', e.target.value)}
                                                             />
                                                         </td>
-
                                                         <td className="p-0 border-r w-32">
-                                                            <input type="number" className="w-full h-full p-2 text-center bg-emerald-50 text-emerald-700 outline-none font-black"
-                                                                value={r.avg_content} readOnly />
+                                                            <input
+                                                                type="text"
+                                                                className="w-full h-full p-2 text-center bg-white outline-none uppercase font-bold"
+                                                                value={r.packing_type || ''}
+                                                                onChange={e => updateGrid(i, 'packing_type', e.target.value)}
+                                                            />
                                                         </td>
-
-                                                        {/* 5. Bag Weight / avg_content (Editable) - NEW */}
-                                                        {/* <td className="p-0 border-r w-24">
-                <input 
-                    type="number" 
-                    className="w-full h-full p-2 text-center bg-white outline-none focus:bg-yellow-50 font-black text-blue-600" 
-                    value={r.avg_content} 
-                    onChange={e => updateGrid(i, 'avg_content', e.target.value)} 
-                />
-            </td> */}
-
-                                                        {/* 6. Total Kgs (Editable / Auto-calculated) */}
                                                         <td className="p-0 border-r w-32">
                                                             <input
                                                                 type="number"
@@ -1374,8 +1444,10 @@ const InvoicePreparation = () => {
                                                                 onChange={e => updateGrid(i, 'total_kgs', e.target.value)}
                                                             />
                                                         </td>
-
-                                                        {/* 7. Rate (Editable) */}
+                                                        <td className="p-0 border-r w-32">
+                                                            <input type="number" className="w-full h-full p-2 text-center bg-emerald-50 text-emerald-700 outline-none font-black"
+                                                                value={r.avg_content || 0} readOnly />
+                                                        </td>
                                                         <td className="p-0 border-r w-32">
                                                             <input
                                                                 type="number"
@@ -1384,10 +1456,10 @@ const InvoicePreparation = () => {
                                                                 onChange={e => updateGrid(i, 'rate', e.target.value)}
                                                             />
                                                         </td>
-
-
-
-                                                        {/* 9. Charity (Editable) */}
+                                                        <td className="p-0 border-r w-24"><input type="text" className="w-full h-full p-2 text-center outline-none bg-white uppercase font-bold" value={r.rate_per || ''} onChange={e => updateGrid(i, 'rate_per', e.target.value)} /></td>
+                                                        <td className="p-1 border-r"><input type="text" className="w-full p-2 text-[13px] border border-slate-300 rounded font-black uppercase text-center" value={r.identification_mark || ''} onChange={e => updateGrid(i, 'identification_mark', e.target.value)} /></td>
+                                                        <td className="p-2 border-r text-center bg-blue-100 text-blue-800">{num(r.assessable_value).toFixed(2)}</td>
+                                                        <td className="p-0 border-r w-28"><input type="number" className="w-full h-full p-2 text-center outline-none bg-white font-black" value={r.charity_per_bale || 0} onChange={e => updateGrid(i, 'charity_per_bale', e.target.value)} /></td>
                                                         <td className="p-0 border-r w-32">
                                                             <input
                                                                 type="number"
@@ -1396,8 +1468,6 @@ const InvoicePreparation = () => {
                                                                 onChange={e => updateGrid(i, 'charity_amt', e.target.value)}
                                                             />
                                                         </td>
-
-                                                        {/* TAX PAIRS (Handled by helper) */}
                                                         {renderPairCell(r, i, 'gst_per', 'gst_amt', true, updateGrid)}
                                                         {renderPairCell(r, i, 'sgst_per', 'sgst_amt', true, updateGrid)}
                                                         {renderPairCell(r, i, 'cgst_per', 'cgst_amt', true, updateGrid)}
@@ -1406,16 +1476,23 @@ const InvoicePreparation = () => {
                                                         {renderPairCell(r, i, 'cenvat_per', 'cenvat_amt', true, updateGrid)}
                                                         {renderPairCell(r, i, 'duty_per', 'duty_amt', true, updateGrid)}
                                                         {renderPairCell(r, i, 'cess_per', 'cess_amt', true, updateGrid)}
+                                                        <td className="p-1 border-r"><input type="number" className="w-full p-2 text-center outline-none" value={r.freight_amt || 0} onChange={e => updateGrid(i, 'freight_amt', e.target.value)} /></td>
                                                         {renderPairCell(r, i, 'hcess_per', 'hr_sec_cess_amt', true, updateGrid)}
                                                         {renderPairCell(r, i, 'tcs_per', 'tcs_amt', true, updateGrid)}
-                                                        {renderPairCell(r, i, 'discount_percentage', 'discount_amt', true, updateGrid, "text-rose-600")}
-
-                                                        {/* Footer Row fields (Already Editable in your code) */}
-                                                        <td className="p-1 border-r"><input type="number" className="w-full p-2 text-center outline-none" value={r.other_amt} onChange={e => updateGrid(i, 'other_amt', e.target.value)} /></td>
-                                                        <td className="p-1 border-r"><input type="number" className="w-full p-2 text-center outline-none" value={r.freight_amt} onChange={e => updateGrid(i, 'freight_amt', e.target.value)} /></td>
-                                                        <td className="p-1 border-r"><input type="text" className="w-full p-2 text-xs border rounded font-black uppercase text-center" value={r.identification_mark} onChange={e => updateGrid(i, 'identification_mark', e.target.value)} /></td>
-
-                                                        {/* Action Button */}
+                                                        {renderPairCell(r, i, 'other_per', 'other_amt', true, updateGrid, "text-slate-700", true)}
+                                                        <td className="p-1 border-r"><input type="number" className="w-full p-2 text-center outline-none" value={r.rounded_off || 0} onChange={e => updateGrid(i, 'rounded_off', e.target.value)} /></td>
+                                                        <td className="p-2 border-r text-center bg-emerald-50 text-emerald-800">{num(r.final_value).toFixed(2)}</td>
+                                                        <td className="p-2 border-r text-center bg-slate-50">{r.order_type}</td>
+                                                        <td className="p-1 border-r"><input type="number" className="w-full p-2 text-center outline-none" value={r.broker_percentage || 0} onChange={e => updateGrid(i, 'broker_percentage', e.target.value)} /></td>
+                                                        <td className="p-1 border-r"><input type="number" className="w-full p-2 text-center outline-none" value={r.broker_percentage2 || 0} onChange={e => updateGrid(i, 'broker_percentage2', e.target.value)} /></td>
+                                                        <td className="p-1 border-r"><input type="text" className="w-full p-2 text-center outline-none uppercase" value={r.from_no || ''} onChange={e => updateGrid(i, 'from_no', e.target.value)} /></td>
+                                                        <td className="p-1 border-r"><input type="text" className="w-full p-2 text-center outline-none uppercase" value={r.to_no || ''} onChange={e => updateGrid(i, 'to_no', e.target.value)} /></td>
+                                                        <td className="p-1 border-r"><input type="text" className="w-full p-2 text-center outline-none uppercase" value={r.lot_no || ''} onChange={e => updateGrid(i, 'lot_no', e.target.value)} /></td>
+                                                        <td className="p-1 border-r"><input type="text" className="w-full p-2 text-center outline-none uppercase" value={r.broker_code1 || r.broker_code || ''} onChange={e => updateGrid(i, 'broker_code1', e.target.value)} /></td>
+                                                        <td className="p-1 border-r"><input type="text" className="w-full p-2 text-center outline-none uppercase" value={r.broker_code2 || ''} onChange={e => updateGrid(i, 'broker_code2', e.target.value)} /></td>
+                                                        <td className="p-1 border-r"><input type="number" className="w-full p-2 text-center outline-none" value={r.resale || 0} onChange={e => updateGrid(i, 'resale', e.target.value)} /></td>
+                                                        <td className="p-1 border-r"><input type="number" className="w-full p-2 text-center outline-none" value={r.convert_to_hank || 0} onChange={e => updateGrid(i, 'convert_to_hank', e.target.value)} /></td>
+                                                        <td className="p-1 border-r"><input type="number" className="w-full p-2 text-center outline-none" value={r.convert_to_cone || 0} onChange={e => updateGrid(i, 'convert_to_cone', e.target.value)} /></td>
                                                         <td className="p-2 text-center">
                                                             <button onClick={() => setGridRows(gridRows.filter((_, idx) => idx !== i))}>
                                                                 <MinusCircle size={22} className="text-red-500 hover:scale-110 transition-transform" />
@@ -1530,15 +1607,15 @@ const InvoicePreparation = () => {
 // ==========================================
 const RowInput = ({ label, width = "w-full", color = "bg-white", ...props }) => (
     <div className="flex items-center">
-        <label className="w-[120px] text-[11px] font-black text-slate-700">{label}</label>
-        <input {...props} className={`border border-slate-300 p-1 text-[11px] font-black outline-none focus:border-blue-500 shadow-inner ${width} ${color}`} />
+        <label className="w-[120px] text-[13px] font-black text-slate-800">{label}</label>
+        <input {...props} className={`border border-slate-400 p-2 text-[13px] text-center font-black outline-none focus:border-blue-600 shadow-inner ${width} ${color}`} />
     </div>
 );
 
 const RowSelect = ({ label, options, width = "w-full", ...props }) => (
     <div className="flex items-center">
-        <label className="w-[120px] text-[11px] font-black text-slate-700">{label}</label>
-        <select {...props} className={`border border-slate-300 p-1 text-[11px] font-black outline-none focus:border-blue-500 ${width}`}>
+        <label className="w-[120px] text-[13px] font-black text-slate-800">{label}</label>
+        <select {...props} className={`border border-slate-400 p-2 text-[13px] text-center font-black outline-none focus:border-blue-600 bg-white ${width}`}>
             <option value="">-- Select --</option>
             {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
@@ -1555,39 +1632,49 @@ const TotalRow = ({ label, value }) => {
             });
 
     return (
-        <div className="flex justify-between items-center text-[11px] py-0.5 px-1 hover:bg-white rounded">
-            <span className="font-black text-slate-500 uppercase tracking-tighter">
+        <div className="flex justify-between items-center text-[13px] py-1 px-2 hover:bg-white rounded">
+            <span className="font-black text-slate-700 uppercase tracking-normal">
                 {label}
             </span>
             <input
                 readOnly
                 value={displayValue}
-                className="w-28 border border-slate-300 text-right p-0.5 font-mono bg-white outline-none font-black shadow-inner"
+                className="w-32 border border-slate-400 text-center p-1.5 font-mono bg-white outline-none font-black shadow-inner"
             />
         </div>
     );
 };
 
 const FooterBtn = ({ label, icon }) => (
-    <button className="bg-white border border-slate-400 px-3 py-1.5 text-[10px] font-black flex items-center gap-1.5 hover:bg-slate-50 shadow-sm transition-colors">
+    <button className="bg-white border border-slate-400 px-3 py-2 text-[12px] font-black flex items-center gap-1.5 hover:bg-slate-50 shadow-sm transition-colors">
         <span className="text-blue-700">{icon}</span> {label}
     </button>
 );
 
-const renderPairCell = (row, idx, perKey, amtKey, isEditable, updateGrid, color = "text-blue-600") => (
+const renderPairCell = (row, idx, perKey, amtKey, isEditable, updateGrid, color = "text-blue-600", amtEditable = false) => (
     <>
         <td className="p-1 border-r bg-white">
             <input
                 type="number"
                 step="0.01"
                 disabled={!isEditable}
-                className={`w-full p-2 text-center font-bold border-none outline-none focus:bg-yellow-50 ${color} disabled:bg-slate-50`}
+                className={`w-full p-2.5 text-center text-[13px] font-black border-none outline-none focus:bg-yellow-50 ${color} disabled:bg-slate-50`}
                 value={row[perKey] || 0}
                 onChange={(e) => updateGrid(idx, perKey, e.target.value)}
             />
         </td>
-        <td className={`p-2 border-r text-right font-black bg-slate-50 ${color}`}>
-            {num(row[amtKey]).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        <td className={`p-1 border-r text-center font-black bg-slate-50 ${color}`}>
+            {amtEditable ? (
+                <input
+                    type="number"
+                    step="0.01"
+                    className={`w-full p-2.5 text-center text-[13px] font-black border-none outline-none focus:bg-yellow-50 bg-white ${color}`}
+                    value={row[amtKey] || 0}
+                    onChange={(e) => updateGrid(idx, amtKey, e.target.value)}
+                />
+            ) : (
+                num(row[amtKey]).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+            )}
         </td>
     </>
 );

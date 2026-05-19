@@ -97,7 +97,7 @@ const sanitizeData = (data) => {
     ];
 
    const numericFields = [
-        'packs', 'total_kgs', 'avg_content', 'rate', 'broker_percentage',
+        'packs', 'total_kgs', 'avg_content', 'rate', 'broker_percentage', 'broker_percentage2',
         'qty', 'bag_wt', 'rate_cr', 'rate_imm', 'rate_per_val',
         'opening_credit', 'opening_debit', 'weight_per_bag', 'freight_charges',
         'round_off_digits', // Added
@@ -114,7 +114,11 @@ const sanitizeData = (data) => {
         'cst_percentage',   // Added
         'cenvat_percentage',
         'gst_per', 'sgst_per', 'cgst_per', 'igst_per',
+        'vat_per', 'cenvat_per', 'duty_per', 'cess_per', 'hcess_per', 'tcs_per', 'other_per',
         'gst_amt', 'sgst_amt', 'cgst_amt', 'igst_amt',
+        'vat_amt', 'cenvat_amt', 'duty_amt', 'cess_amt', 'hr_sec_cess_amt', 'tcs_amt',
+        'assessable_value', 'charity_per_bale', 'charity_amt', 'other_amt', 'freight_amt',
+        'resale', 'convert_to_hank', 'convert_to_cone', 'rounded_off', 'sub_total', 'final_value',
         'total_gst', 'total_sgst', 'total_cgst', 'total_igst'
     ];
 
@@ -219,6 +223,11 @@ const calculateInvoiceBreakdown = ({ Details = [], config, freight_charges, sale
     const cgstPercentage = num(config?.cgst_percentage);
     const igstPercentage = num(config?.igst_percentage);
     const charityPercentage = num(config?.charity_value);
+    const cenvatPercentage = num(config?.cenvat_percentage);
+    const dutyPercentage = num(config?.duty_percentage);
+    const cessPercentage = num(config?.cess_percentage);
+    const hcessPercentage = num(config?.hr_sec_cess_percentage);
+    const tcsPercentage = num(config?.tcs_percentage);
     const taxPercentage =
         igstPercentage > 0
             ? igstPercentage
@@ -237,6 +246,13 @@ const calculateInvoiceBreakdown = ({ Details = [], config, freight_charges, sale
         sgst: 0,
         cgst: 0,
         igst: 0,
+        vat: 0,
+        cenvat: 0,
+        duty: 0,
+        cess: 0,
+        hcess: 0,
+        tcs: 0,
+        other: 0,
         net: 0
     };
 
@@ -246,9 +262,12 @@ const calculateInvoiceBreakdown = ({ Details = [], config, freight_charges, sale
         const rateAfterTax = num(item.rate);
         const rowFreight = packs * freightPerBag;
         const totalInvoiceAmount = 10 * packs * rateAfterTax;
+        const charityPerBale = isGstSale
+            ? num(item.charity_per_bale || 3)
+            : num(item.charity_per_bale || charityPercentage);
         const charity = isGstSale
-            ? totalKgs * 3
-            : (totalInvoiceAmount * charityPercentage) / 100;
+            ? totalKgs * charityPerBale
+            : (totalInvoiceAmount * charityPerBale) / 100;
         const adjustedAmount = totalInvoiceAmount - rowFreight - charity;
         const baseAmount = divisor > 0 ? (adjustedAmount / divisor) * 100 : adjustedAmount;
         const gstAmount = (baseAmount * taxPercentage) / 100;
@@ -257,6 +276,21 @@ const calculateInvoiceBreakdown = ({ Details = [], config, freight_charges, sale
         const rowCgst = cgstPercentage > 0 ? gstAmount / 2 : 0;
         const rowIgst = igstPercentage > 0 ? gstAmount : 0;
         const rowGst = gstPercentage > 0 ? gstAmount : 0;
+        const rowVatPer = num(item.vat_per);
+        const rowCenvatPer = num(item.cenvat_per || cenvatPercentage);
+        const rowDutyPer = num(item.duty_per || dutyPercentage);
+        const rowCessPer = num(item.cess_per || cessPercentage);
+        const rowHcessPer = num(item.hcess_per || hcessPercentage);
+        const rowTcsPer = num(item.tcs_per || tcsPercentage);
+        const rowOtherAmt = num(item.other_per) > 0
+            ? (assessableValue * num(item.other_per)) / 100
+            : num(item.other_amt);
+        const rowVat = (assessableValue * rowVatPer) / 100;
+        const rowCenvat = (assessableValue * rowCenvatPer) / 100;
+        const rowDuty = (assessableValue * rowDutyPer) / 100;
+        const rowCess = (assessableValue * rowCessPer) / 100;
+        const rowHcess = (assessableValue * rowHcessPer) / 100;
+        const rowTcs = (totalInvoiceAmount * rowTcsPer) / 100;
 
         totals.assess += assessableValue;
         totals.charity += charity;
@@ -265,10 +299,20 @@ const calculateInvoiceBreakdown = ({ Details = [], config, freight_charges, sale
         totals.sgst += rowSgst;
         totals.cgst += rowCgst;
         totals.igst += rowIgst;
+        totals.vat += rowVat;
+        totals.cenvat += rowCenvat;
+        totals.duty += rowDuty;
+        totals.cess += rowCess;
+        totals.hcess += rowHcess;
+        totals.tcs += rowTcs;
+        totals.other += rowOtherAmt;
         totals.net += totalInvoiceAmount;
 
         return {
             ...sanitizeData(item),
+            broker_code: item.broker_code || item.broker_code1 || '',
+            broker_code1: item.broker_code1 || item.broker_code || '',
+            charity_per_bale: charityPerBale,
             charity_amt: charity,
             freight_amt: rowFreight,
             assessable_value: assessableValue,
@@ -280,6 +324,19 @@ const calculateInvoiceBreakdown = ({ Details = [], config, freight_charges, sale
             cgst_amt: rowCgst,
             igst_per: igstPercentage,
             igst_amt: rowIgst,
+            vat_per: rowVatPer,
+            vat_amt: rowVat,
+            cenvat_per: rowCenvatPer,
+            cenvat_amt: rowCenvat,
+            duty_per: rowDutyPer,
+            duty_amt: rowDuty,
+            cess_per: rowCessPer,
+            cess_amt: rowCess,
+            hcess_per: rowHcessPer,
+            hr_sec_cess_amt: rowHcess,
+            tcs_per: rowTcsPer,
+            tcs_amt: rowTcs,
+            other_amt: rowOtherAmt,
             final_value: totalInvoiceAmount
         };
     });
@@ -313,6 +370,13 @@ invoiceCtrl.create = async (req, res) => {
             total_sgst: totals.sgst,
             total_cgst: totals.cgst,
             total_igst: totals.igst,
+            total_vat: totals.vat,
+            total_cenvat: totals.cenvat,
+            total_duty: totals.duty,
+            total_cess: totals.cess,
+            total_hr_sec_cess: totals.hcess,
+            total_tcs: totals.tcs,
+            total_other: totals.other,
             sub_total: totals.net,
             round_off: Math.ceil(totals.net) - totals.net,
             net_amount: Math.ceil(totals.net)
@@ -375,6 +439,13 @@ invoiceCtrl.update = async (req, res) => {
             total_sgst: totals.sgst,
             total_cgst: totals.cgst,
             total_igst: totals.igst,
+            total_vat: totals.vat,
+            total_cenvat: totals.cenvat,
+            total_duty: totals.duty,
+            total_cess: totals.cess,
+            total_hr_sec_cess: totals.hcess,
+            total_tcs: totals.tcs,
+            total_other: totals.other,
             sub_total: totals.net,
             round_off: Math.ceil(totals.net) - totals.net,
             net_amount: Math.ceil(totals.net)

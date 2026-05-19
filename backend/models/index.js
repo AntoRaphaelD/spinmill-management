@@ -505,7 +505,20 @@ const InvoiceDetail = sequelize.define('InvoiceDetail', {
     type: DataTypes.STRING
   },
 
+  broker_code1: {
+    type: DataTypes.STRING
+  },
+
+  broker_code2: {
+    type: DataTypes.STRING
+  },
+
   broker_percentage: {
+    type: DataTypes.DECIMAL(10, 2),
+    defaultValue: 0
+  },
+
+  broker_percentage2: {
     type: DataTypes.DECIMAL(10, 2),
     defaultValue: 0
   },
@@ -558,6 +571,10 @@ const InvoiceDetail = sequelize.define('InvoiceDetail', {
     type: DataTypes.STRING
   },
 
+  lot_no: {
+    type: DataTypes.STRING
+  },
+
   resale: {
     type: DataTypes.DECIMAL(12, 2),
     defaultValue: 0
@@ -569,13 +586,14 @@ const InvoiceDetail = sequelize.define('InvoiceDetail', {
   },
 
   convert_to_cone: {
-    type: DataTypes.BOOLEAN,
-    defaultValue: false
+    type: DataTypes.DECIMAL(12, 2),
+    defaultValue: 0
   },
   // =============================
   // CALCULATED VALUES
   // =============================
   assessable_value: { type: DataTypes.DECIMAL(15, 2), defaultValue: 0 },
+  charity_per_bale: { type: DataTypes.DECIMAL(10, 2), defaultValue: 0 },
   charity_amt: { type: DataTypes.DECIMAL(15, 2), defaultValue: 0 },
 
   vat_amt: { type: DataTypes.DECIMAL(15, 2), defaultValue: 0 },
@@ -592,6 +610,7 @@ const InvoiceDetail = sequelize.define('InvoiceDetail', {
   tcs_amt: { type: DataTypes.DECIMAL(15, 2), defaultValue: 0 },
   discount_percentage: { type: DataTypes.DECIMAL(10, 2), defaultValue: 0 },
   discount_amt: { type: DataTypes.DECIMAL(15, 2), defaultValue: 0 },
+  other_per: { type: DataTypes.DECIMAL(10, 2), defaultValue: 0 },
   other_amt: { type: DataTypes.DECIMAL(15, 2), defaultValue: 0 },
 
   freight_amt: { type: DataTypes.DECIMAL(15, 2), defaultValue: 0 },
