@@ -8,6 +8,12 @@
     "dev": "nodemon server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
+  "nodemonConfig": {
+    "ignore": [
+      "backups/*",
+      "*.log"
+    ]
+  },
   "keywords": [],
   "author": "",
   "license": "ISC",
@@ -19,6 +25,7 @@
     "express": "^4.22.1",
     "mathjs": "^15.1.1",
     "mysql2": "^3.16.0",
+    "nodemailer": "^8.0.7",
     "nodemon": "^3.1.11",
     "sequelize": "^6.37.7"
   }

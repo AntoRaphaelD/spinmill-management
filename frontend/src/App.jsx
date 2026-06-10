@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -6,8 +6,10 @@ import {
   Truck, Factory, FileText, Users, Package, MapPin, 
   CheckSquare, ShoppingBag, Landmark, ArrowLeftRight, 
   BarChart3, ClipboardCheck, Box, Zap, ShieldCheck, 
-  MonitorDot, Cpu, HardDrive, Globe, Activity, Layers
+  MonitorDot, Cpu, HardDrive, Globe, Activity, Layers, LogOut
 } from 'lucide-react';
+import LoginScreen from './components/LoginScreen';
+import { authAPI, setAuthToken } from './service/api';
 
 // --- Master Components ---
 import AccountMaster from './components/AccountMaster';
@@ -34,6 +36,7 @@ import DepotStorage from './components/DepotStorage';
 
 // --- Reports ---
 import ReportsDashboard from './components/ReportsDashboard';
+import SystemMaintenance from './components/SystemMaintenance';
 
 /**
  * ANIMATED HOME SCREEN
@@ -102,64 +105,260 @@ const SidebarLink = ({ to, label, icon: Icon, colorClass }) => {
   const active = loc.pathname === to;
   
   return (
-    <Link to={to} className="relative group block">
-      <div className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-300 relative z-10
-        ${active ? 'text-white' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'}`}
+    <Link to={to} className="relative group block outline-none">
+      <motion.div
+        whileHover={{ x: active ? 0 : 5 }}
+        whileTap={{ scale: 0.98 }}
+        className={`flex items-center gap-3 px-3.5 py-3 rounded-xl transition-colors duration-300 relative z-10 overflow-hidden
+        ${active ? 'text-white' : 'text-slate-700 hover:text-slate-950'}`}
       >
-        <Icon size={18} className={`${active ? 'text-white' : colorClass} transition-transform group-hover:scale-110`} />
-        <span className="text-sm font-bold uppercase tracking-tight">{label}</span>
+        {!active && (
+          <div className="absolute inset-0 bg-slate-50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 -z-20" />
+        )}
         {active && (
           <motion.div 
             layoutId="sidebar-active"
-            className="absolute inset-0 bg-blue-600 rounded-xl -z-10 shadow-lg shadow-blue-200"
-            transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+            className="absolute inset-0 bg-slate-950 rounded-xl -z-10 shadow-lg shadow-slate-200"
+            transition={{ type: "spring", bounce: 0.18, duration: 0.55 }}
           />
         )}
-      </div>
+        {active && (
+          <motion.div
+            layoutId="sidebar-active-edge"
+            className="absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-blue-400"
+            transition={{ type: "spring", bounce: 0.2, duration: 0.55 }}
+          />
+        )}
+        <span className={`h-9 w-9 rounded-lg flex items-center justify-center transition-all duration-300
+          ${active ? 'bg-white/15 text-white shadow-inner' : `bg-white border border-slate-100 ${colorClass} group-hover:border-slate-200 group-hover:shadow-sm`}`}
+        >
+          <Icon size={19} className="transition-transform duration-300 group-hover:scale-110" />
+        </span>
+        <span className="min-w-0 flex-1 text-[14px] font-black uppercase tracking-normal truncate">{label}</span>
+        <ChevronRight size={14} className={`transition-all duration-300 ${active ? 'opacity-100 translate-x-0 text-blue-200' : 'opacity-0 -translate-x-2 text-slate-300 group-hover:opacity-100 group-hover:translate-x-0'}`} />
+        <span className={`absolute right-3 top-1/2 h-1.5 w-1.5 -translate-y-1/2 rounded-full transition-opacity ${active ? 'opacity-0' : 'opacity-0 group-hover:opacity-100'} ${colorClass.replace('text-', 'bg-')}`} />
+      </motion.div>
     </Link>
+  );
+};
+
+const SidebarPulse = () => (
+  <div className="flex items-end gap-1 h-5">
+    {[0, 1, 2].map((item) => (
+      <motion.span
+        key={item}
+        animate={{ height: [6, 18, 8, 14, 6] }}
+        transition={{ duration: 1.8, repeat: Infinity, delay: item * 0.18, ease: "easeInOut" }}
+        className="w-1 rounded-full bg-blue-400"
+      />
+    ))}
+  </div>
+);
+
+const SidebarMetric = ({ label, value, tone = "blue" }) => {
+  const toneClass = {
+    blue: "bg-blue-500",
+    rose: "bg-rose-500",
+    emerald: "bg-emerald-500",
+    slate: "bg-slate-500"
+  }[tone];
+
+  return (
+    <div className="min-w-0">
+      <div className="flex items-center justify-between text-[10px] font-black uppercase text-slate-500">
+        <span>{label}</span>
+        <span className="text-slate-700">{value}%</span>
+      </div>
+      <div className="mt-1 h-1.5 rounded-full bg-slate-100 overflow-hidden">
+        <motion.div
+          initial={{ width: 0 }}
+          animate={{ width: `${value}%` }}
+          transition={{ duration: 0.9, ease: "easeOut" }}
+          className={`h-full rounded-full ${toneClass}`}
+        />
+      </div>
+    </div>
   );
 };
 
 /**
  * SIDEBAR SECTION WRAPPER
  */
-const SidebarSection = ({ title, children }) => (
-  <div className="mb-6 px-4">
-    <h5 className="text-[9px] font-black text-slate-400 uppercase tracking-[0.3em] mb-3 px-2 flex items-center gap-2">
-      <div className="h-px flex-1 bg-slate-100"></div>
-      {title}
-      <div className="h-px flex-1 bg-slate-100"></div>
-    </h5>
-    <div className="space-y-1">{children}</div>
-  </div>
-);
+const SidebarSection = ({ title, children, tone = "blue" }) => {
+  const [open, setOpen] = useState(true);
+  const toneClass = {
+    blue: "bg-blue-500",
+    rose: "bg-rose-500",
+    emerald: "bg-emerald-500",
+    slate: "bg-slate-500"
+  }[tone];
+
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 14 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="mb-4 px-4"
+    >
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        className="w-full mb-2 px-2 py-2.5 flex items-center gap-2 text-left rounded-lg hover:bg-slate-50 transition-colors"
+      >
+        <span className={`h-2 w-2 rounded-full ${toneClass}`} />
+        <span className="flex-1 text-[11px] font-black text-slate-600 uppercase tracking-[0.16em]">{title}</span>
+        <motion.span animate={{ rotate: open ? 90 : 0 }} transition={{ duration: 0.2 }} className="text-slate-300">
+          <ChevronRight size={16} />
+        </motion.span>
+      </button>
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.24, ease: "easeInOut" }}
+            className="overflow-hidden"
+          >
+            <motion.div
+              initial="hidden"
+              animate="visible"
+              variants={{ visible: { transition: { staggerChildren: 0.035 } } }}
+              className="space-y-1"
+            >
+              {React.Children.map(children, (child) => (
+                <motion.div variants={{ hidden: { opacity: 0, x: -8 }, visible: { opacity: 1, x: 0 } }}>
+                  {child}
+                </motion.div>
+              ))}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
+};
 
 /**
  * MAIN APP
  */
 export default function App() {
+  const [auth, setAuth] = useState(() => {
+    const token = localStorage.getItem('kayaar-auth-token');
+    const user = localStorage.getItem('kayaar-auth-user');
+
+    if (!token || !user) return null;
+
+    try {
+      setAuthToken(token);
+      return { token, user: JSON.parse(user) };
+    } catch {
+      localStorage.removeItem('kayaar-auth-token');
+      localStorage.removeItem('kayaar-auth-user');
+      return null;
+    }
+  });
+  const [checkingSession, setCheckingSession] = useState(Boolean(auth?.token));
+
+  useEffect(() => {
+    if (!auth?.token) {
+      setCheckingSession(false);
+      return;
+    }
+
+    setAuthToken(auth.token);
+    authAPI.me()
+      .then((response) => {
+        const nextAuth = { token: auth.token, user: response.data.user };
+        setAuth(nextAuth);
+        localStorage.setItem('kayaar-auth-user', JSON.stringify(response.data.user));
+      })
+      .catch(() => {
+        setAuth(null);
+        setAuthToken(null);
+        localStorage.removeItem('kayaar-auth-token');
+        localStorage.removeItem('kayaar-auth-user');
+      })
+      .finally(() => setCheckingSession(false));
+  }, [auth?.token]);
+
+  const handleAuthenticated = ({ token, user }) => {
+    setAuthToken(token);
+    localStorage.setItem('kayaar-auth-token', token);
+    localStorage.setItem('kayaar-auth-user', JSON.stringify(user));
+    setAuth({ token, user });
+  };
+
+  const handleLogout = async () => {
+    try {
+      await authAPI.logout();
+    } catch {
+      // Clear local auth even if the backend is unavailable.
+    }
+
+    setAuth(null);
+    setAuthToken(null);
+    localStorage.removeItem('kayaar-auth-token');
+    localStorage.removeItem('kayaar-auth-user');
+  };
+
+  if (checkingSession) {
+    return (
+      <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center font-sans">
+        <div className="text-[10px] font-black uppercase tracking-[0.35em] text-slate-400">Checking Session</div>
+      </div>
+    );
+  }
+
   return (
     <Router>
+      {!auth ? (
+        <LoginScreen onAuthenticated={handleAuthenticated} />
+      ) : (
+      <>
       <div className="flex h-screen bg-[#F8FAFC] overflow-hidden font-sans text-slate-900">
         
         {/* --- LEGENDARY SIDEBAR --- */}
-        <aside className="w-72 bg-white border-r border-slate-200 flex flex-col z-30 shadow-sm">
+        <motion.aside
+          initial={{ x: -24, opacity: 0 }}
+          animate={{ x: 0, opacity: 1 }}
+          transition={{ duration: 0.45, ease: "easeOut" }}
+          className="w-72 bg-white border-r border-slate-200 flex flex-col z-30 shadow-xl shadow-slate-200/40 relative overflow-hidden"
+        >
+          <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-slate-50 to-transparent pointer-events-none" />
+          <div className="absolute left-0 top-0 bottom-0 w-px bg-gradient-to-b from-blue-500 via-emerald-400 to-rose-500 opacity-70" />
           {/* Logo */}
-          <div className="p-8">
+          <div className="relative p-6">
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 bg-slate-900 rounded-xl flex items-center justify-center shadow-lg">
+              <motion.div
+                whileHover={{ rotate: -8, scale: 1.05 }}
+                className="h-11 w-11 bg-slate-950 rounded-xl flex items-center justify-center shadow-lg shadow-slate-300"
+              >
                 <Layers className="text-blue-400" size={20} />
-              </div>
-              <div>
+              </motion.div>
+              <div className="min-w-0">
                 <h1 className="text-lg font-black uppercase tracking-tighter leading-tight">Kayaar</h1>
                 <p className="text-[9px] font-bold text-blue-600 uppercase tracking-[0.3em]">Core System</p>
               </div>
+              <div className="ml-auto">
+                <SidebarPulse />
+              </div>
             </div>
+            {/* <div className="mt-5 grid grid-cols-2 gap-3"> */}
+              {/* <div className="rounded-lg border border-slate-100 bg-white/80 px-3 py-2 shadow-sm">
+                <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">Mode</p>
+                <p className="text-[13px] font-black uppercase text-slate-900">Secure</p>
+              </div>
+              <div className="rounded-lg border border-slate-100 bg-white/80 px-3 py-2 shadow-sm">
+                <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">Node</p>
+                <p className="text-[13px] font-black uppercase text-emerald-700">Live</p>
+              </div> */}
+            {/* </div> */}
           </div>
 
           {/* Navigation - ALL FIELDS INCLUDED */}
-          <nav className="flex-1 overflow-y-auto custom-scrollbar pb-10">
-            <SidebarSection title="Masters">
+          <nav className="relative flex-1 overflow-y-auto custom-scrollbar pb-4">
+            <SidebarSection title="Masters" tone="blue">
               <SidebarLink to="/accounts" label="Accounts" icon={Users} colorClass="text-blue-500" />
               <SidebarLink to="/product" label="Product Master" icon={Package} colorClass="text-blue-500" />
               <SidebarLink to="/tariff" label="Tariff Sub Head" icon={FileText} colorClass="text-blue-500" />
@@ -169,7 +368,7 @@ export default function App() {
               <SidebarLink to="/packing" label="Packing Types" icon={Box} colorClass="text-blue-500" />
             </SidebarSection>
 
-              <SidebarSection title="Factory Operations">
+              <SidebarSection title="Factory Operations" tone="rose">
                 <SidebarLink to="/order-with" label="Sales With Order" icon={ClipboardCheck} colorClass="text-rose-500" />
                 <SidebarLink to="/order-without" label="Sales WithOut Order" icon={Zap} colorClass="text-rose-500" />
                 <SidebarLink to="/production" label="RG1 Production" icon={Factory} colorClass="text-rose-500" />
@@ -178,29 +377,47 @@ export default function App() {
                 {/* <SidebarLink to="/invoice-approval" label="Approvals" icon={CheckSquare} colorClass="text-rose-500" /> */}
               </SidebarSection>
 
-              <SidebarSection title="Depot Management">
+              <SidebarSection title="Depot Management" tone="emerald">
                 <SidebarLink to="/depot-sales" label="Depot Sales" icon={ShoppingBag} colorClass="text-emerald-500" />
                 <SidebarLink to="/depot-received" label="Stock Inward" icon={Landmark} colorClass="text-emerald-500" />
                 <SidebarLink to="/depot-transfer" label="Inter-Transfer" icon={ArrowLeftRight} colorClass="text-emerald-500" />
                 <SidebarLink to="/depot-inventory" label="Live Inventory" icon={Box} colorClass="text-emerald-500" />
               </SidebarSection>
 
-            <SidebarSection title="Intelligence">
+            <SidebarSection title="Intelligence" tone="slate">
               <SidebarLink to="/reports" label="Analytics" icon={BarChart3} colorClass="text-slate-500" />
+              <SidebarLink to="/system" label="System Logs" icon={HardDrive} colorClass="text-slate-500" />
             </SidebarSection>
           </nav>
 
           {/* User Profile */}
-          <div className="p-4 bg-slate-50 m-4 rounded-2xl border border-slate-100">
-             <div className="flex items-center gap-3">
-               <div className="h-8 w-8 rounded-lg bg-white flex items-center justify-center shadow-sm text-[10px] font-black">AD</div>
-               <div>
-                 <p className="text-[10px] font-black uppercase">Administrator</p>
-                 <p className="text-[8px] text-emerald-500 font-bold uppercase animate-pulse">● System Online</p>
+          <div className="relative m-4 rounded-xl border border-slate-200 bg-slate-50/90 p-4 shadow-sm">
+             {/* <div className="space-y-3">
+              <SidebarMetric label="Core" value={92} tone="blue" />
+              <SidebarMetric label="Backup" value={78} tone="emerald" />
+             </div> */}
+             <div className="mt-4 pt-4 border-t border-slate-200 flex items-center gap-3">
+               <motion.div
+                 whileHover={{ scale: 1.08 }}
+                 className="h-9 w-9 rounded-lg bg-white flex items-center justify-center shadow-sm text-[10px] font-black border border-slate-100"
+               >
+                 {auth.user.username.slice(0, 2).toUpperCase()}
+               </motion.div>
+               <div className="min-w-0">
+                 <p className="text-[13px] font-black uppercase text-slate-900">{auth.user.username}</p>
+                 <p className="text-[10px] text-emerald-700 font-bold uppercase animate-pulse">System Online</p>
                </div>
+               <button
+                 type="button"
+                 onClick={handleLogout}
+                 className="ml-auto h-8 w-8 rounded-lg bg-white text-slate-400 flex items-center justify-center shadow-sm hover:text-red-600 hover:shadow-md transition-all"
+                 title="Logout"
+               >
+                 <LogOut size={15} />
+               </button>
              </div>
           </div>
-        </aside>
+        </motion.aside>
 
         {/* --- MAIN VIEWPORT --- */}
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
@@ -246,6 +463,7 @@ export default function App() {
                   <Route path="/depot-transfer" element={<DepotTransfer />} />
                   <Route path="/depot-inventory" element={<DepotStorage />} />
                   <Route path="/reports" element={<ReportsDashboard />} />
+                  <Route path="/system" element={<SystemMaintenance />} />
                 </Routes>
               </PageTransition>
             </AnimatePresence>
@@ -267,6 +485,8 @@ export default function App() {
   .custom-scrollbar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
   .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #cbd5e1; }
 `}</style>
+      </>
+      )}
     </Router>
   );
 }

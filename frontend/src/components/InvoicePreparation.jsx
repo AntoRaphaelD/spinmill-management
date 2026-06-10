@@ -333,145 +333,206 @@ const InvoicePreparation = () => {
         const data = formData;
         const rows = gridRows;
         const pageWidth = doc.internal.pageSize.getWidth();
-        const margin = 15;
-        const getProduct = (pid) => listData.products.find(p => p.id === pid);
+        const pageHeight = doc.internal.pageSize.getHeight();
+        const left = 14;
+        const right = pageWidth - 14;
+        const top = 8;
+        const contentWidth = right - left;
+        const fmt = (v, digits = 2) => num(v).toLocaleString('en-IN', {
+            minimumFractionDigits: digits,
+            maximumFractionDigits: digits
+        });
+        const text = (value) => String(value || '');
+        const party = listData.parties.find(p => String(p.id) === String(data.party_id)) || data.Party || {};
+        const cgstPer = rows.find(r => num(r.cgst_per) > 0)?.cgst_per || 0;
+        const sgstPer = rows.find(r => num(r.sgst_per) > 0)?.sgst_per || 0;
+        const igstPer = rows.find(r => num(r.igst_per) > 0)?.igst_per || 0;
 
-        // Header
         doc.setTextColor(0);
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(26);
-        doc.text("TAX INVOICE", pageWidth / 2, 22, { align: "center" });
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(26);
-        doc.text("TAX INVOICE", pageWidth / 2, 22, { align: "center" });
-
-        doc.setFontSize(10);
-        const checkboxX = pageWidth - margin - 45;
-        let checkboxY = 14;
-
-        const drawCheckbox = (label) => {
-            doc.setDrawColor(0);
-            doc.rect(checkboxX, checkboxY - 3, 4, 4);
-            doc.setFontSize(9);
-            doc.text(label, checkboxX + 7, checkboxY);
-            checkboxY += 6;
-        };
-
-        drawCheckbox("ORIGINAL FOR BUYER");
-        drawCheckbox("DUPLICATE FOR TRANSPORTER");
-        drawCheckbox("TRIPLICATE FOR FILE COPY");
-        drawCheckbox("EXTRA COPY");
-
-        // Company Details
-        doc.setTextColor(0);
-        doc.setFontSize(12);
-        doc.text("KAYAAR EXPORTS PRIVATE LIMITED", margin, 48);
-        doc.setFontSize(9);
-        doc.text("D.No: 43/5, Railway Feeder Road", margin, 54);
-        doc.text("K.R. Nagar – 628503, Kovilpatti – Taluk", margin, 59);
-        doc.text("Tuticorin Dist, Tamilnadu, India", margin, 64);
-        doc.text("Phone: 04632 – 248258, 9443238761", margin, 69);
-        doc.text("Email: ttnkrgroup@gmail.com", margin, 74);
-        doc.text("GSTIN: 33AAACK4468M1ZA", margin, 79);
-
-        // PAN & CIN
-        doc.text("PAN: AAACK4468M", pageWidth - margin - 45, 52);
-        doc.text("CIN: U51101TN1991PTC020933", pageWidth - margin - 45, 57);
-
-        // OEKO-TEX
         doc.setDrawColor(0);
-        doc.rect(pageWidth - margin - 50, 65, 55, 18);
-        doc.setFontSize(8);
-        doc.text("OEKO-TEX Standard 100", pageWidth - margin - 45, 72);
-        doc.text("Tested for harmful substances", pageWidth - margin - 45, 77);
+        doc.setLineWidth(0.25);
+        doc.rect(left, top, contentWidth, pageHeight - 16);
 
-        // Party & Invoice Info
+        doc.setFont("helvetica", "bold");
         doc.setFontSize(10);
-        doc.text("Bill To:", margin, 95);
-        doc.text(data.Party?.account_name || "", margin, 102);
-        doc.text(data.addr1 || "", margin, 107);
-        doc.text(data.addr2 || "", margin, 112);
-        doc.text(data.addr3 || "", margin, 117);
+        doc.text("TAX INVOICE", pageWidth / 2, 28, { align: "center" });
 
-        doc.text("Invoice No :", pageWidth / 2, 95);
-        doc.text(`${data.invoice_no}`, pageWidth / 2 + 25, 95);
-        doc.text("Date :", pageWidth / 2, 102);
-        doc.text(data.date, pageWidth / 2 + 25, 102);
-        doc.text("E-Way Bill :", pageWidth / 2, 109);
-        doc.text(data.ebill_no || "PENDING", pageWidth / 2 + 25, 109);
-        doc.text("Vehicle :", pageWidth / 2, 116);
-        doc.text(data.vehicle_no || "N/A", pageWidth / 2 + 25, 116);
-        doc.text("Delivery At :", pageWidth / 2, 123);
-        doc.text(data.delivery || "MUMBAI", pageWidth / 2 + 25, 123);
+        let copyY = 18;
+        ["ORIGINAL FOR BUYER", "DUPLICATE FOR TRANSPORTER", "TRIPLICATE FOR FILE COPY", "EXTRA COPY"].forEach(label => {
+            doc.rect(right - 58, copyY - 3.5, 4, 4);
+            doc.setFontSize(6.5);
+            doc.text(label, right - 52, copyY);
+            copyY += 5;
+        });
 
-        // Table
-        const tableRows = rows.map(r => [
-            `${r.product_description}\nHSN: ${getHSN(r.product_id)}`,
-            r.packs,
-            r.total_kgs,
-            `${r.from_no || ''} - ${r.to_no || ''}`,
-            `Rs. ${Number(r.rate).toLocaleString('en-IN')}`,
-            num(r.assessable_value).toLocaleString()
-        ]);
+        const companyTop = 40;
+        const companyHeight = 57;
+        const certX = right - 45;
+        doc.rect(left + 6, companyTop, contentWidth - 12, companyHeight);
+        doc.line(certX, companyTop, certX, companyTop + companyHeight - 9);
+        doc.line(left + 6, companyTop + companyHeight - 9, right - 6, companyTop + companyHeight - 9);
 
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(9);
+        doc.text("KAYAAR EXPORTS PRIVATE LIMITED", (left + certX) / 2, companyTop + 7, { align: "center" });
+        doc.setFontSize(7.2);
+        [
+            "D.No: 43/5, Railway Feeder Road,",
+            "K.R. Nagar - 628 503, Kovilpatti - Taluk",
+            "Tuticorin Dist., Tamilnadu, India",
+            "(04632) - 248258, 9443238761",
+            "E-Mail : ttnkrgroup@gmail.com",
+            "GSTIN : 33AAACK4468M1ZA"
+        ].forEach((line, idx) => {
+            doc.text(line, (left + certX) / 2, companyTop + 13 + (idx * 5), { align: "center" });
+        });
+
+        doc.setFontSize(6.2);
+        doc.text("OEKO-TEX (R)", certX + 22, companyTop + 6, { align: "center" });
+        doc.text("CONFIDENCE IN TEXTILES", certX + 22, companyTop + 10, { align: "center" });
+        doc.setFontSize(8);
+        doc.text("STANDARD 100", certX + 22, companyTop + 17, { align: "center" });
+        doc.setFontSize(6.2);
+        doc.text("18.HIN.60427 HOHENSTEIN HTTI", certX + 22, companyTop + 22, { align: "center" });
+        doc.setFontSize(5.8);
+        doc.text("Tested for harmful substances", certX + 22, companyTop + 34, { align: "center" });
+        doc.text("www.oeko-tex.com/standard100", certX + 22, companyTop + 38, { align: "center" });
+
+        doc.setFontSize(6.7);
+        doc.text("PAN : AAACK4468M", left + 9, companyTop + companyHeight - 3);
+        doc.text("CIN : U51101TN1991PTC020933", right - 9, companyTop + companyHeight - 3, { align: "right" });
+
+        const partyTop = companyTop + companyHeight;
+        const partyHeight = 55;
+        const midX = left + contentWidth * 0.58;
+        doc.rect(left + 6, partyTop, contentWidth - 12, partyHeight);
+        doc.line(midX, partyTop, midX, partyTop + partyHeight);
+
+        doc.setFontSize(7.2);
+        doc.setFont("helvetica", "bold");
+        doc.text("Party Name & Address", left + 9, partyTop + 8);
+        doc.setFontSize(8);
+        doc.text(text(party.account_name || data.party_name).toUpperCase(), left + 14, partyTop + 17);
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(7);
+        const addressLines = [data.addr1, data.addr2, data.addr3].filter(Boolean);
+        addressLines.forEach((line, idx) => doc.text(text(line).toUpperCase(), left + 14, partyTop + 25 + (idx * 6)));
+        doc.setFont("helvetica", "bold");
+        doc.text(`GST No: ${party.gst_no || data.gst_no || 'N/A'}`, left + 14, partyTop + 47);
+
+        const infoRows = [
+            ["Invoice No", data.invoice_no],
+            ["Invoice Dt", data.date],
+            ["E-Way Bill No", data.ebill_no || "PENDING"],
+            ["Vehicle No", data.vehicle_no || "N/A"],
+            ["Delivery At", data.delivery || "MUMBAI"]
+        ];
+        infoRows.forEach(([label, value], idx) => {
+            const y = partyTop + 12 + (idx * 8);
+            doc.setFont("helvetica", "bold");
+            doc.text(label, midX + 8, y);
+            doc.text(":", midX + 35, y);
+            doc.text(text(value).toUpperCase(), midX + 44, y);
+        });
+
+        const tableStartY = partyTop + partyHeight;
         autoTable(doc, {
-            startY: 135,
-            head: [['Description of Goods', 'No of Bags', 'Net Weight', 'S.L No', 'Rate Per Kgs', 'Assessable Value']],
-            body: tableRows,
-            theme: 'grid',
-            headStyles: { textColor: 0, fontStyle: 'bold', fontSize: 9 },
-            styles: { lineColor: 0, lineWidth: 0.2 },
+            startY: tableStartY,
+            margin: { left: left + 6, right: left + 6 },
+            tableWidth: contentWidth - 12,
+            head: [
+                [{ content: "DESCRIPTION OF GOODS", colSpan: 6, styles: { halign: "center", fontStyle: "bold" } }],
+                ["No of Bags", "Net Weight", "S.L No", "Rate Per Kgs", "Assessable Value"]
+            ],
+            body: rows.map(r => [
+                fmt(r.packs, 0),
+                fmt(r.total_kgs, 2),
+                `${text(r.from_no)} - ${text(r.to_no)}`.trim(),
+                fmt(r.rate, 2),
+                fmt(r.assessable_value, 2)
+            ]),
+            theme: "grid",
+            styles: {
+                font: "helvetica",
+                fontSize: 7,
+                textColor: 0,
+                lineColor: 0,
+                lineWidth: 0.2,
+                cellPadding: 2,
+                valign: "middle"
+            },
+            headStyles: {
+                fillColor: [255, 255, 255],
+                textColor: 0,
+                lineColor: 0,
+                lineWidth: 0.2,
+                fontSize: 7,
+                fontStyle: "bold"
+            },
             columnStyles: {
-                0: { cellWidth: 70 },
-                1: { halign: 'center' },
-                2: { halign: 'center' },
-                3: { halign: 'center' },
-                4: { halign: 'right' },
-                5: { halign: 'right' }
+                0: { cellWidth: 24, halign: "center" },
+                1: { cellWidth: 28, halign: "center" },
+                2: { cellWidth: 54, halign: "center" },
+                3: { cellWidth: 34, halign: "right" },
+                4: { cellWidth: 30, halign: "right" }
             }
         });
 
-        const finalY = doc.lastAutoTable.finalY + 12;
+        let y = doc.lastAutoTable.finalY;
+        const detailHeight = Math.max(44, 22 + (rows.length * 8));
+        const footerTop = Math.min(y, 245);
+        doc.rect(left + 6, footerTop, contentWidth - 12, detailHeight);
+        doc.line(midX, footerTop, midX, footerTop + detailHeight);
+        doc.line(right - 44, footerTop, right - 44, footerTop + detailHeight);
 
-        // Totals
-        doc.setFontSize(11);
-        doc.text("Assessable Value", pageWidth - 85, finalY);
-        doc.text(`Rs. ${num(data.total_assessable).toLocaleString('en-IN')}`, pageWidth - margin, finalY, { align: "right" });
-
-        doc.text("Charity", pageWidth - 85, finalY + 7);
-        doc.text(`Rs. ${num(data.total_charity).toLocaleString('en-IN')}`, pageWidth - margin, finalY + 7, { align: "right" });
-
-        doc.text("Freight Charges", pageWidth - 85, finalY + 14);
-        doc.text(`Rs. ${num(data.freight_charges).toLocaleString('en-IN')}`, pageWidth - margin, finalY + 14, { align: "right" });
-
-        doc.text("GST Total", pageWidth - 85, finalY + 21);
-        doc.text(`Rs.${num(data.total_gst).toLocaleString('en-IN')}`, pageWidth - margin, finalY + 21, { align: "right" });
-
-        // Grand Total Box
-        doc.setDrawColor(0);
-        doc.roundedRect(pageWidth - 85, finalY + 28, 80, 18, 4, 4);
-        doc.setTextColor(0);
-        doc.setFontSize(12);
-        doc.text("GRAND TOTAL", pageWidth - 75, finalY + 39);
-        doc.setFontSize(18);
-        doc.text(`Rs. ${num(data.net_amount).toLocaleString('en-IN')}`, pageWidth - 10, finalY + 39, { align: "right" });
-
-        // Amount in Words
-        const wordsY = finalY + 58;
-        doc.setTextColor(0);
-        doc.setFontSize(10);
-        doc.text("Amount Chargeable (in words):", margin, wordsY);
+        const description = rows.map(r => text(r.product_description).toUpperCase()).filter(Boolean).join(", ");
+        const hsnCodes = [...new Set(rows.map(r => getHSN(r.product_id)).filter(Boolean))].join(", ");
         doc.setFont("helvetica", "bold");
-        doc.text(numberToWords(num(data.net_amount)), margin, wordsY + 7);
+        doc.setFontSize(7.5);
+        doc.text(doc.splitTextToSize(description || "GOODS", midX - left - 17), left + 9, footerTop + 8);
+        doc.text(`HSN CODE: ${hsnCodes || "-"}`, left + 9, footerTop + 31);
+        doc.text("-", left + 9, footerTop + 38);
 
-        // Declaration & Sign
+        const totalLines = [
+            ["CHARITY", fmt(data.total_charity, 2)],
+            ["FREIGHT", fmt(data.freight_charges, 2)],
+            [`C.G.S.T    ${fmt(cgstPer, 2)} %`, fmt(data.total_cgst, 2)],
+            [`S.G.S.T    ${fmt(sgstPer, 2)} %`, fmt(data.total_sgst, 2)],
+            [`I.G.S.T    ${fmt(igstPer, 2)} %`, fmt(data.total_igst, 2)],
+            ["TCS", fmt(data.total_tcs, 2)],
+            ["ROUND OFF", fmt(data.round_off, 2)]
+        ].filter(([, value], idx) => idx < 2 || num(value.replace(/,/g, '')) !== 0);
+
+        totalLines.forEach(([label, value], idx) => {
+            const lineY = footerTop + 8 + (idx * 6);
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(7);
+            doc.text(label, midX + 5, lineY);
+            doc.setFont("helvetica", "bold");
+            doc.text(value, right - 9, lineY, { align: "right" });
+        });
+
+        const amountTop = footerTop + detailHeight;
+        doc.rect(left + 6, amountTop, contentWidth - 12, 20);
+        doc.line(right - 60, amountTop, right - 60, amountTop + 20);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(8);
+        doc.text("Amount Chargeable (in words)", left + 9, amountTop + 6);
+        doc.setFontSize(7);
+        doc.text(doc.splitTextToSize(numberToWords(num(data.net_amount)), 115), left + 9, amountTop + 13);
         doc.setFontSize(9);
-        doc.setFont("helvetica", "italic");
-        doc.text("We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.", margin, wordsY + 22);
+        doc.text("NET AMOUNT", right - 57, amountTop + 8);
+        doc.setFontSize(11);
+        doc.text(fmt(data.net_amount, 2), right - 9, amountTop + 15, { align: "right" });
 
+        const signTop = amountTop + 20;
+        doc.rect(left + 6, signTop, contentWidth - 12, 30);
         doc.setFont("helvetica", "normal");
-        doc.text("Authorised Signatory", pageWidth - margin - 70, wordsY + 45);
-        doc.text("For KAYAAR EXPORTS PRIVATE LIMITED", pageWidth - margin - 70, wordsY + 50);
+        doc.setFontSize(6.5);
+        doc.text("We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.", left + 9, signTop + 7);
+        doc.setFont("helvetica", "bold");
+        doc.text("For KAYAAR EXPORTS PRIVATE LIMITED", right - 9, signTop + 9, { align: "right" });
+        doc.text("Authorised Signatory", right - 9, signTop + 25, { align: "right" });
 
         doc.save(`Kayaar_TAX_INVOICE_${data.invoice_no}.pdf`);
     };

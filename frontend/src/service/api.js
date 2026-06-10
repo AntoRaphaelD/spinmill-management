@@ -11,6 +11,33 @@ const api = axios.create({
   }
 });
 
+const authClient = axios.create({
+  baseURL: `${BASE_URL}/auth`,
+  headers: {
+    'Content-Type': 'application/json'
+  }
+});
+
+export const setAuthToken = (token) => {
+  if (token) {
+    api.defaults.headers.common.Authorization = `Bearer ${token}`;
+    authClient.defaults.headers.common.Authorization = `Bearer ${token}`;
+    return;
+  }
+
+  delete api.defaults.headers.common.Authorization;
+  delete authClient.defaults.headers.common.Authorization;
+};
+
+export const authAPI = {
+  login: (credentials) => authClient.post('/login', credentials),
+  signup: (credentials) => authClient.post('/signup', credentials),
+  requestSignupOtp: (data) => authClient.post('/signup/request-otp', data),
+  verifySignupOtp: (data) => authClient.post('/signup/verify-otp', data),
+  me: () => authClient.get('/me'),
+  logout: () => authClient.post('/logout')
+};
+
 /**
  * ==========================================
  * 1. MASTER API (REST - Existing)
@@ -169,6 +196,16 @@ export const reportsAPI = {
 
     getInvoicePrint: (invoiceNo) =>
         api.get(`/reports/invoice-print/${invoiceNo}`)
+};
+
+export const systemAPI = {
+  logs: () => api.get('/system/logs'),
+  getBackupSettings: () => api.get('/system/backups/settings'),
+  updateBackupSettings: (data) => api.put('/system/backups/settings', data),
+  backupRuns: () => api.get('/system/backups/runs'),
+  sendBackupNow: (data = {}) => api.post('/system/backups/send-now', data),
+  importBackup: (backup) => api.post('/system/backups/import', { backup }),
+  downloadBackup: () => api.get('/system/backups/download', { responseType: 'blob' })
 };
 
 export default api;

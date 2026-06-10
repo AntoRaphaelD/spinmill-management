@@ -1,6 +1,92 @@
 const { Sequelize, DataTypes } = require('sequelize');
 const sequelize = require('../config/database');
 
+const User = sequelize.define('User', {
+  username: {
+    type: DataTypes.STRING,
+    allowNull: false,
+    unique: true
+  },
+  password_hash: {
+    type: DataTypes.STRING,
+    allowNull: false
+  },
+  password_salt: {
+    type: DataTypes.STRING,
+    allowNull: false
+  },
+  session_token: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  mobile_no: {
+    type: DataTypes.STRING,
+    allowNull: true,
+    unique: true
+  },
+  otp_hash: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  otp_salt: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  otp_expires_at: {
+    type: DataTypes.DATE,
+    allowNull: true
+  },
+  otp_verified_at: {
+    type: DataTypes.DATE,
+    allowNull: true
+  }
+}, {
+  tableName: 'tbl_Users',
+  timestamps: true
+});
+
+const AuditLog = sequelize.define('AuditLog', {
+  user_id: { type: DataTypes.INTEGER, allowNull: true },
+  username: { type: DataTypes.STRING, allowNull: true },
+  action: { type: DataTypes.STRING, allowNull: false },
+  method: { type: DataTypes.STRING, allowNull: false },
+  path: { type: DataTypes.STRING, allowNull: false },
+  entity: { type: DataTypes.STRING, allowNull: true },
+  entity_id: { type: DataTypes.STRING, allowNull: true },
+  status: { type: DataTypes.STRING, allowNull: false, defaultValue: 'SUCCESS' },
+  status_code: { type: DataTypes.INTEGER, allowNull: true },
+  ip_address: { type: DataTypes.STRING, allowNull: true },
+  user_agent: { type: DataTypes.STRING(500), allowNull: true },
+  details: { type: DataTypes.JSON, allowNull: true },
+  error_message: { type: DataTypes.TEXT, allowNull: true }
+}, {
+  tableName: 'tbl_AuditLogs',
+  timestamps: true
+});
+
+const BackupSetting = sequelize.define('BackupSetting', {
+  recipient_email: { type: DataTypes.STRING, allowNull: true },
+  backup_time: { type: DataTypes.STRING(5), allowNull: false, defaultValue: '23:00' },
+  enabled: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
+  last_sent_date: { type: DataTypes.DATEONLY, allowNull: true }
+}, {
+  tableName: 'tbl_BackupSettings',
+  timestamps: true
+});
+
+const BackupRun = sequelize.define('BackupRun', {
+  type: { type: DataTypes.STRING, allowNull: false, defaultValue: 'MANUAL' },
+  recipient_email: { type: DataTypes.STRING, allowNull: true },
+  status: { type: DataTypes.STRING, allowNull: false, defaultValue: 'SUCCESS' },
+  file_name: { type: DataTypes.STRING, allowNull: true },
+  file_size: { type: DataTypes.INTEGER, allowNull: true },
+  error_message: { type: DataTypes.TEXT, allowNull: true },
+  sent_at: { type: DataTypes.DATE, allowNull: true }
+}, {
+  tableName: 'tbl_BackupRuns',
+  timestamps: true
+});
+
 /**
  * ==========================================
  * 1. MASTER MODELS
@@ -1681,7 +1767,8 @@ DepotSalesHeader.belongsTo(Broker, {
 DirectInvoiceHeader.belongsTo(Account, { foreignKey: 'party_id', as: 'Party' });
 
 module.exports = {
-  sequelize, TariffSubHead, PackingType, Broker, Transport, Account,
+  sequelize, User, AuditLog, BackupSetting, BackupRun,
+  TariffSubHead, PackingType, Broker, Transport, Account,
   Product, OrderHeader, OrderDetail, RG1Production,
   InvoiceHeader, InvoiceDetail, DirectInvoiceHeader, DirectInvoiceDetail,
   DepotReceived, InvoiceType, DespatchEntry, DepotSalesHeader, DepotSalesDetail
