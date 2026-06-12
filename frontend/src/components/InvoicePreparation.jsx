@@ -647,8 +647,8 @@ const InvoicePreparation = () => {
 
             // 3. FLOW: total_invoice_amount (Inclusive of Tax)
             const rawTotalInvoiceAmount = is68Product
-                ? (10 * packs * rateAfterTax)
-                : (totalKgs * rateAfterTax);
+                ? (10 * packs * rateInput)
+                : (totalKgs * rateInput);
             const totalInvoiceAmount = is68Product ? rawTotalInvoiceAmount : Math.round(rawTotalInvoiceAmount);
 
             // 4. FLOW: charity
