@@ -228,15 +228,15 @@ const TariffMaster = () => {
             {/* Table */}
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                 <table className="w-full text-left">
-                    <thead className="bg-blue-700 border-b text-white text-sm font-bold uppercase tracking-wider">
+                    <thead className="bg-slate-900 text-white text-[10px] font-bold uppercase tracking-wider">
                         <tr>
-                            {isSelectionMode && <th className="p-4 w-12 text-center">#</th>}
-                            <th className="p-4">Tariff Code</th>
-                            <th className="p-4">Tariff Name</th>
-                            <th className="p-4">Tariff No.</th>
-                            <th className="p-4">Yarn Type</th>
-                            <th className="p-4">Product Type</th>
-                            {!isSelectionMode && <th className="p-4 w-10"></th>}
+                            {isSelectionMode && <th className="p-3 w-12 text-center">#</th>}
+                            <th className="p-3">Tariff Code</th>
+                            <th className="p-3">Tariff Name</th>
+                            <th className="p-3">Tariff No.</th>
+                            <th className="p-3">Yarn Type</th>
+                            <th className="p-3">Product Type</th>
+                            {!isSelectionMode && <th className="p-3 w-10"></th>}
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -250,16 +250,16 @@ const TariffMaster = () => {
                                     onClick={() => handleRowClick(item)}
                                 >
                                     {isSelectionMode && (
-                                        <td className="p-4 text-center">
+                                        <td className="p-3 text-center">
                                             {selectedIds.includes(item.id) ? <CheckSquare size={18} className="text-blue-600 mx-auto"/> : <Square size={18} className="text-slate-200 mx-auto"/>}
                                         </td>
                                     )}
-                                    <td className="p-4 text-base font-bold text-blue-600 font-mono">{item.tariff_code}</td>
-                                    <td className="p-4 text-base font-semibold text-slate-700 uppercase">{item.tariff_name}</td>
-                                    <td className="p-4 text-base text-slate-600 font-mono">{item.tariff_no || '—'}</td>
-                                    <td className="p-4 text-base font-bold text-amber-700 uppercase">{item.yarn_type}</td>
-                                    <td className="p-4 text-base font-bold text-slate-600 uppercase">{item.product_type}</td>
-                                    {!isSelectionMode && <td className="p-4 text-slate-300"><Edit size={16} /></td>}
+                                    <td className="p-3 text-sm font-bold text-blue-600 font-mono">{item.tariff_code}</td>
+                                    <td className="p-3 text-sm font-semibold text-slate-700 uppercase">{item.tariff_name}</td>
+                                    <td className="p-3 text-sm text-slate-600 font-mono">{item.tariff_no || '—'}</td>
+                                    <td className="p-3 text-sm font-bold text-amber-700 uppercase">{item.yarn_type}</td>
+                                    <td className="p-3 text-sm font-bold text-slate-600 uppercase">{item.product_type}</td>
+                                    {!isSelectionMode && <td className="p-3 text-slate-300"><Edit size={16} /></td>}
                                 </tr>
                             ))
                         ) : (
@@ -279,20 +279,20 @@ const TariffMaster = () => {
 
             {/* Modal – font sizes aligned */}
            {isModalOpen && (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
-        <div className="bg-white w-full max-w-[680px] rounded-xl shadow-2xl border border-slate-300 flex flex-col max-h-[90vh] overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+        <div className="bg-white w-full max-w-xl rounded-xl shadow-2xl border border-slate-300 flex flex-col max-h-[90vh] overflow-hidden">
             
             {/* Header */}
-            <div className="bg-blue-700 text-white px-5 py-3.5 flex justify-between items-center">
+            <div className="bg-slate-800 text-white px-5 py-3 flex justify-between items-center">
                 <div>
-                    <h2 className="text-lg font-bold uppercase tracking-wide">Tariff Sub Head Master</h2>
+                    <h2 className="text-base font-bold uppercase tracking-wide">Tariff Sub Head Master</h2>
                     <p className="text-blue-100 text-xs mt-0.5">Add / Modify Tariff</p>
                 </div>
                 <button 
                     onClick={() => setIsModalOpen(false)}
-                    className="p-1.5 hover:bg-red-600 rounded transition-colors"
+                    className="p-1 hover:bg-red-600 rounded-full transition-colors"
                 >
-                    <X size={22} strokeWidth={3} />
+                    <X size={20} />
                 </button>
             </div>
 
@@ -300,7 +300,6 @@ const TariffMaster = () => {
             <div className="p-6 overflow-y-auto flex-1">
                 <form onSubmit={handleSave} className="space-y-4">
                     <div className="grid grid-cols-12 gap-x-4 gap-y-3 text-sm">
-
                         {/* Tariff Code */}
                         <div className="col-span-4 flex justify-end items-center">
                             <FormLabel>Tariff Code</FormLabel>
@@ -308,7 +307,7 @@ const TariffMaster = () => {
                         <div className="col-span-8">
                             <input 
                                 readOnly 
-                                className="w-44 p-2 bg-gray-800 text-white font-bold font-mono rounded border border-gray-600 outline-none cursor-default text-sm"
+                                className="w-44 p-1.5 bg-slate-100 border border-slate-300 font-bold font-mono rounded outline-none cursor-default text-sm"
                                 value={formData.tariff_code} 
                             />
                         </div>
@@ -320,7 +319,7 @@ const TariffMaster = () => {
                         <div className="col-span-8">
                             <input 
                                 required 
-                                className="w-full p-2 border border-gray-400 rounded text-sm font-semibold uppercase focus:border-blue-500 focus:ring-1 focus:ring-blue-400"
+                                className="w-full p-1.5 border border-gray-300 rounded text-sm font-semibold uppercase focus:border-blue-500 focus:ring-1 focus:ring-blue-400/50"
                                 value={formData.tariff_name} 
                                 onChange={e => setFormData({...formData, tariff_name: e.target.value.toUpperCase()})} 
                             />
@@ -333,7 +332,7 @@ const TariffMaster = () => {
                         <div className="col-span-8">
                             <input 
                                 required 
-                                className="w-full p-2 border border-gray-400 rounded text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-400"
+                                className="w-full p-1.5 border border-gray-300 rounded text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-400/50"
                                 value={formData.tariff_no} 
                                 onChange={e => setFormData({...formData, tariff_no: e.target.value})} 
                             />
@@ -345,7 +344,7 @@ const TariffMaster = () => {
                         </div>
                         <div className="col-span-8">
                             <select 
-                                className="w-52 p-2 border border-gray-400 rounded text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-400 bg-white"
+                                className="w-52 p-1.5 border border-gray-300 rounded text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-400/50 bg-white"
                                 value={formData.product_type} 
                                 onChange={e => setFormData({...formData, product_type: e.target.value})}
                             >
@@ -361,7 +360,7 @@ const TariffMaster = () => {
                         </div>
                         <div className="col-span-8">
                             <select 
-                                className="w-52 p-2 border border-gray-400 rounded text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-400 bg-white"
+                                className="w-52 p-1.5 border border-gray-300 rounded text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-400/50 bg-white"
                                 value={formData.commodity} 
                                 onChange={e => setFormData({...formData, commodity: e.target.value})}
                             >
@@ -377,7 +376,7 @@ const TariffMaster = () => {
                         </div>
                         <div className="col-span-8">
                             <select 
-                                className="w-52 p-2 border border-gray-400 rounded text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-400 bg-white"
+                                className="w-52 p-1.5 border border-gray-300 rounded text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-400/50 bg-white"
                                 value={formData.fibre} 
                                 onChange={e => setFormData({...formData, fibre: e.target.value})}
                             >
@@ -393,7 +392,7 @@ const TariffMaster = () => {
                         </div>
                         <div className="col-span-8">
                             <select 
-                                className="w-52 p-2 border border-gray-400 rounded text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-400 bg-white"
+                                className="w-52 p-1.5 border border-gray-400 rounded text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-400/50 bg-white"
                                 value={formData.yarn_type} 
                                 onChange={e => setFormData({...formData, yarn_type: e.target.value})}
                             >
@@ -405,13 +404,13 @@ const TariffMaster = () => {
                     </div>
 
                     {/* Footer */}
-                    <div className="flex items-center justify-between pt-6 border-t mt-4">
+                    <div className="flex items-center justify-between pt-4 border-t mt-4">
                         <div>
                             {formData.id && (
                                 <button
                                     type="button"
                                     onClick={handleDeleteSingle}
-                                    className="text-red-600 hover:text-red-700 text-sm font-medium underline hover:no-underline px-3 py-1.5 rounded hover:bg-red-50 transition-colors"
+                                    className="text-red-600 hover:text-red-700 text-xs font-medium underline hover:no-underline px-3 py-1 rounded hover:bg-red-50 transition-colors"
                                 >
                                     Purge Record
                                 </button>
@@ -422,7 +421,7 @@ const TariffMaster = () => {
                             <button
                                 type="submit"
                                 disabled={submitLoading}
-                                className={`px-8 py-2 rounded text-sm font-bold flex items-center gap-2 min-w-[110px] justify-center ${
+                                className={`px-6 py-2 rounded text-xs font-bold flex items-center gap-2 min-w-[100px] justify-center ${
                                     submitLoading
                                         ? 'bg-gray-400 text-gray-100 cursor-not-allowed'
                                         : 'bg-blue-600 hover:bg-blue-700 text-white'
@@ -439,7 +438,7 @@ const TariffMaster = () => {
                             <button
                                 type="button"
                                 onClick={() => setIsModalOpen(false)}
-                                className="px-8 py-2 border border-slate-500 rounded text-sm font-bold hover:bg-slate-50"
+                                className="px-6 py-2 border border-slate-400 rounded text-xs font-bold hover:bg-slate-50"
                             >
                                 Cancel
                             </button>

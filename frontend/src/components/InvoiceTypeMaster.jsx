@@ -63,7 +63,7 @@ const TaxRow = ({ label, checked, onCheck, val, onVal, formula, onFormula, debit
   </div>
 );
 const InvoiceTypeMaster = () => {
-    const [list, setList] = useState([]);
+    const [list, setList] = useState([]); // eslint-disable-line no-unused-vars
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const [submitLoading, setSubmitLoading] = useState(false);
@@ -320,13 +320,13 @@ const InvoiceTypeMaster = () => {
             {/* Table */}
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                 <table className="w-full text-left">
-                    <thead className="bg-blue-700 border-b text-white text-sm font-bold uppercase tracking-wider">
+                    <thead className="bg-slate-900 text-white text-[10px] font-bold uppercase tracking-wider">
                         <tr>
-                            {isSelectionMode && <th className="p-4 w-12 text-center">#</th>}
-                            <th className="p-4">Code</th>
-                            <th className="p-4">Invoice Type Name</th>
-                            <th className="p-4">Sales Type</th>
-                            {!isSelectionMode && <th className="p-4 w-10"></th>}
+                            {isSelectionMode && <th className="p-3 w-12 text-center">#</th>}
+                            <th className="p-3">Code</th>
+                            <th className="p-3">Invoice Type Name</th>
+                            <th className="p-3">Sales Type</th>
+                            {!isSelectionMode && <th className="p-3 w-10"></th>}
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -365,27 +365,27 @@ const InvoiceTypeMaster = () => {
 
             {/* Modal – wider & cleaner fonts */}
            {isModalOpen && (
-  <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 backdrop-blur-md p-4">
-    <div className="relative bg-white w-full max-w-5xl rounded-2xl shadow-2xl overflow-hidden border border-slate-200/70 animate-in zoom-in-95 duration-200 flex flex-col max-h-[85vh]">
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+    <div className="relative bg-white w-full max-w-4xl rounded-xl shadow-2xl overflow-hidden border border-slate-300 flex flex-col max-h-[95vh]">
       
       {/* Header */}
-      <div className="bg-gradient-to-r from-blue-700 to-indigo-700 px-6 py-4 flex justify-between items-center text-white shadow-md">
-        <div className="flex items-center gap-4">
-          <div className="p-2.5 bg-white/15 rounded-xl">
-            <FileText size={26} />
+      <div className="bg-slate-800 px-5 py-3 flex justify-between items-center text-white">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-white/15 rounded-lg">
+            <FileText size={20} />
           </div>
           <div>
-            <h2 className="text-2xl font-bold tracking-tight">Invoice Type Master</h2>
-            <p className="text-blue-100/90 text-sm font-medium mt-0.5 uppercase tracking-widest">
+            <h2 className="text-base font-bold tracking-tight">Invoice Type Master</h2>
+            <p className="text-blue-100/90 text-xs font-medium mt-0.5 uppercase">
               {formData.id ? 'Edit Configuration' : 'Create New Configuration'}
             </p>
           </div>
         </div>
         <button
           onClick={() => setIsModalOpen(false)}
-          className="p-2 rounded-xl hover:bg-white/20 transition-colors active:scale-95"
+          className="p-1.5 rounded-lg hover:bg-white/20 transition-colors active:scale-95"
         >
-          <X size={28} strokeWidth={2.5} />
+          <X size={20} strokeWidth={3} />
         </button>
       </div>
 
@@ -393,14 +393,14 @@ const InvoiceTypeMaster = () => {
       <div className="p-6 overflow-y-auto flex-1 bg-slate-50/50">
         <form onSubmit={handleSave} className="space-y-5">
                 {/* Top row - Code, Option II, Round off */}
-          <div className="grid grid-cols-12 gap-4 items-center bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+          <div className="grid grid-cols-12 gap-4 items-center bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
             <div className="col-span-1 flex justify-end">
               <FormLabel>Code</FormLabel>
             </div>
             <div className="col-span-2">
               <input
                 readOnly
-                className="w-full p-3 bg-slate-800 text-white font-mono font-bold rounded-xl border border-slate-600 cursor-not-allowed text-center"
+                className="w-full p-2 bg-slate-800 text-white font-mono font-bold rounded-lg border border-slate-600 cursor-not-allowed text-center text-sm"
                 value={formData.code || 'NEW'}
               />
             </div>
@@ -411,16 +411,16 @@ const InvoiceTypeMaster = () => {
                 id="opt2"
                 checked={formData.is_option_ii}
                 onChange={e => setFormData({...formData, is_option_ii: e.target.checked})}
-                className="w-6 h-6 accent-blue-600 cursor-pointer"
+                className="w-5 h-5 accent-blue-600 cursor-pointer"
               />
-              <label htmlFor="opt2" className="text-base font-bold text-slate-700 cursor-pointer">Option II</label>
+              <label htmlFor="opt2" className="text-sm font-bold text-slate-700 cursor-pointer">Option II</label>
             </div>
 
             <div className="col-span-6 flex items-center gap-4 justify-end">
               <FormLabel>Round off digits</FormLabel>
               <input
                 type="number"
-                className="w-24 p-3 border border-slate-300 rounded-xl text-center text-lg font-bold focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all"
+                className="w-20 p-2 border border-slate-300 rounded-lg text-center text-base font-bold focus:border-blue-500 focus:ring-1 focus:ring-blue-200 outline-none transition-all"
                 value={formData.round_off_digits ?? ''}
                 onChange={e => setFormData({...formData, round_off_digits: Number(e.target.value)})}
               />
@@ -428,12 +428,12 @@ const InvoiceTypeMaster = () => {
           </div>
 
           {/* Basic info row */}
-          <div className="grid grid-cols-12 gap-4 items-center bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+          <div className="grid grid-cols-12 gap-4 items-center bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
             <div className="col-span-2 flex justify-end"><FormLabel>Invoice Type</FormLabel></div>
             <div className="col-span-4">
               <input
                 required
-                className="w-full p-3 border border-slate-300 rounded-xl uppercase font-bold text-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
+                className="w-full p-2 border border-slate-300 rounded-lg uppercase font-bold text-slate-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-200 outline-none text-sm"
                 value={formData.type_name || ''}
                 onChange={e => setFormData({...formData, type_name: e.target.value.toUpperCase()})}
               />
@@ -442,7 +442,7 @@ const InvoiceTypeMaster = () => {
             <div className="col-span-2 flex justify-end"><FormLabel>Sales Type</FormLabel></div>
             <div className="col-span-4">
               <select
-                className="w-full p-3 border border-slate-300 rounded-xl font-bold text-slate-700 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none appearance-none bg-white"
+                className="w-full p-2 border border-slate-300 rounded-lg font-bold text-slate-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-200 outline-none appearance-none bg-white text-sm"
                 value={formData.sales_type || ''}
                 onChange={e => setFormData({...formData, sales_type: e.target.value})}
               >
@@ -453,23 +453,23 @@ const InvoiceTypeMaster = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-12 gap-4 items-center bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+          <div className="grid grid-cols-12 gap-4 items-center bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
             <div className="col-span-2 flex justify-end"><FormLabel>Group Name</FormLabel></div>
             <div className="col-span-4">
               <input
-                className="w-full p-3 border border-slate-300 rounded-xl uppercase font-semibold focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
+                className="w-full p-2 border border-slate-300 rounded-lg uppercase font-semibold focus:border-blue-500 focus:ring-1 focus:ring-blue-200 outline-none text-sm"
                 value={formData.group_name || ''}
                 onChange={e => setFormData({...formData, group_name: e.target.value.toUpperCase()})}
               />
             </div>
 
             <div className="col-span-6 flex items-center justify-center gap-6">
-              <label className="flex items-center gap-3 text-base font-bold text-slate-700 cursor-pointer bg-blue-50 px-6 py-2.5 rounded-xl border border-blue-100">
+              <label className="flex items-center gap-3 text-sm font-bold text-slate-700 cursor-pointer bg-blue-50 px-4 py-2 rounded-lg border border-blue-100">
                 <input
                   type="checkbox"
                   checked={formData.account_posting}
                   onChange={e => setFormData({...formData, account_posting: e.target.checked})}
-                  className="w-6 h-6 accent-blue-600"
+                  className="w-5 h-5 accent-blue-600"
                 />
                 Enable Account Posting
               </label>
@@ -477,10 +477,10 @@ const InvoiceTypeMaster = () => {
           </div>
 
           {/* Tax Mapping Table Container */}
-<div className="border border-slate-200 rounded-2xl overflow-hidden bg-white shadow-md">
+<div className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-md">
     {/* HEADER */}
-    <div className="bg-slate-800 text-white grid grid-cols-12 py-4 px-6 font-bold text-sm uppercase tracking-widest sticky top-0 z-10">
-        <div className="col-span-2">Description</div>
+    <div className="bg-slate-800 text-white grid grid-cols-12 py-3 px-4 font-bold text-xs uppercase tracking-wider sticky top-0 z-10">
+        <div className="col-span-2 pl-2">Description</div>
         <div className="col-span-1 text-center">Enable</div>
         <div className="col-span-1 text-center">% / Val</div>
         <div className="col-span-4 px-2 text-center">Calculation Formula</div>
@@ -489,14 +489,14 @@ const InvoiceTypeMaster = () => {
     </div>
 
     {/* Assess Value Row */}
-    <div className="grid grid-cols-12 gap-4 px-6 py-4 border-b hover:bg-slate-50 items-center">
+    <div className="grid grid-cols-12 gap-3 px-4 py-2 border-b hover:bg-slate-50 items-center">
         <div className="col-span-2 font-bold text-slate-700">Assess Value</div>
         <div className="col-span-1 flex justify-center">
             <input
                 type="checkbox"
                 checked={formData.assess_checked}
                 onChange={e => setFormData({...formData, assess_checked: e.target.checked})}
-                className="w-6 h-6 accent-blue-600 cursor-pointer"
+                className="w-5 h-5 accent-blue-600 cursor-pointer"
             />
         </div>
         <div className="col-span-1" />
@@ -622,11 +622,11 @@ const InvoiceTypeMaster = () => {
           </div>
 
           {/* Footer formulas */}
-          <div className="grid grid-cols-12 gap-4 bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+          <div className="grid grid-cols-12 gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
             <div className="col-span-2 flex justify-end items-center font-bold text-slate-700">Sub Total</div>
             <div className="col-span-10">
               <input
-                className="w-full p-4 border border-slate-300 rounded-xl font-mono text-lg font-bold text-blue-800 bg-slate-50 focus:ring-2 focus:ring-blue-200 outline-none"
+                className="w-full p-2 border border-slate-300 rounded-lg font-mono text-sm font-bold text-blue-800 bg-slate-50 focus:ring-1 focus:ring-blue-200 outline-none"
                 value={formData.sub_total_formula || ''}
                 onChange={e => setFormData({...formData, sub_total_formula: e.target.value})}
               />
@@ -635,38 +635,38 @@ const InvoiceTypeMaster = () => {
             <div className="col-span-2 flex justify-end items-center font-bold text-slate-700">Total Value</div>
             <div className="col-span-10">
               <input
-                className="w-full p-4 border border-slate-300 rounded-xl font-mono text-lg font-bold text-emerald-800 bg-slate-50 focus:ring-2 focus:ring-emerald-200 outline-none"
+                className="w-full p-2 border border-slate-300 rounded-lg font-mono text-sm font-bold text-emerald-800 bg-slate-50 focus:ring-1 focus:ring-emerald-200 outline-none"
                 value={formData.total_value_formula || ''}
                 onChange={e => setFormData({...formData, total_value_formula: e.target.value})}
               />
             </div>
 
             <div className="col-span-2 flex justify-end items-center font-bold text-slate-700">Round Off</div>
-            <div className="col-span-10 flex flex-col md:flex-row gap-6 items-center">
-              <div className="flex gap-8 bg-slate-100 p-3 px-6 rounded-xl border border-slate-200">
-                <label className="flex items-center gap-3 text-base font-bold text-slate-600 cursor-pointer">
+            <div className="col-span-10 flex flex-col md:flex-row gap-4 items-center">
+              <div className="flex gap-6 bg-slate-100 p-2 px-4 rounded-lg border border-slate-200">
+                <label className="flex items-center gap-2 text-sm font-bold text-slate-600 cursor-pointer">
                   <input
                     type="radio"
                     value="Forward"
                     checked={formData.round_off_direction === 'Forward'}
                     onChange={e => setFormData({...formData, round_off_direction: e.target.value})}
-                    className="w-5 h-5 accent-blue-600"
+                    className="w-4 h-4 accent-blue-600"
                   />
                   Forward
                 </label>
-                <label className="flex items-center gap-3 text-base font-bold text-slate-600 cursor-pointer">
+                <label className="flex items-center gap-2 text-sm font-bold text-slate-600 cursor-pointer">
                   <input
                     type="radio"
                     value="Reverse"
                     checked={formData.round_off_direction === 'Reverse'}
                     onChange={e => setFormData({...formData, round_off_direction: e.target.value})}
-                    className="w-5 h-5 accent-blue-600"
+                    className="w-4 h-4 accent-blue-600"
                   />
                   Reverse
                 </label>
               </div>
               <input
-                className="flex-1 p-4 border border-slate-300 rounded-xl uppercase font-bold text-slate-700 focus:ring-2 focus:ring-blue-200 outline-none"
+                className="flex-1 p-2 border border-slate-300 rounded-lg uppercase font-bold text-slate-700 focus:ring-1 focus:ring-blue-200 outline-none text-sm"
                 value={formData.round_off_account || ''}
                 onChange={e => setFormData({...formData, round_off_account: e.target.value.toUpperCase()})}
                 placeholder="ROUND OFF LEDGER ACCOUNT"
@@ -676,7 +676,7 @@ const InvoiceTypeMaster = () => {
             <div className="col-span-2 flex justify-end items-center font-bold text-slate-700">Lorry Freight</div>
             <div className="col-span-10">
               <input
-                className="w-full p-4 border border-slate-300 rounded-xl uppercase font-bold text-slate-700 focus:ring-2 focus:ring-blue-200 outline-none"
+                className="w-full p-2 border border-slate-300 rounded-lg uppercase font-bold text-slate-700 focus:ring-1 focus:ring-blue-200 outline-none text-sm"
                 value={formData.lorry_freight_account || ''}
                 onChange={e => setFormData({...formData, lorry_freight_account: e.target.value.toUpperCase()})}
                 placeholder="FREIGHT OUTWARD LEDGER"
@@ -685,19 +685,18 @@ const InvoiceTypeMaster = () => {
           </div>
 
           {/* Action Buttons */}
-          <div className="flex justify-end gap-6 pt-8 border-t border-slate-200 mt-4">
+          <div className="flex justify-end gap-4 pt-4 border-t border-slate-200 mt-4">
             <button
               type="button"
               onClick={() => setIsModalOpen(false)}
-              className="px-10 py-4 border-2 border-slate-300 rounded-xl text-slate-600 font-bold hover:bg-slate-100 transition-all text-lg active:scale-95"
+              className="px-8 py-2 border border-slate-300 rounded-lg text-slate-600 font-semibold hover:bg-slate-100 transition-all text-sm active:scale-95"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={submitLoading}
-              className={`
-                px-14 py-4 rounded-xl font-bold flex items-center gap-3 shadow-xl min-w-[220px] justify-center text-lg transition-all active:scale-95
+              className={`px-10 py-2 rounded-lg font-bold flex items-center gap-2 shadow-lg min-w-[180px] justify-center text-sm transition-all active:scale-95
                 ${submitLoading
                   ? 'bg-slate-400 text-white cursor-not-allowed'
                   : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-blue-200'
@@ -706,12 +705,12 @@ const InvoiceTypeMaster = () => {
             >
               {submitLoading ? (
                 <>
-                  <Loader2 className="animate-spin" size={24} />
+                  <Loader2 className="animate-spin" size={18} />
                   Saving Changes...
                 </>
               ) : (
                 <>
-                  <Save size={24} />
+                  <Save size={18} />
                   {formData.id ? 'Update Record' : 'Save Record'}
                 </>
               )}

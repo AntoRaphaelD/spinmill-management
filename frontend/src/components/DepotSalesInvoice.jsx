@@ -166,70 +166,84 @@ const filteredInvoiceTypes = useMemo(() => {
     // ==========================================
     // 2. MATH ENGINE - FREIGHT NOW SYNCED FROM DETAILS
     // ==========================================
-    const runCalculations = useCallback((rows, typeId, salesType = formData.sales_type) => {
+const runCalculations = useCallback((rows, typeId, hFreight = formData.freight, salesType = formData.sales_type) => {
     if (!typeId) return rows;
     const config = listData.types.find(t => t.id === parseInt(typeId));
     if (!config) return rows;
 
     let hTotals = {
-        assess: 0, charity: 0,gst:0, vat: 0, cenvat: 0, duty: 0, cess: 0,
-        hcess: 0, sgst: 0, cgst: 0, igst: 0, tcs: 0,
-        disc: 0, other: 0, net: 0
+        assess: 0, charity: 0, freight: 0, gst: 0, tcs: 0, gross: 0,
+        cenvat: 0, duty: 0, cess: 0, hcess: 0, other: 0, vat: 0,
+        sgst: 0, cgst: 0, igst: 0
     };
+
+    const gstPer = num(config.gst_percentage);
+    const sgstPer = num(config.sgst_percentage);
+    const cgstPer = num(config.cgst_percentage);
+    const igstPer = num(config.igst_percentage);
+    const splitGstPer = sgstPer + cgstPer;
+    const taxPercentage = igstPer > 0 ? igstPer : (splitGstPer > 0 ? splitGstPer : gstPer);
 
     const updatedRows = rows.map((item) => {
         const product = listData.products.find(p => p.id === parseInt(item.product_id));
+        const productName = String(item.product_description || product?.product_name || '').toLowerCase();
+        const is68Product = productName.includes('68');
 
-        // ⭐ SAME LOGIC AS INVOICE PREPARATION: Recalculate Total Kgs
         const packs = num(item.packs);
-        const bagWt = num(item.avg_content); // Weight per bag
+        const bagWt = num(item.avg_content);
+        const rateInput = num(item.rate);
+        const totalKgs = is68Product ? num(item.total_kgs) : (packs * bagWt);
 
-        // 1. Base Math using calculated weight
-        const calculatedKgs = packs * bagWt; 
-        const H = num(item.rate) * calculatedKgs;
-        const A = H - num(item.resale) + num(item.convert_to_hank) - num(item.convert_to_cone);
-        
-        // 2. Charity Logic
-        let charityRate = (salesType === 'GST SALES') ? 3 : (num(config.charity_value) || num(product?.charity_rs));
-        const charity = config.charity_checked ? (charityRate * calculatedKgs) : 0;
-        // 3. Tax Calculations
-        const taxable = A;
-        const vat = (num(item.vat_per) * taxable) / 100;
-        const cenvat = (num(item.cenvat_per) * taxable) / 100;
-        const duty = (num(item.duty_per) * taxable) / 100;
-        const cess = (num(item.cess_per) * taxable) / 100;
-        const hcess = (num(item.hcess_per) * taxable) / 100;
-        const gst = (num(item.gst_per) * taxable) / 100;
-        const sgst = (num(item.sgst_per) * taxable) / 100;
-        const cgst = (num(item.cgst_per) * taxable) / 100;
-        const igst = (num(item.igst_per) * taxable) / 100;
-        const tcs = (num(item.tcs_per) * taxable) / 100;
+        const rawTotalInvoiceAmount = is68Product ? (10 * packs * rateInput) : (totalKgs * rateInput);
+        const totalInvoiceAmount = is68Product ? rawTotalInvoiceAmount : Math.round(rawTotalInvoiceAmount);
 
-        // 4. Row Totaling
-        const basis = taxable + vat + cenvat + duty + gst + cess + hcess + sgst + cgst + igst + tcs + charity + num(item.other_amt) + num(item.freight_amt);
+        const charityPerBale = salesType === 'GST SALES' ? 3 : num(item.charity_per_bale || config.charity_value || 0);
+        let charity = 0;
+        if (salesType === 'GST SALES') {
+            charity = totalKgs * charityPerBale;
+        } else {
+            charity = totalInvoiceAmount * (charityPerBale / 100);
+        }
+
+        const taxDivisor = 1 + (taxPercentage / 100);
+        const baseAmount = taxDivisor > 0 ? (totalInvoiceAmount / taxDivisor) : totalInvoiceAmount;
+        const gstAmount = (baseAmount * taxPercentage) / 100;
+        const accessibleValue = totalInvoiceAmount - num(item.freight_amt) - charity - gstAmount;
+
+        const vat = (accessibleValue * num(item.vat_per)) / 100;
+        const cenvat = (accessibleValue * num(item.cenvat_per)) / 100;
+        const duty = (accessibleValue * num(item.duty_per)) / 100;
+        const cess = (accessibleValue * num(item.cess_per)) / 100;
+        const hcess = (accessibleValue * num(item.hcess_per)) / 100;
+        const tcs = (totalInvoiceAmount * num(item.tcs_per)) / 100;
+
+        const basis = accessibleValue + vat + cenvat + duty + cess + hcess + gstAmount + tcs + charity + num(item.other_amt) + num(item.freight_amt);
         const discAmt = (num(item.discount_percentage) * basis) / 100;
         const rowTotal = basis - discAmt;
 
-        hTotals.assess += A; hTotals.charity += charity;
+        hTotals.assess += accessibleValue; hTotals.charity += charity; hTotals.freight += num(item.freight_amt);
+        hTotals.gst += gstAmount; hTotals.tcs += tcs; hTotals.gross += totalInvoiceAmount;
         hTotals.vat += vat; hTotals.cenvat += cenvat; hTotals.duty += duty;
-        hTotals.cess += cess; hTotals.hcess += hcess;
-        hTotals.gst += gst; hTotals.sgst += sgst; hTotals.cgst += cgst; hTotals.igst += igst;
-        hTotals.tcs += tcs; hTotals.disc += discAmt;
-        hTotals.other += num(item.other_amt); hTotals.net += rowTotal;
+        hTotals.cess += cess; hTotals.hcess += hcess; hTotals.other += num(item.other_amt);
+        hTotals.disc += discAmt; hTotals.net += rowTotal;
 
         return {
             ...item,
             packs: packs,
             avg_content: bagWt,
-            total_kgs: calculatedKgs, // Store the calculated result
-            base_h: H, assessable_value: A, charity_amt: charity,gst_amt: gst,
+            total_kgs: totalKgs,
+            assessable_value: accessibleValue, charity_amt: charity,
+            gst_amt: gstAmount,
+            sgst_amt: sgstPer > 0 ? gstAmount / 2 : 0,
+            cgst_amt: cgstPer > 0 ? gstAmount / 2 : 0,
+            igst_amt: igstPer > 0 ? gstAmount : 0,
             vat_amt: vat, cenvat_amt: cenvat, duty_amt: duty, cess_amt: cess,
-            hcess_amt: hcess, sgst_amt: sgst, cgst_amt: cgst, igst_amt: igst, tcs_amt: tcs,
+            hr_sec_cess_amt: hcess, tcs_amt: tcs,
             discount_amt: discAmt, sub_total: basis, final_value: rowTotal
         };
     });
 
-    const finalRawTotal = hTotals.net + num(formData.pf_amount);
+    const finalRawTotal = hTotals.gross + num(formData.pf_amount);
     const finalNetTotal = Math.round(finalRawTotal);
 
     setFormData(prev => ({
@@ -238,13 +252,12 @@ const filteredInvoiceTypes = useMemo(() => {
         total_charity: money(hTotals.charity),
         total_vat: money(hTotals.vat),
         total_cenvat: money(hTotals.cenvat),
-        total_duty: money(hTotals.duty),
-        total_cess: money(hTotals.cess),
-        total_hr_sec_cess: money(hTotals.hcess),
-        total_gst: money(hTotals.gst),
-        total_sgst: money(hTotals.sgst),
-        total_cgst: money(hTotals.cgst),
-        total_igst: money(hTotals.igst),
+        total_duty: money(hTotals.duty), total_cess: money(hTotals.cess),
+        total_hr_sec_cess: money(hTotals.hcess), 
+        total_gst: igstPer > 0 ? 0 : money(hTotals.gst),
+        total_sgst: sgstPer > 0 ? money(hTotals.gst / 2) : 0,
+        total_cgst: cgstPer > 0 ? money(hTotals.gst / 2) : 0,
+        total_igst: igstPer > 0 ? money(hTotals.gst) : 0,
         total_tcs: money(hTotals.tcs),
         total_discount: money(hTotals.disc),
         total_other: money(hTotals.other),
@@ -254,7 +267,7 @@ const filteredInvoiceTypes = useMemo(() => {
     }));
 
     return updatedRows;
-}, [listData.types, listData.products, formData.pf_amount, formData.sales_type]);
+}, [listData.types, listData.products, formData.pf_amount, formData.freight, formData.sales_type]);
     // ==========================================
     // 3. EXPORT TO PDF (now uses synced freight)
     // ==========================================
@@ -591,8 +604,8 @@ const filteredInvoiceTypes = useMemo(() => {
     }, [listData.history, searchValue, searchField, searchCondition]);
     return (
         <div className="min-h-screen bg-slate-100 p-6 font-sans">
-            <div className="flex justify-between items-center mb-4">
-                <h1 className="text-2xl font-black uppercase tracking-tighter flex items-center gap-3">
+            <div className="flex justify-between items-center mb-6">
+                <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
                     <Warehouse className="text-blue-600" /> Depot Sales Registry
                 </h1>
                 <button
@@ -600,12 +613,12 @@ const filteredInvoiceTypes = useMemo(() => {
                         setFormData({ ...emptyInvoice, invoice_no: (listData.history.length + 1).toString(), header_locked: false });
                         setGridRows([]); setIsModalOpen(true);
                     }}
-                    className="bg-blue-600 text-white px-8 py-2 rounded-xl font-bold uppercase text-xs flex items-center gap-2 shadow-lg hover:bg-blue-700"
+                    className="bg-blue-600 text-white px-5 py-2 rounded-lg font-bold uppercase text-xs flex items-center gap-2 shadow-md hover:bg-blue-700"
                 >
-                    <Plus size={18} /> New Depot Invoice
+                    <Plus size={16} /> New Depot Invoice
                 </button>
             </div>
-            <div className="bg-white p-4 rounded-xl border border-slate-300 shadow-sm mb-6 flex gap-4 items-end">
+            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm mb-6 flex gap-4 items-end">
                 <div className="flex-1">
                     <label className="text-[9px] font-black text-slate-500 uppercase block mb-1">Search Field</label>
                     <select value={searchField} onChange={e => setSearchField(e.target.value)} className="w-full border border-slate-300 p-2 text-xs font-bold rounded">
@@ -620,16 +633,16 @@ const filteredInvoiceTypes = useMemo(() => {
                 </div>
                 <div className="bg-blue-50 text-blue-700 border border-blue-200 px-6 py-2 rounded text-xs font-bold">{filteredHistory.length} Matches</div>
             </div>
-            <div className="bg-white rounded-2xl border border-slate-300 shadow-sm overflow-hidden">
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                 <table className="w-full text-left">
-                    <thead className="bg-slate-900 text-white text-[10px] uppercase font-black tracking-widest">
-                        <tr><th className="p-5">Inv #</th><th className="p-5">Date</th><th className="p-5">Depot</th><th className="p-5">Party</th><th className="p-5 text-right">Net Value</th></tr>
+                    <thead className="bg-slate-900 text-white text-[10px] uppercase font-bold tracking-wider">
+                        <tr><th className="p-3">Inv #</th><th className="p-3">Date</th><th className="p-3">Depot</th><th className="p-3">Party</th><th className="p-3 text-right">Net Value</th></tr>
                     </thead>
-                    <tbody className="divide-y text-sm font-mono">
+                    <tbody className="divide-y divide-slate-100 text-sm">
                         {filteredHistory.map(item => (
                             <tr key={item.id} className="hover:bg-blue-50 cursor-pointer" onClick={async () => {
                                 try {
-                                    setLoading(true);
+                                    setSubmitLoading(true);
                                     const data = await transactionsAPI.depotSales.getOne(item.id);
                                     const full = data.data.data;
                                     if (!full) return;
@@ -653,14 +666,14 @@ const filteredInvoiceTypes = useMemo(() => {
                                     console.error("Error loading depot sales invoice:", err);
                                     alert("Failed to load invoice details");
                                 } finally {
-                                    setLoading(false);
+                                    setSubmitLoading(false);
                                 }
                             }}>
-                                <td className="p-5 font-bold text-blue-600">{item.invoice_no}</td>
-                                <td className="p-5 text-slate-500">{item.date}</td>
-                                <td className="p-5 uppercase text-xs">{item.Depot?.account_name}</td>
-                                <td className="p-5 uppercase font-bold text-xs">{item.Party?.account_name}</td>
-                                <td className="p-5 text-right font-black">₹{parseFloat(item.final_invoice_value).toLocaleString()}</td>
+                                <td className="p-3 font-bold text-blue-600 font-mono">{item.invoice_no}</td>
+                                <td className="p-3 text-slate-500 font-sans">{item.date}</td>
+                                <td className="p-3 uppercase text-xs font-semibold">{item.Depot?.account_name}</td>
+                                <td className="p-3 uppercase font-bold text-xs">{item.Party?.account_name}</td>
+                                <td className="p-3 text-right font-black font-mono">₹{parseFloat(item.final_invoice_value).toLocaleString()}</td>
                             </tr>
                         ))}
                     </tbody>
@@ -803,27 +816,25 @@ const filteredInvoiceTypes = useMemo(() => {
                                         </div>
                                     </div>
                                     <div className="col-span-4 bg-slate-50 border border-slate-300 p-4 rounded flex flex-col gap-1 shadow-inner font-black overflow-y-auto">
-    <h3 className="text-xs text-blue-800 mb-2 border-b pb-1 uppercase tracking-tighter">Aggregate Value</h3>
+    <h3 className="text-[10px] text-blue-800 mb-1 border-b pb-1 uppercase tracking-tighter font-black">Aggregate Value</h3>
     
     <TotalRow label="Assessable Value" value={formData.total_assessable} />
     <TotalRow label="Charity" value={formData.total_charity} />
     
     {/* GST Group */}
-    <div className="bg-blue-50/50 p-1 rounded border border-blue-100 my-1">
+    <div className="bg-blue-50/30 p-0.5 rounded border border-blue-100 my-0.5">
         <TotalRow label="GST (Gen)" value={formData.total_gst} />
         <TotalRow label="SGST Total" value={formData.total_sgst} />
         <TotalRow label="CGST Total" value={formData.total_cgst} />
         <TotalRow label="IGST Total" value={formData.total_igst} />
     </div>
-
     {/* Traditional Taxes from Model */}
     <TotalRow label="VAT Tax" value={formData.total_vat} />
     <TotalRow label="CENVAT Tax" value={formData.total_cenvat} />
     <TotalRow label="Duty Amount" value={formData.total_duty} />
     <TotalRow label="CESS Total" value={formData.total_cess} />
     <TotalRow label="H.S. Cess" value={formData.total_hr_sec_cess} />
-    <TotalRow label="TCS Amount" value={formData.total_tcs} />
-
+    <TotalRow label="TCS Amount" value={formData.total_tcs} color="text-amber-700"/>
     {/* Deductions & Additions */}
     <TotalRow label="Discount (-)" value={formData.total_discount} color="text-red-600" />
     <TotalRow label="Other Amt (+)" value={formData.total_other} />
@@ -842,12 +853,12 @@ const filteredInvoiceTypes = useMemo(() => {
                                 </div>
                             ) : (
                                 <div className="space-y-4 h-full flex flex-col overflow-hidden">
-                                    <div className="bg-blue-50 p-2 border border-blue-200 flex items-center justify-between rounded shadow-sm">
+                                    <div className="bg-[#EBF2FA] p-3 border border-slate-300 flex items-center justify-between rounded shadow-sm">
                                         <div className="flex items-center gap-4">
                                             <span className="text-[10px] font-black uppercase text-blue-700">Sync Mill Order:</span>
                                             <select onChange={handleOrderSync} className="border border-slate-300 text-[11px] p-1 w-72 font-bold rounded">
                                                 <option value="">-- Choose Order --</option>
-                                                {listData.orders.map(o => <option key={o.id} value={`WITH|${o.order_no}`}>{o.order_no} | {o.Party?.account_name}</option>)}
+                                                {listData.orders.map(o => <option key={o.id} value={`WITH|${o.order_no}`}>{o.order_no}</option>)}
                                             </select>
                                         </div>
                                     </div>
@@ -999,7 +1010,17 @@ const RowSelect = ({ label, options, width = "w-full", ...props }) => (
     <div className="flex items-center"><label className="w-[140px] text-[10px] font-black text-slate-700 uppercase tracking-tighter">{label}</label><select {...props} className={`border border-slate-300 p-1 text-[11px] font-bold outline-none rounded-sm shadow-sm ${width}`}><option value="">-- Select --</option>{options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}</select></div>
 );
 const TotalRow = ({ label, value, isEditable = false, onChange, color = "text-slate-900" }) => (
-    <div className="flex justify-between items-center text-[10px] py-0.5 px-2 hover:bg-white rounded transition-colors"><span className="font-black text-slate-500 uppercase tracking-tighter">{label}</span><input readOnly={!isEditable} value={value} onChange={e => onChange?.(e.target.value)} className={`w-32 border border-slate-300 text-right p-0.5 font-mono text-[11px] font-black outline-none rounded shadow-inner ${color} ${isEditable ? 'bg-white border-blue-400' : 'bg-slate-50'}`} /></div>
+    <div className="flex justify-between items-center text-[10px] py-0.5 px-2 hover:bg-white rounded transition-colors">
+        <span className="font-black text-slate-500 uppercase tracking-tighter">{label}</span>
+        <input 
+            readOnly={!isEditable} 
+            value={Number(value).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} 
+            onChange={e => onChange?.(e.target.value)} 
+            className={`w-32 border border-slate-300 text-right p-0.5 font-mono text-[11px] font-black outline-none rounded shadow-inner ${color} ${
+                isEditable ? 'bg-white border-blue-400' : 'bg-slate-50'
+            }`} 
+        />
+    </div>
 );
 const renderPairCell = (row, idx, perKey, amtKey, isEditable, updateGrid, color = "text-blue-600") => (
     <>

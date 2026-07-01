@@ -200,11 +200,11 @@ const handleRowClick = async (item) => {
             {/* List Table Container */}
             <div className="bg-white rounded-xl border border-slate-200 shadow-xl overflow-hidden flex flex-col">
                 <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse">
-                        <thead className="bg-blue-700 text-white text-sm font-bold uppercase tracking-wider sticky top-0">
+                    <table className="w-full text-left">
+                        <thead className="bg-slate-900 text-white text-[10px] uppercase font-black tracking-widest">
                             <tr>
                                 {isSelectionMode && <th className="p-4 w-12 text-center">#</th>}
-                                <th className="p-4">Account Code</th>
+                                <th className="p-4">Code</th>
                                 <th className="p-4">Account Name</th>
                                 <th className="p-4">Sub Group</th>
                                 <th className="p-4">Group</th>
@@ -215,24 +215,24 @@ const handleRowClick = async (item) => {
                                 {!isSelectionMode && <th className="p-4 w-10"></th>}
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-100 text-sm">
+                        <tbody className="divide-y text-sm font-mono">
                             {currentItems.length > 0 ? (
                                 currentItems.map(item => (
                                     <tr key={item.id} className={`hover:bg-blue-50 transition-colors cursor-pointer ${selectedIds.includes(item.id) ? 'bg-blue-100/50' : ''}`} onClick={() => handleRowClick(item)}>
                                         {isSelectionMode && (
-                                            <td className="p-4 text-center">
+                                            <td className="p-3 text-center">
                                                 {selectedIds.includes(item.id) ? <CheckSquare size={18} className="text-blue-600 mx-auto"/> : <Square size={18} className="text-slate-200 mx-auto"/>}
                                             </td>
                                         )}
-                                        <td className="p-4 font-bold text-blue-600 font-mono">{item.account_code}</td>
-                                        <td className="p-4 font-semibold text-slate-700 uppercase">{item.account_name}</td>
-                                        <td className="p-4 font-bold text-amber-600 uppercase text-xs">{item.account_group}</td>
-                                        <td className="p-4 font-bold text-slate-600 uppercase text-xs">{item.primary_group || '-'}</td>
-                                        <td className="p-4 font-bold text-slate-500 uppercase text-xs">{item.main_group || '-'}</td>
-                                        <td className="p-4 text-slate-600 uppercase">{item.place}</td>
-                                        <td className="p-4 text-xs text-slate-500">{item.phone_no || '-'}</td>
-                                        <td className="p-4 text-xs text-slate-500 lowercase">{item.email || '-'}</td>
-                                        {!isSelectionMode && <td className="p-4 text-slate-300"><Edit size={16} /></td>}
+                                        <td className="p-3 font-bold text-blue-600">{item.account_code}</td>
+                                        <td className="p-3 font-semibold text-slate-700 uppercase">{item.account_name}</td>
+                                        <td className="p-3 font-bold text-amber-600 uppercase text-xs">{item.account_group}</td>
+                                        <td className="p-3 font-bold text-slate-600 uppercase text-xs">{item.primary_group || '-'}</td>
+                                        <td className="p-3 font-bold text-slate-500 uppercase text-xs">{item.main_group || '-'}</td>
+                                        <td className="p-3 text-slate-600 uppercase">{item.place}</td>
+                                        <td className="p-3 text-xs text-slate-500">{item.phone_no || '-'}</td>
+                                        <td className="p-3 text-xs text-slate-500 lowercase">{item.email || '-'}</td>
+                                        {!isSelectionMode && <td className="p-3 text-slate-300"><Edit size={16} /></td>}
                                     </tr>
                                 ))
                             ) : (
@@ -245,7 +245,7 @@ const handleRowClick = async (item) => {
                 </div>
 
                 {/* --- IMPROVED PAGINATION FOOTER --- */}
-                <div className="p-4 bg-slate-50 border-t border-slate-200 flex flex-col md:flex-row items-center justify-between gap-4">
+                <div className="p-3 bg-slate-50 border-t border-slate-200 flex flex-col md:flex-row items-center justify-between gap-4">
                     <div className="flex items-center gap-6">
                         {/* Page Size Selector */}
                         <div className="flex items-center gap-2">
@@ -256,7 +256,7 @@ const handleRowClick = async (item) => {
                                     setItemsPerPage(Number(e.target.value));
                                     setCurrentPage(1); 
                                 }}
-                                className="border border-slate-300 rounded-lg px-3 py-1.5 text-sm font-bold outline-none focus:ring-2 focus:ring-blue-500 bg-white shadow-sm cursor-pointer"
+                                className="border border-slate-300 rounded-md px-2 py-1 text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500 bg-white shadow-sm cursor-pointer"
                             >
                                 <option value={5}>5</option>
                                 <option value={10}>10</option>
@@ -268,7 +268,7 @@ const handleRowClick = async (item) => {
                         
                         {/* Total Count Display */}
                         <div className="h-8 w-[1px] bg-slate-200 hidden md:block"></div>
-                        <span className="text-slate-600 font-bold text-sm">
+                        <span className="text-slate-600 font-bold text-xs">
                             Showing <span className="text-blue-700">{(currentPage - 1) * itemsPerPage + 1}</span> to <span className="text-blue-700">{Math.min(currentPage * itemsPerPage, filteredData.length)}</span> of <span className="text-blue-700">{filteredData.length}</span> entries
                         </span>
                     </div>
@@ -278,22 +278,22 @@ const handleRowClick = async (item) => {
                         <button 
                             disabled={currentPage === 1} 
                             onClick={() => setCurrentPage(p => p - 1)} 
-                            className="flex items-center gap-1 px-4 py-2 border border-slate-300 rounded-lg bg-white text-sm font-bold text-slate-700 hover:bg-blue-50 disabled:opacity-30 disabled:hover:bg-white transition-all shadow-sm"
+                            className="flex items-center gap-1 px-3 py-1 border border-slate-300 rounded-md bg-white text-xs font-bold text-slate-700 hover:bg-blue-50 disabled:opacity-30 disabled:hover:bg-white transition-all shadow-sm"
                         >
                             <ChevronLeft size={18}/>
                             <span>Prev</span>
                         </button>
 
                         {/* Page Indicators */}
-                        <div className="flex items-center px-4 py-2 bg-blue-600 rounded-lg shadow-inner">
-                            <span className="text-white text-sm font-black uppercase">Page {currentPage} of {totalPages}</span>
+                        <div className="flex items-center px-3 py-1 bg-blue-600 rounded-md shadow-inner">
+                            <span className="text-white text-xs font-black uppercase">Page {currentPage} of {totalPages}</span>
                         </div>
 
                         {/* Next Button */}
                         <button 
                             disabled={currentPage === totalPages || totalPages === 0} 
                             onClick={() => setCurrentPage(p => p + 1)} 
-                            className="flex items-center gap-1 px-4 py-2 border border-slate-300 rounded-lg bg-white text-sm font-bold text-slate-700 hover:bg-blue-50 disabled:opacity-30 disabled:hover:bg-white transition-all shadow-sm"
+                            className="flex items-center gap-1 px-3 py-1 border border-slate-300 rounded-md bg-white text-xs font-bold text-slate-700 hover:bg-blue-50 disabled:opacity-30 disabled:hover:bg-white transition-all shadow-sm"
                         >
                             <span>Next</span>
                             <ChevronRight size={18}/>

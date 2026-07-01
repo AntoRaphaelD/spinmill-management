@@ -195,10 +195,9 @@ const handleSave = async (e) => {
 
     return (
         <div className="min-h-screen bg-slate-100 p-6 font-sans">
-            
             {/* Header */}
             <div className="flex justify-between items-center mb-6">
-                <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                <h1 className="text-xl font-bold text-slate-800 flex items-center gap-2">
                     <Package className="text-blue-700" /> Product Master
                 </h1>
                 <div className="flex gap-2">
@@ -212,10 +211,10 @@ const handleSave = async (e) => {
             </div>
 
             {/* Search Bar */}
-            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm mb-6 flex flex-wrap items-end gap-4">
+            <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm mb-6 flex flex-wrap items-end gap-4">
                 <div className="flex-1 min-w-[180px]">
                     <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Search Field</label>
-                    <select value={searchField} onChange={e => setSearchField(e.target.value)} className="w-full border border-slate-200 p-2 rounded-xl text-[13px] outline-none focus:ring-1 focus:ring-blue-500">
+                    <select value={searchField} onChange={e => setSearchField(e.target.value)} className="w-full border border-slate-200 p-1.5 rounded-lg text-xs outline-none focus:ring-1 focus:ring-blue-500">
                         <option value="product_name">Product Description</option>
                         <option value="product_code">Product Code</option>
                         <option value="commodity">Commodity</option>
@@ -223,7 +222,7 @@ const handleSave = async (e) => {
                 </div>
                 <div className="flex-1 min-w-[150px]">
                     <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Condition</label>
-                    <select value={searchCondition} onChange={e => setSearchCondition(e.target.value)} className="w-full border p-2 rounded-xl text-[13px] outline-none">
+                    <select value={searchCondition} onChange={e => setSearchCondition(e.target.value)} className="w-full border p-1.5 rounded-lg text-xs outline-none">
                         <option value="Like">Like</option>
                         <option value="Equal">Equal</option>
                     </select>
@@ -235,8 +234,8 @@ const handleSave = async (e) => {
                         <input 
                             type="text" 
                             value={searchValue} 
-                            onChange={e => setSearchValue(e.target.value)} 
-                            className="w-full border pl-9 pr-4 py-2 rounded-xl text-[13px] outline-none focus:ring-1 focus:ring-blue-500 font-semibold" 
+                            onChange={e => setSearchValue(e.target.value)}
+                            className="w-full border pl-9 pr-4 py-1.5 rounded-lg text-xs outline-none focus:ring-1 focus:ring-blue-500 font-semibold"
                             placeholder="Live search..." 
                         />
                     </div>
@@ -245,22 +244,22 @@ const handleSave = async (e) => {
                 {!isSelectionMode ? (
                     <button 
                         onClick={() => setIsSelectionMode(true)} 
-                        className="border border-blue-200 bg-blue-50 text-blue-600 px-8 py-2 rounded-xl text-base font-bold hover:bg-blue-100 shadow-sm transition-all"
+                        className="border border-blue-200 bg-blue-50 text-blue-600 px-6 py-1.5 rounded-lg text-xs font-bold hover:bg-blue-100 shadow-sm transition-all"
                     >
                         Select
                     </button>
                 ) : (
                     <div className="flex gap-2">
                         <button 
-                            onClick={() => { setIsSelectionMode(false); setSelectedIds([]); }} 
-                            className="border border-slate-200 px-6 py-2 rounded-xl text-base font-bold text-slate-600 hover:bg-slate-50"
+                            onClick={() => { setIsSelectionMode(false); setSelectedIds([]); }}
+                            className="border border-slate-200 px-5 py-1.5 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-50"
                         >
                             Clear
                         </button>
                         <button 
                             onClick={handleBulkDelete}
                             disabled={selectedIds.length === 0}
-                            className="bg-red-500 text-white px-6 py-2 rounded-xl text-base font-bold shadow-md disabled:opacity-50 flex items-center gap-1"
+                            className="bg-red-500 text-white px-5 py-1.5 rounded-lg text-xs font-bold shadow-md disabled:opacity-50 flex items-center gap-1"
                         >
                             <Trash2 size={16} /> Delete ({selectedIds.length})
                         </button>
@@ -271,16 +270,16 @@ const handleSave = async (e) => {
             {/* Table */}
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                 <table className="w-full text-left">
-                    <thead className="bg-blue-700 border-b text-white text-sm font-bold uppercase tracking-wider">
+                    <thead className="bg-slate-900 text-white text-[10px] font-bold uppercase tracking-wider">
                         <tr>
-                            {isSelectionMode && <th className="p-4 w-12 text-center">#</th>}
-                            <th className="p-4">Code</th>
-                            <th className="p-4">Product Description</th>
-                            <th className="p-4">Short Description</th>
-                            <th className="p-4">Spinning Count</th>
-                            <th className="p-4">Commodity</th>
-                            <th className="p-4">Packing Type</th>
-                            {!isSelectionMode && <th className="p-4 w-10"></th>}
+                            {isSelectionMode && <th className="p-3 w-12 text-center">#</th>}
+                            <th className="p-3">Code</th>
+                            <th className="p-3">Product Description</th>
+                            <th className="p-3">Short Description</th>
+                            <th className="p-3">Spinning Count</th>
+                            <th className="p-3">Commodity</th>
+                            <th className="p-3">Packing Type</th>
+                            {!isSelectionMode && <th className="p-3 w-10"></th>}
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -293,20 +292,20 @@ const handleSave = async (e) => {
                                 onClick={() => handleRowClick(item)}
                             >
                                 {isSelectionMode && (
-                                    <td className="p-4 text-center">
+                                    <td className="p-3 text-center">
                                         {selectedIds.includes(item.id) ? <CheckSquare size={18} className="text-blue-600 mx-auto"/> : <Square size={18} className="text-slate-200 mx-auto"/>}
                                     </td>
                                 )}
-                                <td className="p-4 text-base font-bold text-blue-600 font-mono">{item.product_code}</td>
-                                <td className="p-4 text-base font-semibold text-slate-700">{item.product_name}</td>
-                                <td className="p-4 text-base text-slate-600 uppercase">{item.short_description || '—'}</td>
-                                <td className="p-4 text-base font-bold text-amber-700">{item.spinning_count_name || '—'}</td>
-                                <td className="p-4 text-base text-slate-600">{item.commodity || '—'}</td>
-                                <td className="p-4 text-base font-semibold text-slate-500">{item.packing_type || '—'}</td>
-                                {!isSelectionMode && <td className="p-4 text-slate-300"><Edit size={16} /></td>}
+                                <td className="p-3 text-sm font-bold text-blue-600 font-mono">{item.product_code}</td>
+                                <td className="p-3 text-sm font-semibold text-slate-700">{item.product_name}</td>
+                                <td className="p-3 text-sm text-slate-600 uppercase">{item.short_description || '—'}</td>
+                                <td className="p-3 text-sm font-bold text-amber-700">{item.spinning_count_name || '—'}</td>
+                                <td className="p-3 text-sm text-slate-600">{item.commodity || '—'}</td>
+                                <td className="p-3 text-sm font-semibold text-slate-500">{item.packing_type || '—'}</td>
+                                {!isSelectionMode && <td className="p-3 text-slate-300"><Edit size={16} /></td>}
                             </tr>
                         )) : (
-                            <tr><td colSpan={7} className="p-12 text-center text-slate-400">No products found</td></tr>
+                            <tr><td colSpan={8} className="p-12 text-center text-slate-400">No products found</td></tr>
                         )}
                     </tbody>
                 </table>
@@ -322,12 +321,12 @@ const handleSave = async (e) => {
 
             {/* Modal */}
             {isModalOpen && (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 backdrop-blur-sm p-3">
-        <div className="bg-white w-full max-w-[940px] rounded-xl shadow-2xl border border-slate-400 flex flex-col max-h-[90vh] overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+        <div className="bg-white w-full max-w-4xl rounded-xl shadow-2xl border border-slate-300 flex flex-col max-h-[95vh] overflow-hidden">
             
             {/* Header */}
-            <div className="bg-blue-700 text-white px-4 py-2.5 flex justify-between items-center">
-                <div>
+            <div className="bg-slate-800 text-white px-5 py-3 flex justify-between items-center">
+                <div className="flex items-center gap-3">
                     <h2 className="text-base font-bold uppercase tracking-wide">Product Master</h2>
                     <p className="text-blue-100 text-xs mt-0.5">Add / Edit Product</p>
                 </div>
@@ -340,9 +339,9 @@ const handleSave = async (e) => {
             </div>
 
             {/* Body */}
-            <div className="p-4 overflow-y-auto flex-1">
-                <form onSubmit={handleSave} className="space-y-3">
-                    <div className="grid grid-cols-12 gap-x-4 gap-y-1.5 text-sm">
+            <div className="p-6 overflow-y-auto flex-1 bg-slate-50">
+                <form onSubmit={handleSave} className="space-y-4">
+                    <div className="grid grid-cols-12 gap-x-4 gap-y-2 text-sm">
 
                         {/* Row 1: Code + Roundoff */}
                         <div className="col-span-3 flex justify-end items-center">
@@ -352,7 +351,7 @@ const handleSave = async (e) => {
                             <input 
                                 readOnly 
                                 className="w-full p-1 bg-gray-100 border border-gray-400 rounded text-sm font-mono font-bold" 
-                                value={formData.product_code} 
+                                value={formData.product_code}
                             />
                         </div>
                         <div className="col-span-6 flex items-center gap-2 pl-2">
@@ -361,7 +360,7 @@ const handleSave = async (e) => {
                                 id="roundoff" 
                                 checked={formData.roundoff} 
                                 onChange={e => setFormData({...formData, roundoff: e.target.checked})} 
-                                className="w-4 h-4 accent-blue-600 mt-0.5" 
+                                className="w-4 h-4 accent-blue-600"
                             />
                             <label htmlFor="roundoff" className="text-sm font-medium text-slate-700">Roundoff</label>
                         </div>
@@ -371,7 +370,7 @@ const handleSave = async (e) => {
                         <div className="col-span-6">
                             <input 
                                 required 
-                                className="w-full p-1 border border-gray-400 rounded text-sm font-semibold uppercase focus:border-blue-500" 
+                                className="w-full p-1.5 border border-gray-400 rounded text-sm font-semibold uppercase focus:border-blue-500"
                                 value={formData.product_name} 
                                 onChange={e => setFormData({...formData, product_name: e.target.value.toUpperCase()})} 
                             />
@@ -394,7 +393,7 @@ const handleSave = async (e) => {
                         <div className="col-span-5">
                             <input 
                                 className="w-full p-1 border border-gray-400 rounded text-sm uppercase" 
-                                value={formData.short_description} 
+                                value={formData.short_description || ''}
                                 onChange={e => setFormData({...formData, short_description: e.target.value.toUpperCase()})} 
                             />
                         </div>
@@ -403,7 +402,7 @@ const handleSave = async (e) => {
                                 <label className="block text-xs text-slate-600 mb-0.5">Commodity</label>
                                 <select 
                                     className="w-full p-1 border border-gray-400 rounded text-xs focus:border-blue-500" 
-                                    value={formData.commodity} 
+                                    value={formData.commodity || ''}
                                     onChange={e => setFormData({...formData, commodity: e.target.value})}
                                 >
                                     <option value="">--</option>
@@ -416,7 +415,7 @@ const handleSave = async (e) => {
                                 <label className="block text-xs text-slate-600 mb-0.5">Comm. Code</label>
                                 <input 
                                     className="w-full p-1 border border-gray-400 rounded text-xs" 
-                                    value={formData.commodity_code} 
+                                    value={formData.commodity_code || ''}
                                     onChange={e => setFormData({...formData, commodity_code: e.target.value})} 
                                 />
                             </div>
@@ -426,7 +425,7 @@ const handleSave = async (e) => {
                         <div className="col-span-5">
                             <select 
                                 className="w-full p-1 border border-gray-400 rounded text-sm focus:border-blue-500" 
-                                value={formData.packing_type} 
+                                value={formData.packing_type || ''}
                                 onChange={e => setFormData({...formData, packing_type: e.target.value})}
                             >
                                 <option value="">--</option>
@@ -437,7 +436,7 @@ const handleSave = async (e) => {
                         <div className="col-span-3">
                             <select 
                                 className="w-full p-1 border border-gray-400 rounded text-sm focus:border-blue-500" 
-                                value={formData.fibre} 
+                                value={formData.fibre || ''}
                                 onChange={e => setFormData({...formData, fibre: e.target.value})}
                             >
                                 <option value="">--</option>
@@ -452,7 +451,7 @@ const handleSave = async (e) => {
                             <input 
                                 type="number" step="0.001" 
                                 className="w-32 p-1 border border-gray-400 rounded text-sm text-right" 
-                                value={formData.wt_per_cone} 
+                                value={formData.wt_per_cone || ''}
                                 onChange={e => setFormData({...formData, wt_per_cone: e.target.value})} 
                             />
                         </div>
@@ -461,7 +460,7 @@ const handleSave = async (e) => {
                             <input 
                                 type="number" 
                                 className="w-full p-1 border border-gray-400 rounded text-sm text-right" 
-                                value={formData.charity_rs} 
+                                value={formData.charity_rs || ''}
                                 onChange={e => setFormData({...formData, charity_rs: e.target.value})} 
                             />
                         </div>
@@ -472,7 +471,7 @@ const handleSave = async (e) => {
                             <input 
                                 type="number" 
                                 className="w-32 p-1 border border-gray-400 rounded text-sm text-right" 
-                                value={formData.no_of_cones_per_pack} 
+                                value={formData.no_of_cones_per_pack || ''}
                                 onChange={e => setFormData({...formData, no_of_cones_per_pack: e.target.value})} 
                             />
                         </div>
@@ -481,7 +480,7 @@ const handleSave = async (e) => {
                             <input 
                                 type="number" 
                                 className="w-full p-1 border border-gray-400 rounded text-sm text-right" 
-                                value={formData.other_receipt} 
+                                value={formData.other_receipt || ''}
                                 onChange={e => setFormData({...formData, other_receipt: e.target.value})} 
                             />
                         </div>
@@ -492,7 +491,7 @@ const handleSave = async (e) => {
                             <input 
                                 readOnly 
                                 className="w-28 p-1 bg-gray-100 border border-gray-400 rounded text-sm font-mono text-right" 
-                                value={formData.pack_nett_wt} 
+                                value={formData.pack_nett_wt || ''}
                             />
                         </div>
 
@@ -501,12 +500,12 @@ const handleSave = async (e) => {
                         <div className="col-span-9 flex gap-1.5">
                             <input 
                                 className="w-24 p-1 border border-gray-400 rounded text-sm font-mono" 
-                                value={formData.tariff_sub_head} 
+                                value={formData.tariff_sub_head || ''}
                                 onChange={e => handleTariffChange(e.target.value)} 
                             />
                             <select 
                                 className="flex-1 p-1 border border-gray-400 rounded text-sm focus:border-blue-500" 
-                                value={formData.tariff_sub_head} 
+                                value={formData.tariff_sub_head || ''}
                                 onChange={e => handleTariffChange(e.target.value)}
                             >
                                 <option value="">-- Select --</option>
@@ -518,12 +517,12 @@ const handleSave = async (e) => {
                         <div className="col-span-9 flex gap-1.5">
                             <input 
                                 className="w-24 p-1 border border-gray-400 rounded text-sm" 
-                                value={formData.printing_tariff_sub_head_no} 
+                                value={formData.printing_tariff_sub_head_no || ''}
                                 onChange={e => setFormData({...formData, printing_tariff_sub_head_no: e.target.value})} 
                             />
                             <input 
                                 className="flex-1 p-1 border border-gray-400 rounded text-sm" 
-                                value={formData.printing_tariff_desc} 
+                                value={formData.printing_tariff_desc || ''}
                                 onChange={e => setFormData({...formData, printing_tariff_desc: e.target.value})} 
                             />
                         </div>
@@ -533,7 +532,7 @@ const handleSave = async (e) => {
                         <div className="col-span-9">
                             <input 
                                 className="w-full p-1 border border-gray-400 rounded text-sm uppercase" 
-                                value={formData.product_type} 
+                                value={formData.product_type || ''}
                                 onChange={e => setFormData({...formData, product_type: e.target.value.toUpperCase()})} 
                             />
                         </div>
@@ -542,7 +541,7 @@ const handleSave = async (e) => {
                         <div className="col-span-9">
                             <input 
                                 className="w-full p-1 border border-gray-400 rounded text-sm uppercase" 
-                                value={formData.spinning_count_name} 
+                                value={formData.spinning_count_name || ''}
                                 onChange={e => setFormData({...formData, spinning_count_name: e.target.value.toUpperCase()})} 
                             />
                         </div>
@@ -552,7 +551,7 @@ const handleSave = async (e) => {
                             <input 
                                 type="number" step="0.001" 
                                 className="w-24 p-1 border border-gray-400 rounded text-sm text-right" 
-                                value={formData.converted_factor_40s} 
+                                value={formData.converted_factor_40s || ''}
                                 onChange={e => setFormData({...formData, converted_factor_40s: e.target.value})} 
                             />
                         </div>
@@ -561,7 +560,7 @@ const handleSave = async (e) => {
                         <div className="col-span-9">
                             <input 
                                 className="w-24 p-1 border border-gray-400 rounded text-sm font-mono" 
-                                value={formData.actual_count} 
+                                value={formData.actual_count || ''}
                                 onChange={e => setFormData({...formData, actual_count: e.target.value})} 
                             />
                         </div>
@@ -569,7 +568,7 @@ const handleSave = async (e) => {
                     </div>
 
                     {/* Footer */}
-                    <div className="flex justify-between items-center pt-4 border-t mt-3">
+                    <div className="flex justify-between items-center pt-3 border-t mt-3">
                         <div>
                             {formData.id && (
                                 <button
@@ -588,11 +587,11 @@ const handleSave = async (e) => {
                             )}
                         </div>
 
-                        <div className="flex gap-2.5">
+                        <div className="flex gap-2">
                             <button
                                 type="submit"
                                 disabled={submitLoading}
-                                className={`px-7 py-1.5 rounded text-sm font-bold flex items-center gap-1.5 ${
+                                className={`px-6 py-2 rounded text-xs font-bold flex items-center gap-1.5 ${
                                     submitLoading 
                                         ? 'bg-gray-400 text-gray-100 cursor-not-allowed' 
                                         : 'bg-blue-600 hover:bg-blue-700 text-white'
@@ -605,7 +604,7 @@ const handleSave = async (e) => {
                             <button
                                 type="button"
                                 onClick={() => setIsModalOpen(false)}
-                                className="px-7 py-1.5 border border-slate-500 rounded text-sm font-bold hover:bg-slate-50"
+                                className="px-6 py-2 border border-slate-400 rounded text-xs font-bold hover:bg-slate-50"
                             >
                                 Cancel
                             </button>

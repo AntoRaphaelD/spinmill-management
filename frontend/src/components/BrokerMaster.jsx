@@ -188,14 +188,14 @@ const BrokerMaster = () => {
             {/* Table */}
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                 <table className="w-full text-left">
-                    <thead className="bg-blue-700 border-b text-white text-sm font-bold uppercase tracking-wider">
+                    <thead className="bg-slate-900 text-white text-[10px] font-bold uppercase tracking-wider">
                         <tr>
-                            {isSelectionMode && <th className="p-4 w-12 text-center">#</th>}
-                            <th className="p-4">Broker Code</th>
-                            <th className="p-4">Broker Name</th>
-                            <th className="p-4 text-right">Commission</th>
-                            <th className="p-4">Address</th>
-                            {!isSelectionMode && <th className="p-4 w-10"></th>}
+                            {isSelectionMode && <th className="p-3 w-12 text-center">#</th>}
+                            <th className="p-3">Code</th>
+                            <th className="p-3">Broker Name</th>
+                            <th className="p-3 text-right">Commission</th>
+                            <th className="p-3">Address</th>
+                            {!isSelectionMode && <th className="p-3 w-10"></th>}
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -208,17 +208,17 @@ const BrokerMaster = () => {
                                 onClick={() => handleRowClick(item)}
                             >
                                 {isSelectionMode && (
-                                    <td className="p-4 text-center">
+                                    <td className="p-3 text-center">
                                         {selectedIds.includes(item.id) ? <CheckSquare size={18} className="text-blue-600 mx-auto"/> : <Square size={18} className="text-slate-200 mx-auto"/>}
                                     </td>
                                 )}
-                                <td className="p-4 text-base font-bold text-blue-600 font-mono">{item.broker_code}</td>
-                                <td className="p-4 text-base font-semibold text-slate-700 uppercase">{item.broker_name}</td>
-                                <td className="p-4 text-base font-bold text-right text-emerald-700">
+                                <td className="p-3 text-sm font-bold text-blue-600 font-mono">{item.broker_code}</td>
+                                <td className="p-3 text-sm font-semibold text-slate-700 uppercase">{item.broker_name}</td>
+                                <td className="p-3 text-xs font-bold text-right text-emerald-700">
                                     {item.commission_pct}{item.is_comm_per_kg ? '' : '%'}
                                 </td>
-                                <td className="p-4 text-base text-slate-600">{item.address || '—'}</td>
-                                {!isSelectionMode && <td className="p-4 text-slate-300"><Edit size={16} /></td>}
+                                <td className="p-3 text-xs text-slate-600">{item.address || '—'}</td>
+                                {!isSelectionMode && <td className="p-3 text-slate-300"><Edit size={16} /></td>}
                             </tr>
                         )) : (
                             <tr><td colSpan={6} className="p-12 text-center text-slate-400 font-medium">No brokers found</td></tr>
@@ -246,11 +246,11 @@ const BrokerMaster = () => {
       <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-5 flex justify-between items-center text-white shadow-md">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-white/15 rounded-lg">
-            <Briefcase size={22} />
+            <Briefcase size={20} />
           </div>
           <div>
             <h2 className="text-lg font-bold tracking-tight">Broker Master</h2>
-            <p className="text-blue-100/90 text-xs font-medium mt-0.5 uppercase tracking-wide">
+            <p className="text-blue-100/90 text-[10px] font-medium mt-0.5 uppercase tracking-wider">
               {formData.id ? 'Edit Broker' : 'New Broker'}
             </p>
           </div>
@@ -259,7 +259,7 @@ const BrokerMaster = () => {
           onClick={() => setIsModalOpen(false)}
           className="p-2 rounded-lg hover:bg-white/20 transition-colors active:scale-95"
         >
-          <X size={20} strokeWidth={3} />
+          <X size={18} strokeWidth={3} />
         </button>
       </div>
 
@@ -269,7 +269,7 @@ const BrokerMaster = () => {
 
           {/* Broker Code */}
           <div className="grid grid-cols-12 items-center gap-4">
-            <label className="col-span-4 text-right text-sm font-semibold text-slate-600 uppercase tracking-wide">
+            <label className="col-span-4 text-right text-xs font-semibold text-slate-600 uppercase tracking-wide">
               Broker Code
             </label>
             <div className="col-span-8">
@@ -277,7 +277,7 @@ const BrokerMaster = () => {
                 <Hash size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   readOnly
-                  className="w-40 pl-10 pr-4 py-2.5 bg-slate-100 border border-slate-300 rounded-lg font-mono font-bold text-slate-700 cursor-not-allowed shadow-inner"
+                  className="w-32 pl-10 pr-4 py-2 bg-slate-100 border border-slate-300 rounded-lg font-mono font-bold text-slate-700 cursor-not-allowed shadow-inner text-sm"
                   value={formData.broker_code}
                 />
               </div>
@@ -286,14 +286,14 @@ const BrokerMaster = () => {
 
           {/* Broker Name */}
           <div className="grid grid-cols-12 items-center gap-4">
-            <label className="col-span-4 text-right text-sm font-semibold text-slate-700 uppercase tracking-wide">
+            <label className="col-span-4 text-right text-xs font-semibold text-slate-700 uppercase tracking-wide">
               Name <span className="text-red-500">*</span>
             </label>
             <div className="col-span-8 relative">
               <User size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
               <input
                 required
-                className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-xl text-slate-800 font-semibold uppercase focus:border-blue-500 focus:ring-2 focus:ring-blue-400/30 outline-none transition-all"
+                className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg text-slate-800 font-semibold uppercase focus:border-blue-500 focus:ring-1 focus:ring-blue-400/30 outline-none transition-all text-xs"
                 value={formData.broker_name}
                 onChange={e => setFormData({ ...formData, broker_name: e.target.value.toUpperCase() })}
                 placeholder="Broker full name"
@@ -303,14 +303,14 @@ const BrokerMaster = () => {
 
           {/* Address */}
           <div className="grid grid-cols-12 gap-4">
-            <label className="col-span-4 text-right pt-2 text-sm font-semibold text-slate-700 uppercase tracking-wide">
+            <label className="col-span-4 text-right pt-2 text-xs font-semibold text-slate-700 uppercase tracking-wide">
               Address
             </label>
             <div className="col-span-8 relative">
               <MapPin size={18} className="absolute left-3 top-3 text-slate-400 pointer-events-none" />
               <textarea
                 rows={3}
-                className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-xl text-slate-700 resize-none focus:border-blue-500 focus:ring-2 focus:ring-blue-400/30 outline-none transition-all"
+                className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg text-slate-700 resize-none focus:border-blue-500 focus:ring-1 focus:ring-blue-400/30 outline-none transition-all text-xs"
                 value={formData.address || ''}
                 onChange={e => setFormData({ ...formData, address: e.target.value.toUpperCase() })}
                 placeholder="Street, city, pincode..."
@@ -320,7 +320,7 @@ const BrokerMaster = () => {
 
           {/* Commission */}
           <div className="grid grid-cols-12 items-start gap-4">
-            <label className="col-span-4 text-right pt-2 text-sm font-semibold text-slate-700 uppercase tracking-wide">
+            <label className="col-span-4 text-right pt-2 text-xs font-semibold text-slate-700 uppercase tracking-wide">
               Commission
             </label>
             <div className="col-span-8 space-y-3">
@@ -332,40 +332,39 @@ const BrokerMaster = () => {
                   type="number"
                   step="0.01"
                   min="0"
-                  className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-xl text-right font-bold text-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-400/30 outline-none transition-all"
+                  className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg text-right font-bold text-slate-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-400/30 outline-none transition-all text-xs"
                   value={formData.commission_pct}
                   onChange={e => setFormData({ ...formData, commission_pct: Number(e.target.value) || 0 })}
                   placeholder="0.00"
                 />
               </div>
 
-              <label className="flex items-center gap-3 px-4 py-2.5 bg-white border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-50 transition-colors">
+              <label className="flex items-center gap-3 px-4 py-2 bg-white border border-slate-200 rounded-lg cursor-pointer hover:bg-slate-50 transition-colors">
                 <input
                   type="checkbox"
                   checked={formData.is_comm_per_kg}
                   onChange={e => setFormData({ ...formData, is_comm_per_kg: e.target.checked })}
-                  className="w-5 h-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                  className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                 />
-                <span className="text-sm font-semibold text-slate-700">Per Kg (instead of %)</span>
+                <span className="text-xs font-semibold text-slate-700">Per Kg (instead of %)</span>
               </label>
             </div>
           </div>
 
           {/* Footer */}
-          <div className="flex justify-end gap-3 pt-5 border-t border-slate-200 mt-3">
-            <button
+          <div className="flex justify-end gap-2 pt-4 border-t border-slate-200 mt-3">
+            <button_
               type="button"
               onClick={() => setIsModalOpen(false)}
-              className="px-6 py-2.5 text-slate-600 font-medium rounded-xl hover:bg-slate-100 transition-colors flex items-center gap-2"
+              className="px-6 py-2 text-slate-600 font-medium rounded-lg hover:bg-slate-100 transition-colors flex items-center gap-2 text-xs"
             >
               Cancel
-            </button>
+            </button_>
 
             <button
               type="submit"
               disabled={submitLoading}
-              className={`
-                min-w-[140px] px-7 py-2.5 rounded-xl font-semibold shadow-md flex items-center justify-center gap-2 transition-all
+              className={`min-w-[120px] px-6 py-2 rounded-lg font-semibold shadow-md flex items-center justify-center gap-2 transition-all text-xs
                 ${submitLoading
                   ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
                   : 'bg-blue-600 hover:bg-blue-700 text-white hover:shadow-blue-300 active:scale-[0.98]'

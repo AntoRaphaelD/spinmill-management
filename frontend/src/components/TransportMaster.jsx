@@ -213,14 +213,14 @@ const TransportMaster = () => {
             {/* Table */}
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                 <table className="w-full text-left">
-                    <thead className="bg-blue-700 border-b text-white text-sm font-bold uppercase tracking-wider">
+                    <thead className="bg-slate-900 text-white text-[10px] font-bold uppercase tracking-wider">
                         <tr>
-                            {isSelectionMode && <th className="p-4 w-12 text-center">#</th>}
-                            <th className="p-4">Code</th>
-                            <th className="p-4">Transport Name</th>
-                            <th className="p-4">Place</th>
-                            <th className="p-4">Address</th>
-                            {!isSelectionMode && <th className="p-4 w-10"></th>}
+                            {isSelectionMode && <th className="p-3 w-12 text-center">#</th>}
+                            <th className="p-3">Code</th>
+                            <th className="p-3">Transport Name</th>
+                            <th className="p-3">Place</th>
+                            <th className="p-3">Address</th>
+                            {!isSelectionMode && <th className="p-3 w-10"></th>}
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -234,15 +234,15 @@ const TransportMaster = () => {
                                     onClick={() => handleRowClick(item)}
                                 >
                                     {isSelectionMode && (
-                                        <td className="p-4 text-center">
+                                        <td className="p-3 text-center">
                                             {selectedIds.includes(item.id) ? <CheckSquare size={18} className="text-blue-600 mx-auto"/> : <Square size={18} className="text-slate-200 mx-auto"/>}
                                         </td>
                                     )}
-                                    <td className="p-4 text-base font-bold text-blue-600 font-mono">{item.transport_code}</td>
-                                    <td className="p-4 text-base font-semibold text-slate-700 uppercase">{item.transport_name}</td>
-                                    <td className="p-4 text-base font-bold text-slate-600 uppercase">{item.place || '—'}</td>
-                                    <td className="p-4 text-base text-slate-600 truncate max-w-[400px]">{item.address || '—'}</td>
-                                    {!isSelectionMode && <td className="p-4 text-slate-300"><Edit size={16} /></td>}
+                                    <td className="p-3 text-sm font-bold text-blue-600 font-mono">{item.transport_code}</td>
+                                    <td className="p-3 text-sm font-semibold text-slate-700 uppercase">{item.transport_name}</td>
+                                    <td className="p-3 text-sm font-bold text-slate-600 uppercase">{item.place || '—'}</td>
+                                    <td className="p-3 text-xs text-slate-600 truncate max-w-[400px]">{item.address || '—'}</td>
+                                    {!isSelectionMode && <td className="p-3 text-slate-300"><Edit size={16} /></td>}
                                 </tr>
                             ))
                         ) : (
@@ -280,7 +280,7 @@ const TransportMaster = () => {
         </div>
         <button
           onClick={() => setIsModalOpen(false)}
-          className="p-2 rounded-lg hover:bg-white/20 transition-colors active:scale-95"
+          className="p-1.5 rounded-lg hover:bg-white/20 transition-colors active:scale-95"
         >
           <X size={20} strokeWidth={3} />
         </button>
@@ -291,7 +291,7 @@ const TransportMaster = () => {
         <form onSubmit={handleSave} className="space-y-4.5">
 
           {/* Transport Code */}
-          <div className="grid grid-cols-12 items-center gap-4">
+          <div className="grid grid-cols-12 items-center gap-2">
             <label className="col-span-4 text-right text-sm font-semibold text-slate-600 uppercase tracking-wide">
               Transport Code
             </label>
@@ -300,7 +300,7 @@ const TransportMaster = () => {
                 <Hash size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                 <input
                   readOnly
-                  className="w-44 pl-10 pr-4 py-2.5 bg-slate-100 border border-slate-300 rounded-lg font-mono font-bold text-slate-700 cursor-not-allowed shadow-inner"
+                  className="w-36 pl-10 pr-4 py-2 bg-slate-100 border border-slate-300 rounded-lg font-mono font-bold text-slate-700 cursor-not-allowed shadow-inner text-sm"
                   value={formData.transport_code}
                 />
               </div>
@@ -308,7 +308,7 @@ const TransportMaster = () => {
           </div>
 
           {/* Transport Name */}
-          <div className="grid grid-cols-12 items-center gap-4">
+          <div className="grid grid-cols-12 items-center gap-2">
             <label className="col-span-4 text-right text-sm font-semibold text-slate-700 uppercase tracking-wide">
               Transport Name <span className="text-red-500">*</span>
             </label>
@@ -316,7 +316,7 @@ const TransportMaster = () => {
               <Briefcase size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
               <input
                 required
-                className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-xl text-slate-800 font-semibold uppercase focus:border-blue-500 focus:ring-2 focus:ring-blue-400/30 outline-none transition-all"
+                className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg text-slate-800 font-semibold uppercase focus:border-blue-500 focus:ring-1 focus:ring-blue-400/30 outline-none transition-all text-sm"
                 value={formData.transport_name}
                 onChange={e => setFormData({ ...formData, transport_name: e.target.value.toUpperCase() })}
                 placeholder="e.g. ABC TRANSPORTS"
@@ -325,14 +325,14 @@ const TransportMaster = () => {
           </div>
 
           {/* Place */}
-          <div className="grid grid-cols-12 items-center gap-4">
+          <div className="grid grid-cols-12 items-center gap-2">
             <label className="col-span-4 text-right text-sm font-semibold text-slate-700 uppercase tracking-wide">
               Place
             </label>
             <div className="col-span-8 relative">
               <MapPin size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
               <input
-                className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-xl text-slate-700 uppercase focus:border-blue-500 focus:ring-2 focus:ring-blue-400/30 outline-none transition-all"
+                className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg text-slate-700 uppercase focus:border-blue-500 focus:ring-1 focus:ring-blue-400/30 outline-none transition-all text-sm"
                 value={formData.place || ''}
                 onChange={e => setFormData({ ...formData, place: e.target.value.toUpperCase() })}
                 placeholder="e.g. COIMBATORE"
@@ -341,7 +341,7 @@ const TransportMaster = () => {
           </div>
 
           {/* Address */}
-          <div className="grid grid-cols-12 gap-4">
+          <div className="grid grid-cols-12 gap-2">
             <label className="col-span-4 text-right pt-2 text-sm font-semibold text-slate-700 uppercase tracking-wide">
               Address
             </label>
@@ -349,7 +349,7 @@ const TransportMaster = () => {
               <MapPin size={18} className="absolute left-3 top-3 text-slate-400 pointer-events-none" />
               <textarea
                 rows={4}
-                className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-xl text-slate-700 resize-none focus:border-blue-500 focus:ring-2 focus:ring-blue-400/30 outline-none transition-all"
+                className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg text-slate-700 resize-none focus:border-blue-500 focus:ring-1 focus:ring-blue-400/30 outline-none transition-all text-xs"
                 value={formData.address || ''}
                 onChange={e => setFormData({ ...formData, address: e.target.value.toUpperCase() })}
                 placeholder="Full address including pincode..."
@@ -358,11 +358,11 @@ const TransportMaster = () => {
           </div>
 
           {/* Footer */}
-          <div className="flex justify-end gap-3 pt-5 border-t border-slate-200 mt-3">
+          <div className="flex justify-end gap-2 pt-4 border-t border-slate-200 mt-3">
             <button
               type="button"
               onClick={() => setIsModalOpen(false)}
-              className="px-6 py-2.5 text-slate-600 font-medium rounded-xl hover:bg-slate-100 transition-colors flex items-center gap-2"
+              className="px-6 py-2 text-slate-600 font-medium rounded-lg hover:bg-slate-100 transition-colors flex items-center gap-2 text-xs"
             >
               Cancel
             </button>
@@ -370,8 +370,7 @@ const TransportMaster = () => {
             <button
               type="submit"
               disabled={submitLoading}
-              className={`
-                min-w-[140px] px-7 py-2.5 rounded-xl font-semibold shadow-md flex items-center justify-center gap-2 transition-all
+              className={`min-w-[120px] px-6 py-2 rounded-lg font-semibold shadow-md flex items-center justify-center gap-2 transition-all text-xs
                 ${submitLoading
                   ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
                   : 'bg-blue-600 hover:bg-blue-700 text-white hover:shadow-blue-300 active:scale-[0.98]'

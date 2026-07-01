@@ -1261,21 +1261,16 @@ const InvoicePreparation = () => {
             {/* PREPARATION MODAL */}
             {isModalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4">
-                    <div className="bg-white rounded-lg shadow-2xl w-full max-w-[1150px] flex flex-col overflow-hidden border border-slate-300 h-[96vh]">
+                    <div className="bg-[#D9E5F7] rounded-lg shadow-2xl w-full max-w-[1250px] flex flex-col overflow-hidden border border-slate-400 h-[98vh]">
 
-                        {/* <div className="bg-white p-2 border-b border-slate-300 flex justify-between items-center shadow-sm">
-                            <span className="text-sm font-bold text-slate-700 flex items-center gap-2"><Layers size={16}/> Invoice Preparation</span>
-                            <button onClick={() => setIsModalOpen(false)} className="text-white bg-red-500 hover:bg-red-600 px-2 rounded font-bold">×</button>
-                        </div> */}
-
-                        <div className="bg-[#2557A7] p-4 text-white">
-                            <h2 className="text-xl font-black">Invoice</h2>
-                            <p className="text-[13px] opacity-95 uppercase font-bold tracking-wide">To Add, Modify Invoice details.</p>
+                        <div className="bg-[#FCD166] p-1.5 border-b border-slate-400 flex justify-between items-center">
+                            <span className="text-[13px] font-bold text-slate-700 ml-2 flex items-center gap-2"><Layers size={14} /> Invoice Preparation</span>
+                            <button onClick={() => setIsModalOpen(false)} className="bg-red-500 text-white px-2 rounded font-bold">×</button>
                         </div>
 
                         <div className="flex bg-[#D9E5F7] pt-2 px-4 gap-1">
                             {['head', 'detail'].map(t => (
-                                <button key={t} onClick={() => setActiveTab(t)} className={`px-6 py-2 text-sm font-black border border-b-0 rounded-t-md transition-all ${activeTab === t ? 'bg-white text-blue-800 border-slate-500 shadow-sm' : 'bg-[#EBF2FA] text-slate-700 border-slate-300'}`}>
+                                <button key={t} onClick={() => setActiveTab(t)} className={`px-6 py-1 text-[11px] font-bold border border-b-0 rounded-t-md ${activeTab === t ? 'bg-white text-blue-700 border-slate-400' : 'bg-[#EBF2FA] text-slate-500 border-slate-300'}`}>
                                     {t.toUpperCase()}
                                 </button>
                             ))}
@@ -1284,19 +1279,19 @@ const InvoicePreparation = () => {
                         <div className="flex-1 bg-white mx-4 mb-4 border border-slate-400 p-5 overflow-hidden flex flex-col">
                             {activeTab === 'head' ? (
                                 <div className="grid grid-cols-12 gap-6 h-full overflow-y-auto">
-                                    <div className="col-span-8 space-y-2.5">
+                                    <div className="col-span-8 space-y-2">
                                         <div className="flex items-center gap-2">
-                                            <RowInput label="Invoice No." value={formData.invoice_no} readOnly width="w-32" color="bg-[#F5F8FA]" />
+                                            <RowInput label="Invoice No." value={formData.invoice_no} readOnly color="bg-slate-50" />
                                             <RowSelect label="Load No" value={formData.load_id} options={listData.loads.map(l => ({ value: l.id, label: l.load_no }))} onChange={e => handleLoadSync(e.target.value)} width="w-44" />
                                         </div>
-                                        <RowInput label="Date" type="date" value={formData.date} onChange={e => setFormData({ ...formData, date: e.target.value })} width="w-44" />
+                                        <RowInput label="Date" type="date" value={formData.date} onChange={e => setFormData({ ...formData, date: e.target.value })} />
                                         <RowSelect
                                             label="Sales Type"
                                             value={formData.sales_type}
                                             options={[
                                                 { value: 'GST SALES', label: 'GST SALES' },
                                                 { value: 'DEPOT SALES', label: 'DEPOT SALES' },
-                                                { value: 'DIRECT SALES', label: 'DIRECT SALES' }
+                                                { value: 'DIRECT SALES', label: 'DIRECT SALES' },
                                             ]}
                                             onChange={e => setFormData({
                                                 ...formData,
@@ -1317,14 +1312,14 @@ const InvoicePreparation = () => {
                                             })}
                                         />
                                         <RowSelect label="Party name" value={formData.party_id} options={listData.parties.map(p => ({ value: p.id, label: p.account_name }))} onChange={e => handleAccountSync(e.target.value)} />
-                                        <div className="flex flex-col gap-1 ml-[120px]">
-                                            <input readOnly value={formData.addr1} className="border border-slate-400 p-2 text-[13px] bg-[#F5F8FA] font-bold outline-none text-center" />
-                                            <input readOnly value={formData.addr2} className="border border-slate-400 p-2 text-[13px] bg-[#F5F8FA] font-bold outline-none text-center" />
-                                            <input readOnly value={formData.addr3} className="border border-slate-400 p-2 text-[13px] bg-[#F5F8FA] font-bold outline-none text-center" />
+                                        <div className="flex flex-col gap-1 ml-[140px]">
+                                            <input readOnly value={formData.addr1} className="border border-slate-300 p-1 px-2 text-[11px] bg-slate-50 font-bold outline-none" />
+                                            <input readOnly value={formData.addr2} className="border border-slate-300 p-1 px-2 text-[11px] bg-slate-50 font-bold outline-none" />
+                                            <input readOnly value={formData.addr3} className="border border-slate-300 p-1 px-2 text-[11px] bg-slate-50 font-bold outline-none" />
                                         </div>
-                                        <div className="flex items-center gap-8 ml-[120px] py-1">
-                                            <div className="flex items-center gap-2"><span className="text-[13px] font-black text-slate-800">Credit days</span><input type="number" className="border border-slate-400 w-20 p-2 text-sm text-center font-black" value={formData.credit_days} onChange={e => setFormData({ ...formData, credit_days: e.target.value })} /></div>
-                                            <div className="flex items-center gap-2"><span className="text-[13px] font-black text-slate-800">Interest %</span><input type="number" className="border border-slate-400 w-20 p-2 text-sm text-center font-black" value={formData.interest_percentage} onChange={e => setFormData({ ...formData, interest_percentage: e.target.value })} /></div>
+                                        <div className="flex items-center gap-8 ml-[140px] py-1">
+                                            <div className="flex items-center gap-2"><span className="text-[10px] font-black text-slate-700 uppercase">Credit days</span><input type="number" className="border border-slate-300 w-20 p-1 text-sm text-center font-bold" value={formData.credit_days} onChange={e => setFormData({ ...formData, credit_days: e.target.value })} /></div>
+                                            <div className="flex items-center gap-2"><span className="text-[10px] font-black text-slate-700 uppercase">Interest %</span><input type="number" className="border border-slate-300 w-20 p-1 text-sm text-center font-bold" value={formData.interest_percentage} onChange={e => setFormData({ ...formData, interest_percentage: e.target.value })} /></div>
                                         </div>
                                         <RowSelect
                                             label="Broker"
@@ -1356,13 +1351,13 @@ const InvoicePreparation = () => {
                                         </div>
                                         <div className="grid grid-cols-2 gap-4">
                                             <RowInput label="Prepare Time" type="text" value={formData.prepare_time} onChange={e => setFormData({ ...formData, prepare_time: e.target.value })} />
-                                            <RowInput label="Form JJ" value={formData.form_j} onChange={e => setFormData({ ...formData, form_j: e.target.value })} width="w-24" />
+                                            <RowInput label="Form JJ" value={formData.form_j} onChange={e => setFormData({ ...formData, form_j: e.target.value })} />
                                         </div>
-                                        <RowInput label="Sales Against" value={formData.sales_against} onChange={e => setFormData({ ...formData, sales_against: e.target.value })} color="bg-rose-50" />
+                                        <RowInput label="Sales Against" value={formData.sales_against} onChange={e => setFormData({ ...formData, sales_against: e.target.value })} />
                                         <RowInput label="EPCG No" value={formData.epcg_no} onChange={e => setFormData({ ...formData, epcg_no: e.target.value })} />
                                     </div>
-                                    <div className="col-span-4 bg-[#F5F8FA] border border-slate-400 p-5 flex flex-col gap-1.5 rounded shadow-inner">
-                                        <h3 className="text-sm font-black text-slate-800 mb-2 border-b border-slate-400 pb-2 uppercase tracking-wide text-center">Invoice Summary</h3>
+                                    <div className="col-span-4 bg-slate-50 border border-slate-300 p-4 rounded flex flex-col gap-1 shadow-inner font-black overflow-y-auto">
+                                        <h3 className="text-[10px] text-blue-800 mb-1 border-b pb-1 uppercase tracking-tighter font-black">Invoice Summary</h3>
                                         <TotalRow label="Assessable Value" value={formData.total_assessable} />
                                         <TotalRow label="Charity" value={formData.total_charity} />
                                         <TotalRow label="VAT" value={formData.total_vat} />
@@ -1377,24 +1372,24 @@ const InvoicePreparation = () => {
                                         <TotalRow label="Freight" value={formData.freight_charges} />
                                         <TotalRow label="Other" value={formData.total_other} />
 
-                                        <div className="mt-auto pt-4 border-t-2 border-slate-400 space-y-1.5">
-                                            <TotalRow label="Gross Total" value={formData.sub_total} />
+                                        <div className="mt-auto pt-4 border-t-2 border-slate-400 space-y-1">
+                                            <TotalRow label="Sub Total" value={formData.sub_total} />
 
                                             {/* 🟢 TCS moved here to show it is part of the final deduction process */}
-                                            <div className="flex justify-between items-center text-[13px] py-1 px-2 bg-red-50 rounded border border-red-200">
+                                            <div className="flex justify-between items-center text-[10px] py-0.5 px-2 bg-red-50 rounded border border-red-200">
                                                 <span className="font-black text-red-600 uppercase tracking-tighter">(-) TCS</span>
                                                 <input
                                                     readOnly
                                                     value={num(formData.total_tcs).toLocaleString()}
-                                                    className="w-32 border border-red-300 text-center p-1.5 font-mono bg-white outline-none font-black text-red-600"
+                                                    className="w-32 border border-red-300 text-right p-0.5 font-mono text-[11px] bg-white outline-none font-black text-red-600"
                                                 />
                                             </div>
 
                                             <TotalRow label="Round off" value={formData.round_off} />
 
-                                            <div className="flex justify-between items-center py-2 px-2 bg-white border border-slate-400 mt-2 shadow-sm">
-                                                <span className="text-sm font-black uppercase text-slate-800">Net Amount</span>
-                                                <span className="text-2xl font-black font-mono text-blue-800">₹ {num(formData.net_amount).toLocaleString()}</span>
+                                            <div className="flex justify-between items-center py-2 px-2 bg-white border border-slate-400 rounded shadow-sm mt-1">
+                                                <span className="text-[11px] uppercase font-black">Net Amount</span>
+                                                <span className="text-xl font-mono text-blue-700 font-black">₹ {num(formData.net_amount).toLocaleString()}</span>
                                             </div>
                                         </div>
                                     </div>
@@ -1402,25 +1397,25 @@ const InvoicePreparation = () => {
                             ) : (
                                 /* TAB 2: DETAIL MATRIX */
                                 <div className="space-y-4 h-full flex flex-col overflow-hidden">
-                                    <div className="bg-[#EBF2FA] p-3 border border-slate-300 flex items-center justify-between rounded shadow-sm">
-                                        <div className="flex items-center gap-3">
-                                            <span className="text-[13px] font-black text-slate-800">Select with order No.</span>
-                                            <select className="border border-slate-400 text-sm p-2 min-w-[200px] font-black outline-none text-center bg-white" onChange={handleOrderSync}>
+                                    <div className="bg-blue-50 p-2 border border-blue-200 flex items-center justify-between rounded shadow-sm">
+                                        <div className="flex items-center gap-4">
+                                            <span className="text-[10px] font-black uppercase text-blue-700">Sync Mill Order:</span>
+                                            <select className="border border-slate-300 text-[11px] p-1 w-72 font-bold rounded" onChange={handleOrderSync}>
                                                 <option value="">-- Order No --</option>
                                                 {listData.orders.map(o => <option key={o.id} value={`WITH|${o.order_no}`}>{o.order_no}</option>)}
                                             </select>
                                         </div>
-                                        <div className="flex items-center gap-3">
-                                            <span className="text-[13px] font-black text-slate-800">Select without order No.</span>
-                                            <select className="border border-slate-400 text-sm p-2 min-w-[200px] font-black outline-none text-center bg-white" onChange={handleOrderSync}>
+                                        <div className="flex items-center gap-4">
+                                            <span className="text-[10px] font-black uppercase text-blue-700">Sync Direct Doc:</span>
+                                            <select className="border border-slate-300 text-[11px] p-1 w-72 font-bold rounded" onChange={handleOrderSync}>
                                                 <option value="">-- Direct Doc --</option>
                                                 {listData.directOrders.map(o => <option key={o.id} value={`WITHOUT|${o.order_no}`}>{o.order_no}</option>)}
                                             </select>
                                         </div>
                                     </div>
 
-                                    <div className="flex-1 border border-slate-300 overflow-x-auto bg-[#F5F8FA]">
-                                        <table className="min-w-[9800px] text-[13px] border-collapse bg-white">
+                                    <div className="flex-1 border border-slate-300 overflow-x-auto bg-slate-50 shadow-inner rounded">
+                                        <table className="min-w-[9800px] text-[10px] border-collapse bg-white">
                                             <thead className="bg-blue-50 sticky top-0 z-10 border-b-2 border-slate-500 text-slate-900">
                                                 <tr className="h-12">
                                                     <th className="p-3 border-r w-10"></th>
@@ -1477,14 +1472,14 @@ const InvoicePreparation = () => {
                                             </thead>
                                             <tbody className="divide-y divide-slate-300">
                                                 {gridRows.map((r, i) => (
-                                                    <tr key={i} className="h-12 hover:bg-blue-50 font-black text-slate-900">
+                                                    <tr key={i} className="hover:bg-blue-50">
                                                         <td className="p-2 border-r text-center text-slate-300">›</td>
                                                         <td className="p-2 border-r text-center text-blue-800 font-mono bg-slate-50">{r.order_no}</td>
                                                         <td className="p-2 border-r text-center uppercase text-slate-800 bg-slate-50">{r.product_description}</td>
                                                         <td className="p-0 border-r w-24">
                                                             <input
                                                                 type="number"
-                                                                className="w-full h-full p-2 text-center bg-pink-50 outline-none focus:bg-pink-100 font-black"
+                                                                className="w-full h-full p-2 text-center bg-pink-50 outline-none focus:bg-pink-100 font-bold"
                                                                 value={r.packs}
                                                                 onChange={e => updateGrid(i, 'packs', e.target.value)}
                                                             />
@@ -1492,7 +1487,7 @@ const InvoicePreparation = () => {
                                                         <td className="p-0 border-r w-32">
                                                             <input
                                                                 type="text"
-                                                                className="w-full h-full p-2 text-center bg-white outline-none uppercase font-bold"
+                                                                className="w-full h-full p-2 text-center bg-white outline-none uppercase font-bold text-slate-800"
                                                                 value={r.packing_type || ''}
                                                                 onChange={e => updateGrid(i, 'packing_type', e.target.value)}
                                                             />
@@ -1500,31 +1495,31 @@ const InvoicePreparation = () => {
                                                         <td className="p-0 border-r w-32">
                                                             <input
                                                                 type="number"
-                                                                className="w-full h-full p-2 text-center text-blue-700 font-black outline-none bg-blue-50"
+                                                                className="w-full h-full p-2 text-center text-blue-700 font-bold outline-none bg-blue-50"
                                                                 value={r.total_kgs}
                                                                 onChange={e => updateGrid(i, 'total_kgs', e.target.value)}
                                                             />
                                                         </td>
                                                         <td className="p-0 border-r w-32">
-                                                            <input type="number" className="w-full h-full p-2 text-center bg-emerald-50 text-emerald-700 outline-none font-black"
+                                                            <input type="number" className="w-full h-full p-2 text-center bg-emerald-50 text-emerald-700 outline-none font-bold"
                                                                 value={r.avg_content || 0} readOnly />
                                                         </td>
                                                         <td className="p-0 border-r w-32">
                                                             <input
                                                                 type="number"
-                                                                className="w-full h-full p-2 text-center outline-none bg-white font-black"
+                                                                className="w-full h-full p-2 text-center outline-none bg-white font-bold"
                                                                 value={r.rate}
                                                                 onChange={e => updateGrid(i, 'rate', e.target.value)}
                                                             />
                                                         </td>
-                                                        <td className="p-0 border-r w-24"><input type="text" className="w-full h-full p-2 text-center outline-none bg-white uppercase font-bold" value={r.rate_per || ''} onChange={e => updateGrid(i, 'rate_per', e.target.value)} /></td>
-                                                        <td className="p-1 border-r"><input type="text" className="w-full p-2 text-[13px] border border-slate-300 rounded font-black uppercase text-center" value={r.identification_mark || ''} onChange={e => updateGrid(i, 'identification_mark', e.target.value)} /></td>
+                                                        <td className="p-0 border-r w-24"><input type="text" className="w-full h-full p-2 text-center outline-none bg-white uppercase font-bold text-slate-800" value={r.rate_per || ''} onChange={e => updateGrid(i, 'rate_per', e.target.value)} /></td>
+                                                        <td className="p-1 border-r"><input type="text" className="w-full p-1 border border-slate-300 rounded font-bold uppercase text-center" value={r.identification_mark || ''} onChange={e => updateGrid(i, 'identification_mark', e.target.value)} /></td>
                                                         <td className="p-2 border-r text-center bg-blue-100 text-blue-800">{num(r.assessable_value).toFixed(2)}</td>
-                                                        <td className="p-0 border-r w-28"><input type="number" className="w-full h-full p-2 text-center outline-none bg-white font-black" value={r.charity_per_bale || 0} onChange={e => updateGrid(i, 'charity_per_bale', e.target.value)} /></td>
+                                                        <td className="p-0 border-r w-28"><input type="number" className="w-full h-full p-2 text-center outline-none bg-white font-bold" value={r.charity_per_bale || 0} onChange={e => updateGrid(i, 'charity_per_bale', e.target.value)} /></td>
                                                         <td className="p-0 border-r w-32">
                                                             <input
                                                                 type="number"
-                                                                className="w-full h-full p-2 text-center text-orange-600 outline-none bg-white font-black"
+                                                                className="w-full h-full p-2 text-center text-orange-600 outline-none bg-white font-bold"
                                                                 value={num(r.charity_amt)}
                                                                 onChange={e => updateGrid(i, 'charity_amt', e.target.value)}
                                                             />
@@ -1569,7 +1564,7 @@ const InvoicePreparation = () => {
                         </div>
 
                         {/* Modal Footer */}
-                        <div className="bg-[#D9E5F7] p-4 border-t border-slate-400 flex justify-between items-center shadow-lg">
+                        <div className="bg-[#D9E5F7] p-3 border-t border-slate-400 flex justify-between gap-3 px-6 shadow-inner">
                             <div className="flex items-center gap-2">
                                 <input type="checkbox" checked={formData.is_approved} onChange={e => setFormData({ ...formData, is_approved: e.target.checked })} className="w-4 h-4" />
                                 <span className="text-xs font-black text-blue-800">Approval</span>
@@ -1583,7 +1578,7 @@ const InvoicePreparation = () => {
                                 <FooterBtn icon={<Printer size={14} />} label="Report [A80]" />
                                 <button
                                     onClick={exportToJSON}
-                                    className="bg-indigo-600 text-white border border-indigo-700 px-4 py-1.5 text-[10px] font-black flex items-center gap-1.5 hover:bg-indigo-700 shadow-sm transition-all rounded active:scale-95"
+                                    className="bg-indigo-600 text-white px-6 py-2 text-[11px] font-black rounded flex items-center gap-2 shadow hover:bg-indigo-700 transition-all active:scale-95"
                                 >
                                     <FileJson size={14} className="text-indigo-100" />
                                     EXPORT JSON
@@ -1594,26 +1589,25 @@ const InvoicePreparation = () => {
                                 {/* EXPORT PDF BUTTON */}
                                 <button
                                     onClick={exportToPDF}
-                                    disabled={gridRows.length === 0}
-                                    className="bg-emerald-600 text-white border border-emerald-700 px-6 py-2 text-xs font-black uppercase hover:bg-emerald-700 shadow-md transition-all rounded flex items-center gap-2"
+                                    disabled={gridRows.length === 0} className="bg-emerald-600 text-white px-6 py-2 text-[11px] font-black rounded flex items-center gap-2 shadow hover:bg-emerald-700"
                                 >
-                                    <FileText size={16} /> Download Professional TAX INVOICE
+                                    <FileText size={16} /> DOWNLOAD PDF
                                 </button>
 
                                 {/* UPDATE BUTTON */}
                                 <button
                                     onClick={handleSave}
                                     disabled={submitLoading}
-                                    className="bg-white border border-slate-400 px-10 py-2 text-xs font-black flex items-center gap-2 hover:bg-green-50 shadow-sm transition-all rounded"
+                                    className="bg-blue-600 text-white border border-blue-700 px-12 py-2 text-[11px] font-black rounded flex items-center gap-2 hover:bg-blue-700 shadow-md"
                                 >
                                     <Save size={16} className="text-blue-700" />
-                                    {submitLoading ? 'Saving...' : 'Update'}
+                                    {submitLoading ? 'SAVING...' : 'COMMIT INVOICE'}
                                 </button>
 
                                 {/* CANCEL BUTTON */}
                                 <button
                                     onClick={() => setIsModalOpen(false)}
-                                    className="bg-white border border-slate-400 px-10 py-2 text-xs font-black flex items-center gap-2 hover:bg-red-50 shadow-sm transition-all rounded"
+                                    className="bg-white border border-slate-400 px-10 py-2 text-[11px] font-black rounded uppercase hover:bg-slate-50"
                                 >
                                     <X size={16} className="text-red-600" /> Cancel
                                 </button>
@@ -1668,46 +1662,46 @@ const InvoicePreparation = () => {
 // ==========================================
 const RowInput = ({ label, width = "w-full", color = "bg-white", ...props }) => (
     <div className="flex items-center">
-        <label className="w-[120px] text-[13px] font-black text-slate-800">{label}</label>
-        <input {...props} className={`border border-slate-400 p-2 text-[13px] text-center font-black outline-none focus:border-blue-600 shadow-inner ${width} ${color}`} />
+        <label className="w-[140px] text-[10px] font-black text-slate-700 uppercase tracking-tighter">{label}</label>
+        <input {...props} className={`border border-slate-300 p-1 px-2 text-[11px] font-bold outline-none rounded-sm shadow-sm ${width} ${color}`} />
     </div>
 );
 
 const RowSelect = ({ label, options, width = "w-full", ...props }) => (
     <div className="flex items-center">
-        <label className="w-[120px] text-[13px] font-black text-slate-800">{label}</label>
-        <select {...props} className={`border border-slate-400 p-2 text-[13px] text-center font-black outline-none focus:border-blue-600 bg-white ${width}`}>
+        <label className="w-[140px] text-[10px] font-black text-slate-700 uppercase tracking-tighter">{label}</label>
+        <select {...props} className={`border border-slate-300 p-1 text-[11px] font-bold outline-none rounded-sm shadow-sm ${width}`}>
             <option value="">-- Select --</option>
             {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
     </div>
 );
-const TotalRow = ({ label, value }) => {
+const TotalRow = ({ label, value, isEditable = false, onChange, color = "text-slate-900" }) => {
 
     const displayValue =
         value === '' || value === null || value === undefined
             ? ''
-            : Number(value).toLocaleString(undefined, {
-                minimumFractionDigits: 0,
-                maximumFractionDigits: 0
+            : Number(value).toLocaleString('en-IN', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
             });
 
     return (
-        <div className="flex justify-between items-center text-[13px] py-1 px-2 hover:bg-white rounded">
-            <span className="font-black text-slate-700 uppercase tracking-normal">
+        <div className="flex justify-between items-center text-[10px] py-0.5 px-2 hover:bg-white rounded transition-colors">
+            <span className="font-black text-slate-500 uppercase tracking-tighter">
                 {label}
             </span>
             <input
                 readOnly
-                value={displayValue}
-                className="w-32 border border-slate-400 text-center p-1.5 font-mono bg-white outline-none font-black shadow-inner"
+                value={value}
+                className={`w-32 border border-slate-300 text-right p-0.5 font-mono text-[11px] font-black outline-none rounded shadow-inner ${color} ${isEditable ? 'bg-white border-blue-400' : 'bg-slate-50'}`}
             />
         </div>
     );
 };
 
 const FooterBtn = ({ label, icon }) => (
-    <button className="bg-white border border-slate-400 px-3 py-2 text-[12px] font-black flex items-center gap-1.5 hover:bg-slate-50 shadow-sm transition-colors">
+    <button className="bg-white border border-slate-400 px-3 py-1.5 text-[10px] font-black flex items-center gap-1.5 hover:bg-slate-50 shadow-sm transition-colors">
         <span className="text-blue-700">{icon}</span> {label}
     </button>
 );
@@ -1719,17 +1713,17 @@ const renderPairCell = (row, idx, perKey, amtKey, isEditable, updateGrid, color 
                 type="number"
                 step="0.01"
                 disabled={!isEditable}
-                className={`w-full p-2.5 text-center text-[13px] font-black border-none outline-none focus:bg-yellow-50 ${color} disabled:bg-slate-50`}
+                className={`w-full p-2 text-center font-bold border rounded bg-white outline-none focus:border-blue-500 ${color} disabled:bg-slate-100 disabled:border-transparent`}
                 value={row[perKey] || 0}
                 onChange={(e) => updateGrid(idx, perKey, e.target.value)}
             />
         </td>
-        <td className={`p-1 border-r text-center font-black bg-slate-50 ${color}`}>
+        <td className={`p-2 border-r text-center font-bold bg-slate-50 ${color}`}>
             {amtEditable ? (
                 <input
                     type="number"
                     step="0.01"
-                    className={`w-full p-2.5 text-center text-[13px] font-black border-none outline-none focus:bg-yellow-50 bg-white ${color}`}
+                    className={`w-full p-2 text-center font-bold border-none outline-none focus:bg-yellow-50 bg-white ${color}`}
                     value={row[amtKey] || 0}
                     onChange={(e) => updateGrid(idx, amtKey, e.target.value)}
                 />

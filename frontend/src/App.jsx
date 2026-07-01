@@ -109,7 +109,7 @@ const SidebarLink = ({ to, label, icon: Icon, colorClass }) => {
       <motion.div
         whileHover={{ x: active ? 0 : 5 }}
         whileTap={{ scale: 0.98 }}
-        className={`flex items-center gap-3 px-3.5 py-3 rounded-xl transition-colors duration-300 relative z-10 overflow-hidden
+        className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg transition-colors duration-300 relative z-10 overflow-hidden
         ${active ? 'text-white' : 'text-slate-700 hover:text-slate-950'}`}
       >
         {!active && (
@@ -118,23 +118,23 @@ const SidebarLink = ({ to, label, icon: Icon, colorClass }) => {
         {active && (
           <motion.div 
             layoutId="sidebar-active"
-            className="absolute inset-0 bg-slate-950 rounded-xl -z-10 shadow-lg shadow-slate-200"
+            className="absolute inset-0 bg-slate-950 rounded-lg -z-10 shadow-lg shadow-slate-200"
             transition={{ type: "spring", bounce: 0.18, duration: 0.55 }}
           />
         )}
         {active && (
           <motion.div
             layoutId="sidebar-active-edge"
-            className="absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-blue-400"
+            className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r-full bg-blue-400"
             transition={{ type: "spring", bounce: 0.2, duration: 0.55 }}
           />
         )}
-        <span className={`h-9 w-9 rounded-lg flex items-center justify-center transition-all duration-300
+        <span className={`h-8 w-8 rounded-md flex items-center justify-center transition-all duration-300
           ${active ? 'bg-white/15 text-white shadow-inner' : `bg-white border border-slate-100 ${colorClass} group-hover:border-slate-200 group-hover:shadow-sm`}`}
         >
-          <Icon size={19} className="transition-transform duration-300 group-hover:scale-110" />
+          <Icon size={16} className="transition-transform duration-300 group-hover:scale-110" />
         </span>
-        <span className="min-w-0 flex-1 text-[14px] font-black uppercase tracking-normal truncate">{label}</span>
+        <span className="min-w-0 flex-1 text-xs font-black uppercase tracking-normal truncate">{label}</span>
         <ChevronRight size={14} className={`transition-all duration-300 ${active ? 'opacity-100 translate-x-0 text-blue-200' : 'opacity-0 -translate-x-2 text-slate-300 group-hover:opacity-100 group-hover:translate-x-0'}`} />
         <span className={`absolute right-3 top-1/2 h-1.5 w-1.5 -translate-y-1/2 rounded-full transition-opacity ${active ? 'opacity-0' : 'opacity-0 group-hover:opacity-100'} ${colorClass.replace('text-', 'bg-')}`} />
       </motion.div>
@@ -198,12 +198,12 @@ const SidebarSection = ({ title, children, tone = "blue" }) => {
       layout
       initial={{ opacity: 0, y: 14 }}
       animate={{ opacity: 1, y: 0 }}
-      className="mb-4 px-4"
+      className="mb-3 px-3"
     >
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
-        className="w-full mb-2 px-2 py-2.5 flex items-center gap-2 text-left rounded-lg hover:bg-slate-50 transition-colors"
+        className="w-full mb-1.5 px-2 py-2 flex items-center gap-2 text-left rounded-md hover:bg-slate-50 transition-colors"
       >
         <span className={`h-2 w-2 rounded-full ${toneClass}`} />
         <span className="flex-1 text-[11px] font-black text-slate-600 uppercase tracking-[0.16em]">{title}</span>
@@ -322,8 +322,8 @@ export default function App() {
         <motion.aside
           initial={{ x: -24, opacity: 0 }}
           animate={{ x: 0, opacity: 1 }}
-          transition={{ duration: 0.45, ease: "easeOut" }}
-          className="w-72 bg-white border-r border-slate-200 flex flex-col z-30 shadow-xl shadow-slate-200/40 relative overflow-hidden"
+          transition={{ duration: 0.4, ease: "easeOut" }}
+          className="w-64 bg-white border-r border-slate-200 flex flex-col z-30 shadow-xl shadow-slate-200/40 relative overflow-hidden"
         >
           <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-slate-50 to-transparent pointer-events-none" />
           <div className="absolute left-0 top-0 bottom-0 w-px bg-gradient-to-b from-blue-500 via-emerald-400 to-rose-500 opacity-70" />

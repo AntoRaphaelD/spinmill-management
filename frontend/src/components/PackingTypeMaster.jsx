@@ -204,12 +204,12 @@ const PackingTypeMaster = () => {
             {/* Table */}
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                 <table className="w-full text-left">
-                    <thead className="bg-blue-700 border-b text-white text-sm font-bold uppercase tracking-wider">
+                    <thead className="bg-slate-900 text-white text-[10px] font-bold uppercase tracking-wider">
                         <tr>
-                            {isSelectionMode && <th className="p-4 w-12 text-center">#</th>}
-                            <th className="p-4">Code</th>
-                            <th className="p-4">Packing Type Description</th>
-                            {!isSelectionMode && <th className="p-4 w-10"></th>}
+                            {isSelectionMode && <th className="p-3 w-12 text-center">#</th>}
+                            <th className="p-3">Code</th>
+                            <th className="p-3">Packing Type Description</th>
+                            {!isSelectionMode && <th className="p-3 w-10"></th>}
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -223,13 +223,13 @@ const PackingTypeMaster = () => {
                                     onClick={() => handleRowClick(item)}
                                 >
                                     {isSelectionMode && (
-                                        <td className="p-4 text-center">
+                                        <td className="p-3 text-center">
                                             {selectedIds.includes(item.id) ? <CheckSquare size={18} className="text-blue-600 mx-auto"/> : <Square size={18} className="text-slate-200 mx-auto"/>}
                                         </td>
                                     )}
-                                    <td className="p-4 text-base font-bold text-blue-600 font-mono">{item.id}</td>
-                                    <td className="p-4 text-base font-semibold text-slate-700 uppercase">{item.packing_type}</td>
-                                    {!isSelectionMode && <td className="p-4 text-slate-300"><Edit size={16} /></td>}
+                                    <td className="p-3 text-sm font-bold text-blue-600 font-mono">{item.id}</td>
+                                    <td className="p-3 text-sm font-semibold text-slate-700 uppercase">{item.packing_type}</td>
+                                    {!isSelectionMode && <td className="p-3 text-slate-300"><Edit size={16} /></td>}
                                 </tr>
                             ))
                         ) : (
@@ -249,11 +249,11 @@ const PackingTypeMaster = () => {
 
             {/* Modal */}
             {isModalOpen && (
-  <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4">
-    <div className="relative bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden border border-slate-200/70 animate-in zoom-in-95 duration-200 flex flex-col max-h-[85vh]">
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
+    <div className="relative bg-white w-full max-w-sm rounded-xl shadow-2xl overflow-hidden border border-slate-300 animate-in zoom-in-95 duration-200 flex flex-col max-h-[85vh]">
       
       {/* Header */}
-      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-5 flex justify-between items-center text-white shadow-md">
+      <div className="bg-slate-800 px-5 py-3 flex justify-between items-center text-white">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-white/15 rounded-lg">
             <Package size={22} /> {/* or Box, Layers, etc. — choose what fits */}
@@ -269,7 +269,7 @@ const PackingTypeMaster = () => {
           onClick={() => setIsModalOpen(false)}
           className="p-2 rounded-lg hover:bg-white/20 transition-colors active:scale-95"
         >
-          <X size={20} strokeWidth={3} />
+          <X size={18} strokeWidth={3} />
         </button>
       </div>
 
@@ -278,7 +278,7 @@ const PackingTypeMaster = () => {
         <form onSubmit={handleSave} className="space-y-5">
 
           {/* Code / ID */}
-          <div className="grid grid-cols-12 items-center gap-4">
+          <div className="grid grid-cols-12 items-center gap-2">
             <label className="col-span-4 text-right text-sm font-semibold text-slate-600 uppercase tracking-wide">
               Code
             </label>
@@ -287,7 +287,7 @@ const PackingTypeMaster = () => {
                 <Hash size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                 <input
                   readOnly
-                  className="w-44 pl-10 pr-4 py-2.5 bg-slate-100 border border-slate-300 rounded-lg font-mono font-bold text-slate-700 cursor-not-allowed shadow-inner"
+                  className="w-36 pl-10 pr-4 py-2 bg-slate-100 border border-slate-300 rounded-lg font-mono font-bold text-slate-700 cursor-not-allowed shadow-inner text-sm"
                   value={formData.id || 'New'}
                 />
               </div>
@@ -295,7 +295,7 @@ const PackingTypeMaster = () => {
           </div>
 
           {/* Packing Type */}
-          <div className="grid grid-cols-12 items-center gap-4">
+          <div className="grid grid-cols-12 items-center gap-2">
             <label className="col-span-4 text-right text-sm font-semibold text-slate-700 uppercase tracking-wide">
               Packing Type <span className="text-red-500">*</span>
             </label>
@@ -303,7 +303,7 @@ const PackingTypeMaster = () => {
               <Package size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
               <input
                 required
-                className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-xl text-slate-800 font-semibold uppercase focus:border-blue-500 focus:ring-2 focus:ring-blue-400/30 outline-none transition-all"
+                className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg text-slate-800 font-semibold uppercase focus:border-blue-500 focus:ring-1 focus:ring-blue-400/30 outline-none transition-all text-sm"
                 value={formData.packing_type || ''}
                 onChange={e => setFormData({ ...formData, packing_type: e.target.value.toUpperCase() })}
                 placeholder="e.g. CONE 2.0 KG"
@@ -312,11 +312,11 @@ const PackingTypeMaster = () => {
           </div>
 
           {/* Footer */}
-          <div className="flex justify-end gap-3 pt-6 border-t border-slate-200 mt-4">
+          <div className="flex justify-end gap-2 pt-4 border-t border-slate-200 mt-4">
             <button
               type="button"
               onClick={() => setIsModalOpen(false)}
-              className="px-6 py-2.5 text-slate-600 font-medium rounded-xl hover:bg-slate-100 transition-colors flex items-center gap-2"
+              className="px-6 py-2 text-slate-600 font-medium rounded-lg hover:bg-slate-100 transition-colors flex items-center gap-2 text-xs"
             >
               Cancel
             </button>
@@ -324,8 +324,7 @@ const PackingTypeMaster = () => {
             <button
               type="submit"
               disabled={submitLoading}
-              className={`
-                min-w-[140px] px-7 py-2.5 rounded-xl font-semibold shadow-md flex items-center justify-center gap-2 transition-all
+              className={`min-w-[120px] px-6 py-2 rounded-lg font-semibold shadow-md flex items-center justify-center gap-2 transition-all text-xs
                 ${submitLoading
                   ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
                   : 'bg-blue-600 hover:bg-blue-700 text-white hover:shadow-blue-300 active:scale-[0.98]'
