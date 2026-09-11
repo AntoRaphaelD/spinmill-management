@@ -257,6 +257,7 @@ const calculateInvoiceBreakdown = ({ Details = [], config, freight_charges, sale
     const cessPercentage = num(config?.cess_percentage);
     const hcessPercentage = num(config?.hr_sec_cess_percentage);
     const tcsPercentage = num(config?.tcs_percentage);
+    const isForward = String(config?.round_off_direction || config?.calculation_type || '').trim().toLowerCase() === 'forward';
     const taxPercentage =
         igstPercentage > 0
             ? igstPercentage
@@ -288,43 +289,93 @@ const calculateInvoiceBreakdown = ({ Details = [], config, freight_charges, sale
     const processedRows = Details.map((item) => {
         const packs = num(item.packs);
         const totalKgs = num(item.total_kgs);
-        const rateAfterTax = num(item.rate);
+        const rateInput = num(item.rate);
         const rowFreight = packs * freightPerBag;
-        const totalInvoiceAmount = 10 * packs * rateAfterTax;
-        const charityPerBale = isGstSale
-            ? num(item.charity_per_bale || 3)
-            : num(item.charity_per_bale || charityPercentage);
-        const charity = isGstSale
-            ? totalKgs * charityPerBale
-            : (totalInvoiceAmount * charityPerBale) / 100;
-        const adjustedAmount = totalInvoiceAmount - rowFreight - charity;
-        const baseAmount = divisor > 0 ? (adjustedAmount / divisor) * 100 : adjustedAmount;
-        const gstAmount = (baseAmount * taxPercentage) / 100;
-        const assessableValue = totalInvoiceAmount - rowFreight - charity - gstAmount;
-        const rowSgst = sgstPercentage > 0 ? gstAmount / 2 : 0;
-        const rowCgst = cgstPercentage > 0 ? gstAmount / 2 : 0;
-        const rowIgst = igstPercentage > 0 ? gstAmount : 0;
-        const rowGst = gstPercentage > 0 ? gstAmount : 0;
-        const rowVatPer = num(item.vat_per);
+        const productName = String(item.product_description || item.Product?.product_name || '').toLowerCase();
+        const is68Product = productName.includes('68');
+
+        const rowVatPer = num(item.vat_per || config?.vat_percentage);
         const rowCenvatPer = num(item.cenvat_per || cenvatPercentage);
         const rowDutyPer = num(item.duty_per || dutyPercentage);
         const rowCessPer = num(item.cess_per || cessPercentage);
         const rowHcessPer = num(item.hcess_per || hcessPercentage);
         const rowTcsPer = num(item.tcs_per || tcsPercentage);
-        const rowOtherAmt = num(item.other_per) > 0
-            ? (assessableValue * num(item.other_per)) / 100
-            : num(item.other_amt);
-        const rowVat = (assessableValue * rowVatPer) / 100;
-        const rowCenvat = (assessableValue * rowCenvatPer) / 100;
-        const rowDuty = (assessableValue * rowDutyPer) / 100;
-        const rowCess = (assessableValue * rowCessPer) / 100;
-        const rowHcess = (assessableValue * rowHcessPer) / 100;
-        const rowTcs = (totalInvoiceAmount * rowTcsPer) / 100;
 
+        const charityPerBale = isGstSale
+            ? num(item.charity_per_bale || 3)
+            : num(item.charity_per_bale || charityPercentage);
+
+        let charity = 0;
+        let assessableValue = 0;
+        let gstAmount = 0;
+        let rowIgst = 0;
+        let rowSgst = 0;
+        let rowCgst = 0;
+        let rowGst = 0;
+        let rowVat = 0;
+        let rowCenvat = 0;
+        let rowDuty = 0;
+        let rowCess = 0;
+        let rowHcess = 0;
+        let rowOtherAmt = 0;
+        let totalInvoiceAmount = 0;
+        let rowTcs = 0;
+
+        if (isForward) {
+            // FORWARD FLOW:
+            assessableValue = Math.round(is68Product ? (10 * packs * rateInput) : (totalKgs * rateInput));
+            charity = (isGstSale || config?.charity_checked) ? Math.round(totalKgs * charityPerBale) : 0;
+            const roundedRowFreight = Math.round(rowFreight);
+
+            gstAmount = Math.round((assessableValue * taxPercentage) / 100);
+            rowIgst = igstPercentage > 0 ? Math.round(assessableValue * igstPercentage / 100) : 0;
+            rowSgst = igstPercentage > 0 ? 0 : (sgstPercentage > 0 ? Math.round(assessableValue * sgstPercentage / 100) : Math.round(gstAmount / 2));
+            rowCgst = igstPercentage > 0 ? 0 : (cgstPercentage > 0 ? Math.round(assessableValue * cgstPercentage / 100) : Math.round(gstAmount / 2));
+            rowGst = igstPercentage > 0 ? 0 : (rowSgst + rowCgst);
+
+            rowVat = Math.round((assessableValue * rowVatPer) / 100);
+            rowCenvat = Math.round((assessableValue * rowCenvatPer) / 100);
+            rowDuty = Math.round((assessableValue * rowDutyPer) / 100);
+            rowCess = Math.round((assessableValue * rowCessPer) / 100);
+            rowHcess = Math.round((assessableValue * rowHcessPer) / 100);
+            rowOtherAmt = Math.round(num(item.other_per) > 0
+                ? (assessableValue * num(item.other_per)) / 100
+                : num(item.other_amt));
+
+            const totalTax = (igstPercentage > 0 ? rowIgst : (rowSgst + rowCgst)) + rowVat + rowCenvat + rowDuty + rowCess + rowHcess + rowOtherAmt;
+            totalInvoiceAmount = assessableValue + totalTax + roundedRowFreight + charity;
+            rowTcs = Math.round((totalInvoiceAmount * rowTcsPer) / 100);
+        } else {
+            // REVERSE FLOW:
+            totalInvoiceAmount = Math.round(10 * packs * rateInput);
+            charity = isGstSale
+                ? Math.round(totalKgs * charityPerBale)
+                : Math.round((totalInvoiceAmount * charityPerBale) / 100);
+            const roundedRowFreight = Math.round(rowFreight);
+            const adjustedAmount = totalInvoiceAmount - roundedRowFreight - charity;
+            const baseAmount = divisor > 0 ? (adjustedAmount / divisor) * 100 : adjustedAmount;
+            gstAmount = Math.round((baseAmount * taxPercentage) / 100);
+            assessableValue = totalInvoiceAmount - roundedRowFreight - charity - gstAmount;
+            rowSgst = sgstPercentage > 0 ? Math.round(gstAmount * sgstPercentage / taxPercentage) : Math.round(gstAmount / 2);
+            rowCgst = cgstPercentage > 0 ? Math.round(gstAmount * cgstPercentage / taxPercentage) : Math.round(gstAmount / 2);
+            rowIgst = igstPercentage > 0 ? gstAmount : 0;
+            rowGst = igstPercentage > 0 ? 0 : (rowSgst + rowCgst);
+            rowOtherAmt = Math.round(num(item.other_per) > 0
+                ? (assessableValue * num(item.other_per)) / 100
+                : num(item.other_amt));
+            rowVat = Math.round((assessableValue * rowVatPer) / 100);
+            rowCenvat = Math.round((assessableValue * rowCenvatPer) / 100);
+            rowDuty = Math.round((assessableValue * rowDutyPer) / 100);
+            rowCess = Math.round((assessableValue * rowCessPer) / 100);
+            rowHcess = Math.round((assessableValue * rowHcessPer) / 100);
+            rowTcs = Math.round((totalInvoiceAmount * rowTcsPer) / 100);
+        }
+
+        const roundedFreight = Math.round(rowFreight);
         totals.assess += assessableValue;
         totals.charity += charity;
-        totals.freight += rowFreight;
-        totals.gst += gstAmount;
+        totals.freight += roundedFreight;
+        totals.gst += (igstPercentage > 0 ? 0 : (rowSgst + rowCgst));
         totals.sgst += rowSgst;
         totals.cgst += rowCgst;
         totals.igst += rowIgst;
@@ -343,7 +394,7 @@ const calculateInvoiceBreakdown = ({ Details = [], config, freight_charges, sale
             broker_code1: item.broker_code1 || item.broker_code || '',
             charity_per_bale: charityPerBale,
             charity_amt: charity,
-            freight_amt: rowFreight,
+            freight_amt: roundedFreight,
             assessable_value: assessableValue,
             gst_per: gstPercentage,
             gst_amt: rowGst,
@@ -618,9 +669,9 @@ invoiceCtrl.create = async (req, res) => {
             total_hr_sec_cess: totals.hcess,
             total_tcs: totals.tcs,
             total_other: totals.other,
-            sub_total: totals.net,
-            round_off: Math.ceil(totals.net) - totals.net,
-            net_amount: Math.ceil(totals.net)
+            sub_total: Number(totals.net.toFixed(2)),
+            round_off: Number((Math.round(totals.net - totals.tcs) - (totals.net - totals.tcs)).toFixed(2)),
+            net_amount: Math.round(totals.net - totals.tcs)
         }, { transaction: t });
 
         for (const row of processedRows) {
@@ -718,9 +769,9 @@ invoiceCtrl.update = async (req, res) => {
             total_hr_sec_cess: totals.hcess,
             total_tcs: totals.tcs,
             total_other: totals.other,
-            sub_total: totals.net,
-            round_off: Math.ceil(totals.net) - totals.net,
-            net_amount: Math.ceil(totals.net)
+            sub_total: Number(totals.net.toFixed(2)),
+            round_off: Number((Math.round(totals.net - totals.tcs) - (totals.net - totals.tcs)).toFixed(2)),
+            net_amount: Math.round(totals.net - totals.tcs)
         }, {
             where: { id },
             transaction: t
@@ -1864,7 +1915,7 @@ const bulkImportSave = async (req, res) => {
                     vehicle_no: 'TN 34 X 9117',
                     status: 'OPEN',
                     is_cancelled: false,
-                    final_invoice_value: Math.ceil(totals.net)
+                    final_invoice_value: Math.round(totals.net - totals.tcs)
                 }, { transaction: t });
 
                 for (const r of detailsPayload) {
@@ -1917,23 +1968,23 @@ const bulkImportSave = async (req, res) => {
                 address: inv.address,
                 vehicle_no: 'TN 34 X 9117',
                 delivery: inv.place || '',
-                total_assessable: totals.assess,
-                total_charity: totals.charity,
-                freight_charges: totals.freight,
-                total_gst: totals.gst,
-                total_sgst: totals.sgst,
-                total_cgst: totals.cgst,
-                total_igst: totals.igst,
-                total_vat: totals.vat,
-                total_cenvat: totals.cenvat,
-                total_duty: totals.duty,
-                total_cess: totals.cess,
-                total_hr_sec_cess: totals.hcess,
-                total_tcs: totals.tcs,
-                total_other: totals.other,
-                sub_total: totals.net,
-                round_off: Math.ceil(totals.net) - totals.net,
-                net_amount: Math.ceil(totals.net),
+                total_assessable: Number(totals.assess.toFixed(2)),
+                total_charity: Number(totals.charity.toFixed(2)),
+                freight_charges: Number(totals.freight.toFixed(2)),
+                total_gst: Number(totals.gst.toFixed(2)),
+                total_sgst: Number(totals.sgst.toFixed(2)),
+                total_cgst: Number(totals.cgst.toFixed(2)),
+                total_igst: Number(totals.igst.toFixed(2)),
+                total_vat: Number(totals.vat.toFixed(2)),
+                total_cenvat: Number(totals.cenvat.toFixed(2)),
+                total_duty: Number(totals.duty.toFixed(2)),
+                total_cess: Number(totals.cess.toFixed(2)),
+                total_hr_sec_cess: Number(totals.hcess.toFixed(2)),
+                total_tcs: Number(totals.tcs.toFixed(2)),
+                total_other: Number(totals.other.toFixed(2)),
+                sub_total: Number(totals.net.toFixed(2)),
+                round_off: Number((Math.round(totals.net - totals.tcs) - (totals.net - totals.tcs)).toFixed(2)),
+                net_amount: Math.round(totals.net - totals.tcs),
                 is_approved: true
             }, { transaction: t });
 

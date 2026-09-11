@@ -24,7 +24,7 @@ const num = (v) => {
     return isNaN(n) ? 0 : n;
 };
 
-const money = (v) => Math.round(num(v));
+const money = (v) => Number((num(v)).toFixed(2));
 
 const imageUrlToDataUrl = async (url) => {
     const response = await fetch(url);
@@ -105,28 +105,30 @@ const ModernPrintView = ({ data, listData, getHSN }) => {
 
     const party = listData?.parties?.find(p => String(p.id) === String(data.party_id)) || data.Party || {};
     const config = listData?.types?.find(t => String(t.id) === String(data.invoice_type_id)) || {};
+    const items = (data.Details || data.InvoiceDetails || []).filter(Boolean);
+
     const gstPer = num(config.gst_percentage);
-    let cgstPer = num(config.cgst_percentage);
-    let sgstPer = num(config.sgst_percentage);
-    let igstPer = num(config.igst_percentage);
-    const tcsPer = num(config.tcs_percentage);
+    let cgstPer = num(config.cgst_percentage) || (items.length ? num(items[0]?.cgst_per) : 0);
+    let sgstPer = num(config.sgst_percentage) || (items.length ? num(items[0]?.sgst_per) : 0);
+    let igstPer = num(config.igst_percentage) || (items.length ? num(items[0]?.igst_per) : 0);
+    const tcsPer = num(config.tcs_percentage) || (items.length ? num(items[0]?.tcs_per) : 0);
 
     if (igstPer === 0 && cgstPer === 0 && sgstPer === 0 && gstPer > 0) {
         cgstPer = gstPer / 2;
         sgstPer = gstPer / 2;
     }
 
-    const totalGst = num(data.total_gst);
-    let totalCgst = num(data.total_cgst);
-    let totalSgst = num(data.total_sgst);
-    let totalIgst = num(data.total_igst);
+    const totalGst = num(data.total_gst) || items.reduce((sum, r) => sum + num(r.gst_amt), 0);
+    let totalCgst = num(data.total_cgst) || items.reduce((sum, r) => sum + num(r.cgst_amt), 0);
+    let totalSgst = num(data.total_sgst) || items.reduce((sum, r) => sum + num(r.sgst_amt), 0);
+    let totalIgst = num(data.total_igst) || items.reduce((sum, r) => sum + num(r.igst_amt), 0);
 
-    if (igstPer === 0 && totalCgst === 0 && totalSgst === 0 && totalGst > 0) {
+    if (igstPer > 0 && totalIgst === 0 && totalGst > 0) {
+        totalIgst = totalGst;
+    } else if (igstPer === 0 && totalCgst === 0 && totalSgst === 0 && totalGst > 0) {
         totalCgst = totalGst / 2;
         totalSgst = totalGst / 2;
     }
-
-    const items = (data.Details || data.InvoiceDetails || []).filter(Boolean);
     const totalBags = items.reduce((sum, r) => sum + num(r.packs), 0);
     const totalWeight = items.reduce((sum, r) => sum + num(r.total_kgs), 0);
     const totalAssessable = items.reduce((sum, r) => sum + num(r.assessable_value || (num(r.total_kgs) * num(r.rate))), 0);
@@ -134,7 +136,15 @@ const ModernPrintView = ({ data, listData, getHSN }) => {
 
     const productDescs = [...new Set(items.map(r => r.product_description || (listData?.products?.find(p => String(p.id) === String(r.product_id))?.short_description)).filter(Boolean))];
     const hsnCodes = [...new Set(items.map(r => (getHSN ? getHSN(r.product_id) : '') || r.hsn || '').filter(Boolean))];
-    const netAmount = num(data.net_amount || data.sub_total || totalAssessable);
+    const roundedAssessable = Math.round(num(data.total_assessable || totalAssessable));
+    const roundedCharity = Math.round(num(data.total_charity));
+    const roundedFreight = Math.round(num(data.freight_charges));
+    const roundedCgst = totalCgst > 0 ? Math.round(totalCgst) : 0;
+    const roundedSgst = totalSgst > 0 ? Math.round(totalSgst) : 0;
+    const roundedIgst = totalIgst > 0 ? Math.round(totalIgst) : 0;
+    const roundedSubTotal = roundedAssessable + roundedCharity + roundedFreight + roundedCgst + roundedSgst + roundedIgst;
+    const roundedTcs = Math.round(num(data.total_tcs || 0));
+    const roundedNetAmount = roundedSubTotal - roundedTcs;
 
     return (
         <div id="printable-invoice-wrapper" className="p-4 bg-white text-black font-sans max-w-[210mm] mx-auto text-xs leading-normal">
@@ -267,7 +277,7 @@ const ModernPrintView = ({ data, listData, getHSN }) => {
                 <div className="border-b border-black">
                     {items.map((item, idx) => {
                         const rowWeight = num(item.total_kgs);
-                        const rowAssessable = num(item.assessable_value || (rowWeight * num(item.rate)));
+                        const rowAssessable = Math.round(num(item.assessable_value || (rowWeight * num(item.rate))));
                         const assessableRatePerKg = rowWeight > 0 ? (rowAssessable / rowWeight) : num(item.rate);
                         return (
                             <div key={idx} className="grid grid-cols-12 text-[11px] py-1 border-b border-black/20 last:border-b-0">
@@ -304,43 +314,43 @@ const ModernPrintView = ({ data, listData, getHSN }) => {
                             <tbody>
                                 <tr className="border-b border-black/20">
                                     <td className="p-1.5 pl-3 font-bold">TOTAL ASSESSABLE AMOUNT</td>
-                                    <td className="p-1.5 pr-3 text-right font-bold">{fmtIN(data.total_assessable || totalAssessable, 2)}</td>
+                                    <td className="p-1.5 pr-3 text-right font-bold">{fmtIN(roundedAssessable, 2)}</td>
                                 </tr>
-                                {num(data.total_charity) > 0 && (
+                                {roundedCharity > 0 && (
                                     <tr className="border-b border-black/20">
                                         <td className="p-1.5 pl-3 font-bold">CHARITY</td>
-                                        <td className="p-1.5 pr-3 text-right font-bold">{fmtIN(data.total_charity, 2)}</td>
+                                        <td className="p-1.5 pr-3 text-right font-bold">{fmtIN(roundedCharity, 2)}</td>
                                     </tr>
                                 )}
-                                {num(data.freight_charges) > 0 && (
+                                {roundedFreight > 0 && (
                                     <tr className="border-b border-black/20">
                                         <td className="p-1.5 pl-3 font-bold">FREIGHT</td>
-                                        <td className="p-1.5 pr-3 text-right font-bold">{fmtIN(data.freight_charges, 2)}</td>
+                                        <td className="p-1.5 pr-3 text-right font-bold">{fmtIN(roundedFreight, 2)}</td>
                                     </tr>
                                 )}
                                 <tr className="border-b border-black/20">
                                     <td className="p-1.5 pl-3 font-medium">C.G.S.T &nbsp;&nbsp; : &nbsp; {cgstPer.toFixed(2)} %</td>
-                                    <td className="p-1.5 pr-3 text-right font-medium">{totalCgst > 0 ? fmtIN(totalCgst, 2) : ''}</td>
+                                    <td className="p-1.5 pr-3 text-right font-medium">{roundedCgst > 0 ? fmtIN(roundedCgst, 2) : ''}</td>
                                 </tr>
                                 <tr className="border-b border-black/20">
                                     <td className="p-1.5 pl-3 font-medium">S.G.S.T &nbsp;&nbsp; : &nbsp; {sgstPer.toFixed(2)} %</td>
-                                    <td className="p-1.5 pr-3 text-right font-medium">{totalSgst > 0 ? fmtIN(totalSgst, 2) : ''}</td>
+                                    <td className="p-1.5 pr-3 text-right font-medium">{roundedSgst > 0 ? fmtIN(roundedSgst, 2) : ''}</td>
                                 </tr>
                                 <tr className="border-b border-black/20">
                                     <td className="p-1.5 pl-3 font-medium">I.G.S.T &nbsp;&nbsp; : &nbsp; {igstPer.toFixed(2)} %</td>
-                                    <td className="p-1.5 pr-3 text-right font-medium">{totalIgst > 0 ? fmtIN(totalIgst, 2) : ''}</td>
+                                    <td className="p-1.5 pr-3 text-right font-medium">{roundedIgst > 0 ? fmtIN(roundedIgst, 2) : ''}</td>
                                 </tr>
                                 <tr className="border-t border-b border-black font-bold">
                                     <td className="p-1.5 pl-3"></td>
-                                    <td className="p-1.5 pr-3 text-right">{fmtIN(data.sub_total || (totalAssessable + num(data.total_charity) + num(data.freight_charges) + num(data.total_gst) + num(data.total_cgst) + num(data.total_sgst) + num(data.total_igst)), 2)}</td>
+                                    <td className="p-1.5 pr-3 text-right">{fmtIN(roundedSubTotal, 2)}</td>
                                 </tr>
                                 <tr className="border-b border-black">
                                     <td className="p-1.5 pl-3 font-medium">TCS &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; : &nbsp; {tcsPer.toFixed(3)} %</td>
-                                    <td className="p-1.5 pr-3 text-right font-medium">{fmtIN(data.total_tcs || 0, 2)}</td>
+                                    <td className="p-1.5 pr-3 text-right font-medium">{fmtIN(roundedTcs, 2)}</td>
                                 </tr>
                                 <tr className="font-black text-xs">
                                     <td className="p-2 pl-3">Net Amount</td>
-                                    <td className="p-2 pr-3 text-right">{fmtIN(netAmount, 2)}</td>
+                                    <td className="p-2 pr-3 text-right">{fmtIN(roundedNetAmount, 2)}</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -350,7 +360,7 @@ const ModernPrintView = ({ data, listData, getHSN }) => {
                 {/* 7. Rupees in Words Full Bar */}
                 <div className="border-b border-black p-2 text-[11px] font-bold">
                     <span className="mr-3">Rupees :</span>
-                    <span className="uppercase tracking-wide">{numberToWords(netAmount)}</span>
+                    <span className="uppercase tracking-wide">{numberToWords(roundedNetAmount)}</span>
                 </div>
 
                 {/* 8. Declarations & Signatures Box */}
@@ -538,28 +548,31 @@ const InvoicePreparation = () => {
 
         const party = listData.parties.find(p => String(p.id) === String(data.party_id)) || data.Party || {};
         const config = listData.types.find(t => String(t.id) === String(data.invoice_type_id)) || {};
+        const items = gridRows.length ? gridRows : (data.Details || data.InvoiceDetails || []);
+
         const gstPer = num(config.gst_percentage);
-        let cgstPer = num(config.cgst_percentage);
-        let sgstPer = num(config.sgst_percentage);
-        let igstPer = num(config.igst_percentage);
-        const tcsPer = num(config.tcs_percentage);
+        let cgstPer = num(config.cgst_percentage) || (items.length ? num(items[0]?.cgst_per) : 0);
+        let sgstPer = num(config.sgst_percentage) || (items.length ? num(items[0]?.sgst_per) : 0);
+        let igstPer = num(config.igst_percentage) || (items.length ? num(items[0]?.igst_per) : 0);
+        const tcsPer = num(config.tcs_percentage) || (items.length ? num(items[0]?.tcs_per) : 0);
 
         if (igstPer === 0 && cgstPer === 0 && sgstPer === 0 && gstPer > 0) {
             cgstPer = gstPer / 2;
             sgstPer = gstPer / 2;
         }
 
-        const totalGst = num(data.total_gst);
-        let totalCgst = num(data.total_cgst);
-        let totalSgst = num(data.total_sgst);
-        let totalIgst = num(data.total_igst);
+        const totalGst = num(data.total_gst) || items.reduce((sum, r) => sum + num(r.gst_amt), 0);
+        let totalCgst = num(data.total_cgst) || items.reduce((sum, r) => sum + num(r.cgst_amt), 0);
+        let totalSgst = num(data.total_sgst) || items.reduce((sum, r) => sum + num(r.sgst_amt), 0);
+        let totalIgst = num(data.total_igst) || items.reduce((sum, r) => sum + num(r.igst_amt), 0);
 
-        if (igstPer === 0 && totalCgst === 0 && totalSgst === 0 && totalGst > 0) {
+        if (igstPer > 0 && totalIgst === 0 && totalGst > 0) {
+            totalIgst = totalGst;
+        } else if (igstPer === 0 && totalCgst === 0 && totalSgst === 0 && totalGst > 0) {
             totalCgst = totalGst / 2;
             totalSgst = totalGst / 2;
         }
 
-        const items = gridRows.length ? gridRows : (data.Details || data.InvoiceDetails || []);
         const totalBags = items.reduce((sum, r) => sum + num(r.packs), 0);
         const totalWeight = items.reduce((sum, r) => sum + num(r.total_kgs), 0);
         const totalAssessable = items.reduce((sum, r) => sum + num(r.assessable_value || (num(r.total_kgs) * num(r.rate))), 0);
@@ -691,7 +704,7 @@ const InvoicePreparation = () => {
         const colW = [24, 30, 44, 34, contentWidth - (24 + 30 + 44 + 34)]; // sums to contentWidth (194)
         const tableBody = (items.length ? items : [{}]).map(item => {
             const rowWeight = num(item.total_kgs);
-            const rowAssessable = num(item.assessable_value || (rowWeight * num(item.rate)));
+            const rowAssessable = Math.round(num(item.assessable_value || (rowWeight * num(item.rate))));
             const assessableRatePerKg = rowWeight > 0 ? (rowAssessable / rowWeight) : num(item.rate);
             return [
                 String(item.packs || ''),
@@ -778,24 +791,34 @@ const InvoicePreparation = () => {
             taxY += taxLineHeight;
         };
 
-        renderTaxRow("TOTAL ASSESSABLE", data.total_assessable || totalAssessable, true);
-        if (num(data.total_charity) > 0) {
-            renderTaxRow("CHARITY", data.total_charity, true);
+        const roundedAssessable = Math.round(num(data.total_assessable || totalAssessable));
+        const roundedCharity = Math.round(num(data.total_charity));
+        const roundedFreight = Math.round(num(data.freight_charges));
+        const roundedCgst = totalCgst > 0 ? Math.round(totalCgst) : 0;
+        const roundedSgst = totalSgst > 0 ? Math.round(totalSgst) : 0;
+        const roundedIgst = totalIgst > 0 ? Math.round(totalIgst) : 0;
+        const roundedSubTotal = roundedAssessable + roundedCharity + roundedFreight + roundedCgst + roundedSgst + roundedIgst;
+        const roundedTcs = Math.round(num(data.total_tcs || 0));
+        const roundedNetAmount = roundedSubTotal - roundedTcs;
+
+        renderTaxRow("TOTAL ASSESSABLE", roundedAssessable, true);
+        if (roundedCharity > 0) {
+            renderTaxRow("CHARITY", roundedCharity, true);
         }
-        if (num(data.freight_charges) > 0) {
-            renderTaxRow("FREIGHT", data.freight_charges, true);
+        if (roundedFreight > 0) {
+            renderTaxRow("FREIGHT", roundedFreight, true);
         }
-        renderTaxRow(`C.G.S.T   :   ${cgstPer.toFixed(2)} %`, totalCgst > 0 ? totalCgst : '');
-        renderTaxRow(`S.G.S.T   :   ${sgstPer.toFixed(2)} %`, totalSgst > 0 ? totalSgst : '');
-        renderTaxRow(`I.G.S.T   :   ${igstPer.toFixed(2)} %`, totalIgst > 0 ? totalIgst : '');
+        renderTaxRow(`C.G.S.T   :   ${cgstPer.toFixed(2)} %`, roundedCgst > 0 ? roundedCgst : '');
+        renderTaxRow(`S.G.S.T   :   ${sgstPer.toFixed(2)} %`, roundedSgst > 0 ? roundedSgst : '');
+        renderTaxRow(`I.G.S.T   :   ${igstPer.toFixed(2)} %`, roundedIgst > 0 ? roundedIgst : '');
 
         // Subtotal divider line with clean spacing
         taxY += 1;
         doc.line(midX, taxY - 1.5, right, taxY - 1.5);
         taxY += 2;
-        renderTaxRow("", data.sub_total || (totalAssessable + num(data.total_charity) + num(data.freight_charges) + num(data.total_gst) + num(data.total_cgst) + num(data.total_sgst) + num(data.total_igst)), true);
+        renderTaxRow("", roundedSubTotal, true);
 
-        renderTaxRow(`TCS         :   ${tcsPer.toFixed(3)} %`, data.total_tcs || 0);
+        renderTaxRow(`TCS         :   ${tcsPer.toFixed(3)} %`, roundedTcs);
 
         // Net Amount divider line with generous clearance
         taxY += 1;
@@ -804,7 +827,7 @@ const InvoicePreparation = () => {
         doc.setFont("helvetica", "bold");
         doc.setFontSize(8.5);
         doc.text("Net Amount", rightLabelX, taxY);
-        doc.text(fmt(netAmount, 2), rightValX, taxY, { align: "right" });
+        doc.text(fmt(roundedNetAmount, 2), rightValX, taxY, { align: "right" });
 
         // 6. Rupees in Words Box
         y += splitH;
@@ -813,7 +836,7 @@ const InvoicePreparation = () => {
         doc.setFont("helvetica", "bold");
         doc.setFontSize(7.5);
         doc.text("Rupees :", margin + 3, y + 5.5);
-        doc.text(numberToWords(netAmount), margin + 18, y + 5.5);
+        doc.text(numberToWords(roundedNetAmount), margin + 18, y + 5.5);
 
         // 7. Declaration & Signatures Box
         y += wordsH;
@@ -891,7 +914,7 @@ const InvoicePreparation = () => {
             ["S.No", "Description of Goods", "HSN Code", "Bags/Packs", "Total Kgs", "From-To", "Rate/Kg", "Assessable Value"],
             ...(gridRows.map((row, idx) => {
                 const rowWeight = num(row.total_kgs);
-                const rowAssessable = num(row.assessable_value || (rowWeight * num(row.rate)));
+                const rowAssessable = Math.round(num(row.assessable_value || (rowWeight * num(row.rate))));
                 const assessableRatePerKg = rowWeight > 0 ? (rowAssessable / rowWeight) : num(row.rate);
                 return [
                     idx + 1,
@@ -905,14 +928,14 @@ const InvoicePreparation = () => {
                 ];
             })),
             [],
-            ["", "", "", "", "", "Assessable Value", "", num(formData.total_assessable)],
-            ["", "", "", "", "", "Charity", "", num(formData.total_charity)],
-            ["", "", "", "", "", "Freight Charges", "", num(formData.freight_charges)],
-            ["", "", "", "", "", "Total GST", "", num(formData.total_gst) + num(formData.total_sgst) + num(formData.total_cgst) + num(formData.total_igst)],
-            ["", "", "", "", "", "Round Off", "", num(formData.round_off)],
-            ["", "", "", "", "", "Grand Total", "", num(formData.net_amount)],
+            ["", "", "", "", "", "Assessable Value", "", Math.round(num(formData.total_assessable))],
+            ["", "", "", "", "", "Charity", "", Math.round(num(formData.total_charity))],
+            ["", "", "", "", "", "Freight Charges", "", Math.round(num(formData.freight_charges))],
+            ["", "", "", "", "", "Total GST", "", Math.round(num(formData.total_gst) + num(formData.total_sgst) + num(formData.total_cgst) + num(formData.total_igst))],
+            ["", "", "", "", "", "Round Off", "", 0],
+            ["", "", "", "", "", "Grand Total", "", Math.round(num(formData.net_amount))],
             [],
-            ["Amount Chargeable (in words):", numberToWords(num(formData.net_amount))]
+            ["Amount Chargeable (in words):", numberToWords(Math.round(num(formData.net_amount)))]
         ];
 
         const ws = XLSX.utils.aoa_to_sheet(wsData);
@@ -986,6 +1009,8 @@ const InvoicePreparation = () => {
         const config = listData.types.find(t => t.id === parseInt(typeId));
         if (!config) return rows;
 
+        const isForward = String(config.round_off_direction || config.calculation_type || '').trim().toLowerCase() === 'forward';
+
         // 1. FLOW: Get Tax and TCS Percentages
         const gstPer = num(config.gst_percentage);
         let sgstPer = num(config.sgst_percentage);
@@ -1020,11 +1045,12 @@ const InvoicePreparation = () => {
             freightPerBag = totalBags > 0 ? num(hFreight) / totalBags : 0;
         }
 
-        console.log(`%c >>> CALCULATION START [Tax: ${taxPercentage}%, TCS: ${tcsPer}%] <<< `, "background: #000; color: #fff;");
+        console.log(`%c >>> CALCULATION START [Mode: ${isForward ? 'FORWARD' : 'REVERSE'}, Tax: ${taxPercentage}%, TCS: ${tcsPer}%] <<< `, "background: #000; color: #fff;");
 
         let hTotals = {
             assess: 0, charity: 0, freight: 0, gst: 0, tcs: 0, gross: 0,
-            cenvat: 0, duty: 0, cess: 0, hcess: 0, other: 0
+            cenvat: 0, duty: 0, cess: 0, hcess: 0, other: 0,
+            cgst: 0, sgst: 0, igst: 0, vat: 0
         };
 
         const updatedRows = rows.map((item, idx) => {
@@ -1036,65 +1062,112 @@ const InvoicePreparation = () => {
             const productName = String(item.product_description || item.Product?.product_name || '').toLowerCase();
             const is68Product = productName.includes('68');
 
-            // 2. FLOW: rate_after_tax
-            const rateAfterTax = rateInput + (rateInput * taxPercentage / 100);
-
             // Keep the existing total_kgs if it is already provided to prevent rounding off; otherwise use packs x bag weight.
             const totalKgs = existingTotalKgs > 0 ? existingTotalKgs : (packs * bagWt);
 
-            // 3. FLOW: total_invoice_amount (Inclusive of Tax)
-            const rawTotalInvoiceAmount = is68Product
-                ? (10 * packs * rateInput)
-                : (totalKgs * rateInput);
-            const totalInvoiceAmount = is68Product ? rawTotalInvoiceAmount : Math.round(rawTotalInvoiceAmount);
-
-            // 4. FLOW: charity
-            let charity = 0;
-            const charityPerBale = (salesType === 'GST SALES' || salesType === "DEPOT SALES")
-                ? 3
-                : num(item.charity_per_bale || config.charity_value || 0);
-            if (salesType === 'GST SALES' || salesType === "DEPOT SALES") {
-                charity = totalKgs * charityPerBale;
-            } else {
-                charity = 0
-            }
-
-            // 5. FLOW: divisor and base_amount (Back-calculating Taxable value)
-            const taxDivisor = 1 + (taxPercentage / 100);
-            const baseAmount = taxDivisor > 0 ? (totalInvoiceAmount / taxDivisor) : totalInvoiceAmount;
-
-            // 6. FLOW: gst_amount
-            const rawGstAmount = (baseAmount * taxPercentage) / 100;
-            const gstAmount = is68Product ? rawGstAmount : Math.round(rawGstAmount);
-
-            // 7. FLOW: TCS Amount (Calculated from Gross Invoice Amount)
-            const tcsAmount = (totalInvoiceAmount * tcsPer) / 100;
-
-            // 8. FLOW: accessible_value (Stripping components from Total)
-            const rawAccessibleValue = totalInvoiceAmount - rowFreight - charity - gstAmount;
-            const accessibleValue = is68Product ? rawAccessibleValue : Math.round(rawAccessibleValue);
             const vatPer = num(item.vat_per || config.vat_percentage);
             const cenvatRowPer = num(item.cenvat_per || cenvatPer);
             const dutyRowPer = num(item.duty_per || dutyPer);
             const cessRowPer = num(item.cess_per || cessPer);
             const hcessRowPer = num(item.hcess_per || hcessPer);
-            const vatAmount = (accessibleValue * vatPer) / 100;
-            const cenvatAmount = (accessibleValue * cenvatRowPer) / 100;
-            const dutyAmount = (accessibleValue * dutyRowPer) / 100;
-            const cessAmount = (accessibleValue * cessRowPer) / 100;
-            const hcessAmount = (accessibleValue * hcessRowPer) / 100;
-            const otherAmount = num(item.other_per) > 0
-                ? (accessibleValue * num(item.other_per)) / 100
-                : num(item.other_amt);
 
-            const igstAmount = igstPer > 0 ? gstAmount : 0;
-            const sgstAmount = igstPer > 0 ? 0 : (sgstPer > 0 ? (gstAmount * sgstPer / taxPercentage) : (gstAmount / 2));
-            const cgstAmount = igstPer > 0 ? 0 : (cgstPer > 0 ? (gstAmount * cgstPer / taxPercentage) : (gstAmount / 2));
+            const charityPerBale = (salesType === 'GST SALES' || salesType === "DEPOT SALES")
+                ? 3
+                : num(item.charity_per_bale || config.charity_value || 0);
 
-            hTotals.assess += accessibleValue;
+            let charity = 0;
+            let assessableValue = 0;
+            let gstAmount = 0;
+            let igstAmount = 0;
+            let sgstAmount = 0;
+            let cgstAmount = 0;
+            let vatAmount = 0;
+            let cenvatAmount = 0;
+            let dutyAmount = 0;
+            let cessAmount = 0;
+            let hcessAmount = 0;
+            let otherAmount = 0;
+            let totalInvoiceAmount = 0;
+            let tcsAmount = 0;
+
+            if (isForward) {
+                // 🟢 FORWARD CALCULATION FLOW:
+                // 1. Assessable Value = Rate * Total Net Weight (or 10 * packs * rate for 68 product)
+                assessableValue = Math.round(is68Product
+                    ? (10 * packs * rateInput)
+                    : (totalKgs * rateInput));
+
+                // 2. Charity
+                if (salesType === 'GST SALES' || salesType === "DEPOT SALES" || config.charity_checked) {
+                    charity = Math.round(totalKgs * charityPerBale);
+                } else {
+                    charity = 0;
+                }
+
+                const roundedRowFreight = Math.round(rowFreight);
+
+                // 3. Taxes calculated on Assessable Value and rounded
+                gstAmount = Math.round((assessableValue * taxPercentage) / 100);
+                igstAmount = igstPer > 0 ? Math.round(assessableValue * igstPer / 100) : 0;
+                sgstAmount = igstPer > 0 ? 0 : (sgstPer > 0 ? Math.round(assessableValue * sgstPer / 100) : Math.round(gstAmount / 2));
+                cgstAmount = igstPer > 0 ? 0 : (cgstPer > 0 ? Math.round(assessableValue * cgstPer / 100) : Math.round(gstAmount / 2));
+
+                vatAmount = Math.round((assessableValue * vatPer) / 100);
+                cenvatAmount = Math.round((assessableValue * cenvatRowPer) / 100);
+                dutyAmount = Math.round((assessableValue * dutyRowPer) / 100);
+                cessAmount = Math.round((assessableValue * cessRowPer) / 100);
+                hcessAmount = Math.round((assessableValue * hcessRowPer) / 100);
+                otherAmount = Math.round(num(item.other_per) > 0
+                    ? (assessableValue * num(item.other_per)) / 100
+                    : num(item.other_amt));
+
+                const totalTax = (igstPer > 0 ? igstAmount : (sgstAmount + cgstAmount)) + vatAmount + cenvatAmount + dutyAmount + cessAmount + hcessAmount + otherAmount;
+
+                // 4. Total Invoice Value = Assessable Value + Tax Amounts + Freight + Charity
+                totalInvoiceAmount = assessableValue + totalTax + roundedRowFreight + charity;
+                tcsAmount = Math.round((totalInvoiceAmount * tcsPer) / 100);
+            } else {
+                // 🔵 REVERSE CALCULATION FLOW (Current Back-calculating Flow):
+                const rawTotalInvoiceAmount = is68Product
+                    ? (10 * packs * rateInput)
+                    : (totalKgs * rateInput);
+                totalInvoiceAmount = Math.round(rawTotalInvoiceAmount);
+
+                if (salesType === 'GST SALES' || salesType === "DEPOT SALES") {
+                    charity = Math.round(totalKgs * charityPerBale);
+                } else {
+                    charity = 0;
+                }
+
+                const roundedRowFreight = Math.round(rowFreight);
+                const taxDivisor = 1 + (taxPercentage / 100);
+                const baseAmount = taxDivisor > 0 ? ((totalInvoiceAmount - roundedRowFreight - charity) / taxDivisor) : (totalInvoiceAmount - roundedRowFreight - charity);
+
+                const rawGstAmount = (baseAmount * taxPercentage) / 100;
+                gstAmount = Math.round(rawGstAmount);
+                tcsAmount = Math.round((totalInvoiceAmount * tcsPer) / 100);
+
+                assessableValue = totalInvoiceAmount - roundedRowFreight - charity - gstAmount;
+
+                vatAmount = Math.round((assessableValue * vatPer) / 100);
+                cenvatAmount = Math.round((assessableValue * cenvatRowPer) / 100);
+                dutyAmount = Math.round((assessableValue * dutyRowPer) / 100);
+                cessAmount = Math.round((assessableValue * cessRowPer) / 100);
+                hcessAmount = Math.round((assessableValue * hcessRowPer) / 100);
+                otherAmount = Math.round(num(item.other_per) > 0
+                    ? (assessableValue * num(item.other_per)) / 100
+                    : num(item.other_amt));
+
+                igstAmount = igstPer > 0 ? gstAmount : 0;
+                sgstAmount = igstPer > 0 ? 0 : (sgstPer > 0 ? Math.round(gstAmount * sgstPer / taxPercentage) : Math.round(gstAmount / 2));
+                cgstAmount = igstPer > 0 ? 0 : (cgstPer > 0 ? Math.round(gstAmount * cgstPer / taxPercentage) : Math.round(gstAmount / 2));
+            }
+
+            const rowFreightRounded = Math.round(rowFreight);
+            hTotals.assess += assessableValue;
             hTotals.charity += charity;
-            hTotals.freight += rowFreight;
-            hTotals.gst += gstAmount;
+            hTotals.freight += rowFreightRounded;
+            hTotals.gst += (igstPer > 0 ? 0 : (sgstAmount + cgstAmount));
             hTotals.cgst += cgstAmount;
             hTotals.sgst += sgstAmount;
             hTotals.igst += igstAmount;
@@ -1121,55 +1194,52 @@ const InvoicePreparation = () => {
                 cess_per: cessRowPer,
                 hcess_per: hcessRowPer,
                 tcs_per: tcsPer,
-                charity_amt: money(charity),
-                freight_amt: money(rowFreight),
+                charity_amt: charity,
+                freight_amt: rowFreightRounded,
                 // Handle SGST/CGST split or IGST
-                igst_amt: money(igstAmount),
-                sgst_amt: money(sgstAmount),
-                cgst_amt: money(cgstAmount),
-                gst_amt: igstPer > 0 ? 0 : money(gstAmount),
-                vat_amt: money(vatAmount),
-                cenvat_amt: money(cenvatAmount),
-                duty_amt: money(dutyAmount),
-                cess_amt: money(cessAmount),
-                hr_sec_cess_amt: money(hcessAmount),
-                tcs_amt: money(tcsAmount),
-                other_amt: money(otherAmount),
-                assessable_value: money(accessibleValue),
+                igst_amt: igstAmount,
+                sgst_amt: sgstAmount,
+                cgst_amt: cgstAmount,
+                gst_amt: igstPer > 0 ? 0 : (sgstAmount + cgstAmount),
+                vat_amt: vatAmount,
+                cenvat_amt: cenvatAmount,
+                duty_amt: dutyAmount,
+                cess_amt: cessAmount,
+                hr_sec_cess_amt: hcessAmount,
+                tcs_amt: tcsAmount,
+                other_amt: otherAmount,
+                assessable_value: assessableValue,
                 rounded_off: num(item.rounded_off || 0),
-                final_value: money(totalInvoiceAmount)
+                final_value: totalInvoiceAmount
             };
         });
 
         // 9. GRAND TOTAL (Net Amount): Gross Invoice Amount MINUS TCS
-        const finalGross = hTotals.gross;
-        const amountAfterTcs = finalGross - hTotals.tcs;
-        const finalNetAmount = Math.round(amountAfterTcs);
-        const calculatedRoundOff = finalNetAmount - amountAfterTcs;
+        const totalTaxSum = (igstPer > 0 ? hTotals.igst : (hTotals.cgst + hTotals.sgst)) + hTotals.vat + hTotals.cenvat + hTotals.duty + hTotals.cess + hTotals.hcess + hTotals.other;
+        const finalGross = hTotals.assess + hTotals.charity + hTotals.freight + totalTaxSum;
+        const finalNetAmount = finalGross - hTotals.tcs;
 
         setFormData(prev => ({
             ...prev,
-            total_assessable: money(hTotals.assess),
-            total_charity: money(hTotals.charity),
-            freight_charges: load ? money(hTotals.freight) : num(hFreight),
+            total_assessable: hTotals.assess,
+            total_charity: hTotals.charity,
+            freight_charges: load ? hTotals.freight : Math.round(num(hFreight)),
             // Display full GST amount as the combined CGST + SGST value.
-            total_gst: igstPer > 0 ? 0 : money(hTotals.gst),
-            total_igst: igstPer > 0 ? money(hTotals.igst) : 0,
-            total_sgst: money(hTotals.sgst),
-            total_cgst: money(hTotals.cgst),
-            total_vat: money(hTotals.vat || 0),
-            total_cenvat: money(hTotals.cenvat),
-            total_duty: money(hTotals.duty),
-            total_cess: money(hTotals.cess),
-            total_hr_sec_cess: money(hTotals.hcess),
-            total_tcs: money(hTotals.tcs),
-            total_other: money(hTotals.other),
-            sub_total: money(finalGross),
-            // 🟢 Round off is calculated after TCS deduction
-            round_off: calculatedRoundOff.toFixed(2),
+            total_gst: igstPer > 0 ? 0 : (hTotals.cgst + hTotals.sgst),
+            total_igst: igstPer > 0 ? hTotals.igst : 0,
+            total_sgst: hTotals.sgst,
+            total_cgst: hTotals.cgst,
+            total_vat: hTotals.vat || 0,
+            total_cenvat: hTotals.cenvat,
+            total_duty: hTotals.duty,
+            total_cess: hTotals.cess,
+            total_hr_sec_cess: hTotals.hcess,
+            total_tcs: hTotals.tcs,
+            total_other: hTotals.other,
+            sub_total: finalGross,
+            round_off: '0.00',
             net_amount: finalNetAmount
         }));
-
 
         return updatedRows;
     }, [listData.types, listData.loads, formData.freight_charges, formData.sales_type, formData.load_id]);
@@ -1574,7 +1644,7 @@ const InvoicePreparation = () => {
                 )
             );
             setFormData(header);
-            setActiveTab('detail');
+            setActiveTab('head');
             setIsModalOpen(true);
         } catch (err) {
             console.error("Error loading invoice:", err);
@@ -1995,7 +2065,7 @@ const InvoicePreparation = () => {
                                             value={formData.invoice_type_id}
                                             options={filteredInvoiceTypes.map(t => ({
                                                 value: t.id,
-                                                label: t.type_name
+                                                label: `${t.type_name} [${t.round_off_direction || t.calculation_type || 'Reverse'}]`
                                             }))}
                                             onChange={e => setFormData({
                                                 ...formData,
@@ -2482,7 +2552,7 @@ const InvoicePreparation = () => {
                                                             <td className="p-4 font-black text-slate-800 uppercase">{inv.partyName}</td>
                                                             <td className="p-4 text-slate-500 uppercase">{inv.rows.map(r => r.product_name).join(', ')}</td>
                                                             <td className="p-4 text-center font-bold">{totalBags}</td>
-                                                            <td className="p-4 text-right font-black">₹{Math.ceil(totalVal).toLocaleString('en-IN')}</td>
+                                                            <td className="p-4 text-right font-black">₹{Math.round(totalVal).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                                                         </tr>
                                                     );
                                                 })}
@@ -2530,6 +2600,13 @@ const InvoicePreparation = () => {
                             </div>
                         </div>
                     </div>
+                </div>
+            )}
+
+            {/* Print View Rendered in DOM for window.print() */}
+            {printData && (
+                <div id="printable-invoice-wrapper">
+                    <ModernPrintView data={printData} listData={listData} getHSN={getHSN} />
                 </div>
             )}
 
@@ -2651,7 +2728,6 @@ const RowSelect = ({ label, options = [], width = "w-full", value, onChange, dis
     );
 };
 const TotalRow = ({ label, value, isEditable = false, onChange, color = "text-slate-900" }) => {
-
     const displayValue =
         value === '' || value === null || value === undefined
             ? ''
@@ -2666,8 +2742,9 @@ const TotalRow = ({ label, value, isEditable = false, onChange, color = "text-sl
                 {label}
             </span>
             <input
-                readOnly
-                value={value}
+                readOnly={!isEditable}
+                value={isEditable ? (value ?? '') : displayValue}
+                onChange={onChange}
                 className={`w-32 border border-slate-300 text-right p-0.5 font-mono text-[11px] font-black outline-none rounded shadow-inner ${color} ${isEditable ? 'bg-white border-blue-400' : 'bg-slate-50'}`}
             />
         </div>

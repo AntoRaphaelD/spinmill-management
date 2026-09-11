@@ -98,23 +98,27 @@ const TaxInvoiceTemplate = forwardRef(({ data }, ref) => {
                         </tr>
                     </thead>
                     <tbody className="min-h-[300px]">
-                        {data.InvoiceDetails?.map((item, idx) => (
-                            <React.Fragment key={idx}>
-                                <tr className="text-center font-bold">
-                                    <td className="border-r-2 border-black p-2 align-top">{item.packs}</td>
-                                    <td className="border-r-2 border-black p-2 align-top">{parseFloat(item.total_kgs).toFixed(2)}</td>
-                                    <td className="border-r-2 border-black p-2 align-top text-[10px]">{item.sl_no || '-'}</td>
-                                    <td className="border-r-2 border-black p-2 align-top">{parseFloat(item.rate).toFixed(2)}</td>
-                                    <td className="p-2 text-right align-top pr-4">{(item.total_kgs * item.rate).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
-                                </tr>
-                                <tr>
-                                    <td colSpan={5} className="px-4 py-2">
-                                        <p className="font-black text-sm uppercase">{item.Product?.product_name}</p>
-                                        <p className="mt-2 font-bold">HSN CODE: {item.Product?.TariffSubHead?.tariff_no || '52052790'}</p>
-                                    </td>
-                                </tr>
-                            </React.Fragment>
-                        ))}
+                        {data.InvoiceDetails?.map((item, idx) => {
+                            const rowWeight = parseFloat(item.total_kgs) || 0;
+                            const rowAssessable = Math.round(parseFloat(item.assessable_value || (rowWeight * parseFloat(item.rate)) || 0));
+                            return (
+                                <React.Fragment key={idx}>
+                                    <tr className="text-center font-bold">
+                                        <td className="border-r-2 border-black p-2 align-top">{item.packs}</td>
+                                        <td className="border-r-2 border-black p-2 align-top">{rowWeight.toFixed(2)}</td>
+                                        <td className="border-r-2 border-black p-2 align-top text-[10px]">{item.sl_no || '-'}</td>
+                                        <td className="border-r-2 border-black p-2 align-top">{parseFloat(item.rate || 0).toFixed(2)}</td>
+                                        <td className="p-2 text-right align-top pr-4">{rowAssessable.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                                    </tr>
+                                    <tr>
+                                        <td colSpan={5} className="px-4 py-2">
+                                            <p className="font-black text-sm uppercase">{item.Product?.product_name}</p>
+                                            <p className="mt-2 font-bold">HSN CODE: {item.Product?.TariffSubHead?.tariff_no || '52052790'}</p>
+                                        </td>
+                                    </tr>
+                                </React.Fragment>
+                            );
+                        })}
                         {/* Filler Row to push footer down */}
                         <tr style={{ height: "120px" }}>
                             <td className="border-r-2 border-black"></td>
@@ -136,23 +140,27 @@ const TaxInvoiceTemplate = forwardRef(({ data }, ref) => {
                                     <tbody>
                                         <tr className="border-b border-black">
                                             <td className="p-2 pl-4">CHARITY</td>
-                                            <td className="p-2 text-right pr-4">{parseFloat(data.charity || 0).toFixed(2)}</td>
+                                            <td className="p-2 text-right pr-4">{Math.round(parseFloat(data.charity || data.total_charity || 0)).toFixed(2)}</td>
                                         </tr>
                                         <tr className="border-b border-black">
                                             <td className="p-2 pl-4">FREIGHT</td>
-                                            <td className="p-2 text-right pr-4">{parseFloat(data.freight || 0).toFixed(2)}</td>
+                                            <td className="p-2 text-right pr-4">{Math.round(parseFloat(data.freight || data.freight_charges || 0)).toFixed(2)}</td>
                                         </tr>
                                         <tr className="border-b border-black">
-                                            <td className="p-2 pl-4">C.G.S.T &nbsp;&nbsp;&nbsp; : 0.00 %</td>
-                                            <td className="p-2 text-right pr-4">0.00</td>
+                                            <td className="p-2 pl-4">C.G.S.T &nbsp;&nbsp;&nbsp; : {parseFloat(data.cgst_percentage || data.cgst_per || 0).toFixed(2)} %</td>
+                                            <td className="p-2 text-right pr-4">{Math.round(parseFloat(data.total_cgst || data.cgst_amt || 0)).toFixed(2)}</td>
                                         </tr>
                                         <tr className="border-b border-black">
-                                            <td className="p-2 pl-4">S.G.S.T &nbsp;&nbsp;&nbsp; : 0.00 %</td>
-                                            <td className="p-2 text-right pr-4">0.00</td>
+                                            <td className="p-2 pl-4">S.G.S.T &nbsp;&nbsp;&nbsp; : {parseFloat(data.sgst_percentage || data.sgst_per || 0).toFixed(2)} %</td>
+                                            <td className="p-2 text-right pr-4">{Math.round(parseFloat(data.total_sgst || data.sgst_amt || 0)).toFixed(2)}</td>
+                                        </tr>
+                                        <tr className="border-b border-black">
+                                            <td className="p-2 pl-4">I.G.S.T &nbsp;&nbsp;&nbsp; : {parseFloat(data.igst_percentage || data.igst_per || 0).toFixed(2)} %</td>
+                                            <td className="p-2 text-right pr-4">{Math.round(parseFloat(data.total_igst || data.igst_amt || 0)).toFixed(2)}</td>
                                         </tr>
                                         <tr className="bg-slate-100">
                                             <td className="p-2 pl-4 text-sm font-black">TOTAL VALUE</td>
-                                            <td className="p-2 text-right pr-4 text-sm font-black">₹ {parseFloat(data.final_invoice_value).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                                            <td className="p-2 text-right pr-4 text-sm font-black">₹ {Math.round(parseFloat(data.final_invoice_value || data.net_amount || 0)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                                         </tr>
                                     </tbody>
                                 </table>

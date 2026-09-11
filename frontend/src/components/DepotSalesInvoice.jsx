@@ -535,6 +535,8 @@ const DepotSalesInvoice = () => {
         const config = listData.types.find(t => t.id === parseInt(typeId));
         if (!config) return rows;
 
+        const isForward = String(config.round_off_direction || config.calculation_type || '').trim().toLowerCase() === 'forward';
+
         let hTotals = {
             assess: 0, charity: 0, freight: 0, gst: 0, tcs: 0, gross: 0,
             cenvat: 0, duty: 0, cess: 0, hcess: 0, other: 0, vat: 0,
@@ -566,38 +568,76 @@ const DepotSalesInvoice = () => {
             const rateInput = num(item.rate);
             const totalKgs = is68Product ? num(item.total_kgs) : (packs * bagWt);
 
-            const rawTotalInvoiceAmount = is68Product ? (10 * packs * rateInput) : (totalKgs * rateInput);
-            const totalInvoiceAmount = is68Product ? rawTotalInvoiceAmount : Math.round(rawTotalInvoiceAmount);
-
             const charityPerBale = salesType === 'GST SALES' || salesType === "DEPOT SALES" ? 3 : num(item.charity_per_bale || config.charity_value || 0);
             let charity = 0;
-            if (salesType === 'GST SALES' || salesType === "DEPOT SALES") {
+            if (salesType === 'GST SALES' || salesType === "DEPOT SALES" || config.charity_checked) {
                 charity = totalKgs * charityPerBale;
             } else {
                 charity = 0;
             }
 
-            const taxDivisor = 1 + (taxPercentage / 100);
-            const baseAmount = taxDivisor > 0 ? (totalInvoiceAmount / taxDivisor) : totalInvoiceAmount;
-            const gstAmount = (baseAmount * taxPercentage) / 100;
-            const accessibleValue = totalInvoiceAmount - num(item.freight_amt) - charity - gstAmount;
+            let assessableValue = 0;
+            let gstAmount = 0;
+            let igstAmount = 0;
+            let sgstAmount = 0;
+            let cgstAmount = 0;
+            let vat = 0;
+            let cenvat = 0;
+            let duty = 0;
+            let cess = 0;
+            let hcess = 0;
+            let basis = 0;
+            let discAmt = 0;
+            let rowTotal = 0;
+            let totalInvoiceAmount = 0;
+            let tcs = 0;
 
-            const vat = (accessibleValue * num(item.vat_per)) / 100;
-            const cenvat = (accessibleValue * num(item.cenvat_per)) / 100;
-            const duty = (accessibleValue * num(item.duty_per)) / 100;
-            const cess = (accessibleValue * num(item.cess_per)) / 100;
-            const hcess = (accessibleValue * num(item.hcess_per)) / 100;
-            const tcs = (totalInvoiceAmount * num(item.tcs_per)) / 100;
+            if (isForward) {
+                // FORWARD CALCULATION FLOW:
+                assessableValue = is68Product ? (10 * packs * rateInput) : (totalKgs * rateInput);
+                gstAmount = (assessableValue * taxPercentage) / 100;
+                igstAmount = igstPer > 0 ? (assessableValue * igstPer / 100) : 0;
+                sgstAmount = igstPer > 0 ? 0 : (sgstPer > 0 ? (assessableValue * sgstPer / 100) : (gstAmount / 2));
+                cgstAmount = igstPer > 0 ? 0 : (cgstPer > 0 ? (assessableValue * cgstPer / 100) : (gstAmount / 2));
+                vat = (assessableValue * num(item.vat_per)) / 100;
+                cenvat = (assessableValue * num(item.cenvat_per)) / 100;
+                duty = (assessableValue * num(item.duty_per)) / 100;
+                cess = (assessableValue * num(item.cess_per)) / 100;
+                hcess = (assessableValue * num(item.hcess_per)) / 100;
 
-            const basis = accessibleValue + vat + cenvat + duty + cess + hcess + gstAmount + tcs + charity + num(item.other_amt) + num(item.freight_amt);
-            const discAmt = (num(item.discount_percentage) * basis) / 100;
-            const rowTotal = basis - discAmt;
+                const totalTax = (igstPer > 0 ? igstAmount : (sgstAmount + cgstAmount)) + vat + cenvat + duty + cess + hcess + num(item.other_amt);
+                basis = assessableValue + totalTax + charity + num(item.freight_amt);
+                discAmt = (num(item.discount_percentage) * basis) / 100;
+                rowTotal = basis - discAmt;
+                totalInvoiceAmount = rowTotal;
+                tcs = (totalInvoiceAmount * num(item.tcs_per)) / 100;
+            } else {
+                // REVERSE CALCULATION FLOW:
+                const rawTotalInvoiceAmount = is68Product ? (10 * packs * rateInput) : (totalKgs * rateInput);
+                totalInvoiceAmount = is68Product ? rawTotalInvoiceAmount : Math.round(rawTotalInvoiceAmount);
 
-            const igstAmount = igstPer > 0 ? gstAmount : 0;
-            const sgstAmount = igstPer > 0 ? 0 : (sgstPer > 0 ? (gstAmount * sgstPer / taxPercentage) : (gstAmount / 2));
-            const cgstAmount = igstPer > 0 ? 0 : (cgstPer > 0 ? (gstAmount * cgstPer / taxPercentage) : (gstAmount / 2));
+                const taxDivisor = 1 + (taxPercentage / 100);
+                const baseAmount = taxDivisor > 0 ? (totalInvoiceAmount / taxDivisor) : totalInvoiceAmount;
+                gstAmount = (baseAmount * taxPercentage) / 100;
+                assessableValue = totalInvoiceAmount - num(item.freight_amt) - charity - gstAmount;
 
-            hTotals.assess += accessibleValue;
+                vat = (assessableValue * num(item.vat_per)) / 100;
+                cenvat = (assessableValue * num(item.cenvat_per)) / 100;
+                duty = (assessableValue * num(item.duty_per)) / 100;
+                cess = (assessableValue * num(item.cess_per)) / 100;
+                hcess = (assessableValue * num(item.hcess_per)) / 100;
+                tcs = (totalInvoiceAmount * num(item.tcs_per)) / 100;
+
+                basis = assessableValue + vat + cenvat + duty + cess + hcess + gstAmount + tcs + charity + num(item.other_amt) + num(item.freight_amt);
+                discAmt = (num(item.discount_percentage) * basis) / 100;
+                rowTotal = basis - discAmt;
+
+                igstAmount = igstPer > 0 ? gstAmount : 0;
+                sgstAmount = igstPer > 0 ? 0 : (sgstPer > 0 ? (gstAmount * sgstPer / taxPercentage) : (gstAmount / 2));
+                cgstAmount = igstPer > 0 ? 0 : (cgstPer > 0 ? (gstAmount * cgstPer / taxPercentage) : (gstAmount / 2));
+            }
+
+            hTotals.assess += assessableValue;
             hTotals.charity += charity;
             hTotals.freight += num(item.freight_amt);
             hTotals.gst += gstAmount;
@@ -620,7 +660,7 @@ const DepotSalesInvoice = () => {
                 packs: packs,
                 avg_content: bagWt,
                 total_kgs: totalKgs,
-                assessable_value: accessibleValue,
+                assessable_value: assessableValue,
                 charity_amt: charity,
                 gst_per: gstPer,
                 sgst_per: sgstPer,
@@ -697,28 +737,31 @@ const DepotSalesInvoice = () => {
 
         const party = listData.parties.find(p => String(p.id) === String(data.party_id)) || data.Party || {};
         const config = listData.types.find(t => String(t.id) === String(data.invoice_type_id)) || {};
+        const items = gridRows.length ? gridRows : (data.Details || data.InvoiceDetails || []);
+
         const gstPer = num(config.gst_percentage);
-        let cgstPer = num(config.cgst_percentage);
-        let sgstPer = num(config.sgst_percentage);
-        let igstPer = num(config.igst_percentage);
-        const tcsPer = num(config.tcs_percentage);
+        let cgstPer = num(config.cgst_percentage) || (items.length ? num(items[0]?.cgst_per) : 0);
+        let sgstPer = num(config.sgst_percentage) || (items.length ? num(items[0]?.sgst_per) : 0);
+        let igstPer = num(config.igst_percentage) || (items.length ? num(items[0]?.igst_per) : 0);
+        const tcsPer = num(config.tcs_percentage) || (items.length ? num(items[0]?.tcs_per) : 0);
 
         if (igstPer === 0 && cgstPer === 0 && sgstPer === 0 && gstPer > 0) {
             cgstPer = gstPer / 2;
             sgstPer = gstPer / 2;
         }
 
-        const totalGst = num(data.total_gst);
-        let totalCgst = num(data.total_cgst);
-        let totalSgst = num(data.total_sgst);
-        let totalIgst = num(data.total_igst);
+        const totalGst = num(data.total_gst) || items.reduce((sum, r) => sum + num(r.gst_amt), 0);
+        let totalCgst = num(data.total_cgst) || items.reduce((sum, r) => sum + num(r.cgst_amt), 0);
+        let totalSgst = num(data.total_sgst) || items.reduce((sum, r) => sum + num(r.sgst_amt), 0);
+        let totalIgst = num(data.total_igst) || items.reduce((sum, r) => sum + num(r.igst_amt), 0);
 
-        if (igstPer === 0 && totalCgst === 0 && totalSgst === 0 && totalGst > 0) {
+        if (igstPer > 0 && totalIgst === 0 && totalGst > 0) {
+            totalIgst = totalGst;
+        } else if (igstPer === 0 && totalCgst === 0 && totalSgst === 0 && totalGst > 0) {
             totalCgst = totalGst / 2;
             totalSgst = totalGst / 2;
         }
 
-        const items = gridRows.length ? gridRows : (data.Details || data.InvoiceDetails || []);
         const totalAssessable = items.reduce((sum, r) => sum + num(r.assessable_value || (num(r.total_kgs) * num(r.rate))), 0);
 
         const getHSN = (productId) => {

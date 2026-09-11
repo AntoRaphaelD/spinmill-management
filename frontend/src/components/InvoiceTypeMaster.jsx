@@ -326,12 +326,13 @@ const InvoiceTypeMaster = () => {
                             <th className="p-3">Code</th>
                             <th className="p-3">Invoice Type Name</th>
                             <th className="p-3">Sales Type</th>
+                            <th className="p-3 text-center">Calculation Method</th>
                             {!isSelectionMode && <th className="p-3 w-10"></th>}
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                         {loading ? (
-                            <tr><td colSpan={4} className="p-12 text-center text-slate-400">Loading...</td></tr>
+                            <tr><td colSpan={5} className="p-12 text-center text-slate-400">Loading...</td></tr>
                         ) : currentItems.length > 0 ? currentItems.map(item => (
                             <tr 
                                 key={item.id} 
@@ -346,10 +347,23 @@ const InvoiceTypeMaster = () => {
                                 <td className="p-4 text-base font-bold text-blue-600 font-mono">{item.code}</td>
                                 <td className="p-4 text-base font-semibold text-slate-700 uppercase">{item.type_name}</td>
                                 <td className="p-4 text-base text-slate-600 uppercase">{item.sales_type || '—'}</td>
+                                <td className="p-4 text-center">
+                                    {String(item.round_off_direction || '').toLowerCase() === 'forward' ? (
+                                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-sm">
+                                            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                                            FORWARD
+                                        </span>
+                                    ) : (
+                                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-indigo-100 text-indigo-800 border border-indigo-300 shadow-sm">
+                                            <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
+                                            REVERSE
+                                        </span>
+                                    )}
+                                </td>
                                 {!isSelectionMode && <td className="p-4 text-slate-300"><Edit size={16} /></td>}
                             </tr>
                         )) : (
-                            <tr><td colSpan={4} className="p-12 text-center text-slate-400">No invoice types found</td></tr>
+                            <tr><td colSpan={5} className="p-12 text-center text-slate-400">No invoice types found</td></tr>
                         )}
                     </tbody>
                 </table>
@@ -472,6 +486,68 @@ const InvoiceTypeMaster = () => {
                   className="w-5 h-5 accent-blue-600"
                 />
                 Enable Account Posting
+              </label>
+            </div>
+          </div>
+
+          {/* Calculation Method Selection Card */}
+          <div className="bg-gradient-to-r from-slate-900 to-slate-800 p-4 rounded-xl text-white shadow-md">
+            <div className="flex items-center justify-between mb-3 border-b border-slate-700 pb-2">
+              <div className="flex items-center gap-2 font-bold text-sm tracking-wide uppercase text-blue-300">
+                <Calculator size={18} /> Calculation Method Flow
+              </div>
+              <span className="text-xs px-2.5 py-0.5 rounded bg-blue-500/20 text-blue-200 border border-blue-400/30 font-bold">
+                {formData.round_off_direction === 'Forward' ? 'FORWARD ACTIVE' : 'REVERSE ACTIVE'}
+              </span>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {/* Option 1: Reverse */}
+              <label 
+                className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
+                  formData.round_off_direction === 'Reverse' 
+                    ? 'bg-blue-600/30 border-blue-400 text-white shadow-inner ring-1 ring-blue-400' 
+                    : 'bg-slate-800/60 border-slate-700 text-slate-300 hover:bg-slate-700/50'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="calculation_flow"
+                  value="Reverse"
+                  checked={formData.round_off_direction === 'Reverse'}
+                  onChange={e => setFormData({...formData, round_off_direction: e.target.value})}
+                  className="w-5 h-5 accent-blue-500 mt-0.5"
+                />
+                <div className="flex-1">
+                  <p className="font-bold text-sm text-blue-200">Reverse Calculation (Default)</p>
+                  <p className="text-[11px] text-slate-300 mt-0.5 leading-relaxed">
+                    Tax-inclusive flow. Back-calculates Assessable Value & Taxes from the Gross Total Invoice Amount.
+                  </p>
+                </div>
+              </label>
+
+              {/* Option 2: Forward */}
+              <label 
+                className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
+                  formData.round_off_direction === 'Forward' 
+                    ? 'bg-emerald-600/30 border-emerald-400 text-white shadow-inner ring-1 ring-emerald-400' 
+                    : 'bg-slate-800/60 border-slate-700 text-slate-300 hover:bg-slate-700/50'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="calculation_flow"
+                  value="Forward"
+                  checked={formData.round_off_direction === 'Forward'}
+                  onChange={e => setFormData({...formData, round_off_direction: e.target.value})}
+                  className="w-5 h-5 accent-emerald-500 mt-0.5"
+                />
+                <div className="flex-1">
+                  <p className="font-bold text-sm text-emerald-300">Forward Calculation</p>
+                  <p className="text-[11px] text-slate-300 mt-0.5 leading-relaxed">
+                    Assessable = Rate × Weight. Taxes are calculated on Assessable Value. Total = Assessable + Taxes + Freight + Charity.
+                  </p>
+                </div>
               </label>
             </div>
           </div>
@@ -641,30 +717,8 @@ const InvoiceTypeMaster = () => {
               />
             </div>
 
-            <div className="col-span-2 flex justify-end items-center font-bold text-slate-700">Round Off</div>
+            <div className="col-span-2 flex justify-end items-center font-bold text-slate-700">Round Off A/C</div>
             <div className="col-span-10 flex flex-col md:flex-row gap-4 items-center">
-              <div className="flex gap-6 bg-slate-100 p-2 px-4 rounded-lg border border-slate-200">
-                <label className="flex items-center gap-2 text-sm font-bold text-slate-600 cursor-pointer">
-                  <input
-                    type="radio"
-                    value="Forward"
-                    checked={formData.round_off_direction === 'Forward'}
-                    onChange={e => setFormData({...formData, round_off_direction: e.target.value})}
-                    className="w-4 h-4 accent-blue-600"
-                  />
-                  Forward
-                </label>
-                <label className="flex items-center gap-2 text-sm font-bold text-slate-600 cursor-pointer">
-                  <input
-                    type="radio"
-                    value="Reverse"
-                    checked={formData.round_off_direction === 'Reverse'}
-                    onChange={e => setFormData({...formData, round_off_direction: e.target.value})}
-                    className="w-4 h-4 accent-blue-600"
-                  />
-                  Reverse
-                </label>
-              </div>
               <input
                 className="flex-1 p-2 border border-slate-300 rounded-lg uppercase font-bold text-slate-700 focus:ring-1 focus:ring-blue-200 outline-none text-sm"
                 value={formData.round_off_account || ''}
