@@ -304,8 +304,11 @@ const ModernPrintView = ({ data, listData, getHSN }) => {
                                 HSN CODE: {hsnCodes.join(', ') || '52052790'}
                             </div>
                             {data.epcg_no && (
-                                <div className="font-bold text-[10px] mt-2 whitespace-pre-line text-slate-800">
-                                    EPCG NO: {data.epcg_no}
+                                <div className="font-bold text-[10px] mt-2 flex items-start text-slate-800">
+                                    <span className="shrink-0 w-20">EPCG NO :</span>
+                                    <div className="flex-1 whitespace-pre-line">
+                                        {data.epcg_no}
+                                    </div>
                                 </div>
                             )}
                         </div>
@@ -776,8 +779,20 @@ const InvoicePreparation = () => {
         if (data.epcg_no) {
             doc.setFont("helvetica", "bold");
             doc.setFontSize(7);
-            const epcgLines = doc.splitTextToSize(`EPCG NO: ${data.epcg_no}`, midX - margin - 6);
-            doc.text(epcgLines, margin + 3, y + 25);
+            const epcgLabel = "EPCG NO : ";
+            const epcgX = margin + 3;
+            const epcgValX = epcgX + 16;
+            let epcgY = y + 25;
+            doc.text(epcgLabel, epcgX, epcgY);
+            const rawLines = String(data.epcg_no).split('\n');
+            rawLines.forEach((lineText, idx) => {
+                if (idx > 0) epcgY += 3.5;
+                const wrappedSubLines = doc.splitTextToSize(lineText.trim(), midX - epcgValX - 3);
+                wrappedSubLines.forEach((subLine, sIdx) => {
+                    if (sIdx > 0) epcgY += 3.5;
+                    doc.text(subLine, epcgValX, epcgY);
+                });
+            });
         }
 
         doc.setFont("helvetica", "normal");

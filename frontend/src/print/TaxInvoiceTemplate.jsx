@@ -114,6 +114,14 @@ const TaxInvoiceTemplate = forwardRef(({ data }, ref) => {
                                         <td colSpan={5} className="px-4 py-2">
                                             <p className="font-black text-sm uppercase">{item.Product?.product_name}</p>
                                             <p className="mt-2 font-bold">HSN CODE: {item.Product?.TariffSubHead?.tariff_no || '52052790'}</p>
+                                            {data.epcg_no && (
+                                                <div className="font-bold text-xs mt-2 flex items-start">
+                                                    <span className="shrink-0 w-24">EPCG NO :</span>
+                                                    <div className="flex-1 whitespace-pre-line">
+                                                        {data.epcg_no}
+                                                    </div>
+                                                </div>
+                                            )}
                                         </td>
                                     </tr>
                                 </React.Fragment>
