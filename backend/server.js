@@ -160,6 +160,28 @@ const ensureDespatchColumns = async () => {
   }
 };
 
+const ensureInvoiceHeaderColumns = async () => {
+  try {
+    const queryInterface = sequelize.getQueryInterface();
+    
+    // tbl_InvoiceHeaders
+    const invHeadersTable = 'tbl_InvoiceHeaders';
+    const existingInv = await queryInterface.describeTable(invHeadersTable);
+    if (!existingInv.epcg_no) {
+      await queryInterface.addColumn(invHeadersTable, 'epcg_no', { type: DataTypes.TEXT, allowNull: true });
+    }
+
+    // tbl_DepotSalesHeaders
+    const depotHeadersTable = 'tbl_DepotSalesHeaders';
+    const existingDepot = await queryInterface.describeTable(depotHeadersTable);
+    if (!existingDepot.epcg_no) {
+      await queryInterface.addColumn(depotHeadersTable, 'epcg_no', { type: DataTypes.TEXT, allowNull: true });
+    }
+  } catch (err) {
+    console.error('ensureInvoiceHeaderColumns error:', err.message);
+  }
+};
+
 async function startServer() {
   const app = express();
   app.use(cors());
@@ -182,6 +204,7 @@ async function startServer() {
     await ensureProductColumns();
     await ensureInvoiceDetailColumns();
     await ensureDespatchColumns();
+    await ensureInvoiceHeaderColumns();
 
     const PORT = process.env.PORT || 5000;
     app.listen(PORT, () => {

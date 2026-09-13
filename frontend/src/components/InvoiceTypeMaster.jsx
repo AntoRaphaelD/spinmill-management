@@ -463,6 +463,7 @@ const InvoiceTypeMaster = () => {
                 <option value="DIRECT SALES">DIRECT SALES</option>
                 <option value="GST SALES">GST SALES</option>
                 <option value="DEPOT SALES">DEPOT SALES</option>
+                <option value="MERCHANT SALES">MERCHANT SALES</option>
               </select>
             </div>
           </div>

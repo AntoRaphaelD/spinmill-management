@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { mastersAPI, transactionsAPI } from '../service/api';
 import { getNextInvoiceSequence, getPrefixForParty } from '../service/utils';
+import { generateGstEInvoiceJson } from '../service/exportUtils';
 import * as XLSX from 'xlsx';
 import {
     Save, FileText, Calculator, RefreshCw, X, Plus,
@@ -231,27 +232,27 @@ const ModernPrintView = ({ data, listData, getHSN }) => {
                                 <tr>
                                     <td className="font-bold py-0.5">Invoice No</td>
                                     <td className="font-bold py-0.5 w-4">:</td>
-                                    <td className="font-bold py-0.5 text-right font-mono">{data.invoice_no || '-'}</td>
+                                    <td className="font-bold py-0.5 text-left pl-2 font-mono">{data.invoice_no || '-'}</td>
                                 </tr>
                                 <tr>
                                     <td className="font-bold py-0.5">Invoice Dt</td>
                                     <td className="font-bold py-0.5">:</td>
-                                    <td className="font-bold py-0.5 text-right">{fmtInvoiceDate(data.date)}</td>
+                                    <td className="font-bold py-0.5 text-left pl-2">{fmtInvoiceDate(data.date)}</td>
                                 </tr>
                                 <tr>
                                     <td className="font-bold py-0.5">E-Way Bill No</td>
                                     <td className="font-bold py-0.5">:</td>
-                                    <td className="font-bold py-0.5 text-right font-mono">{data.ebill_no || '-'}</td>
+                                    <td className="font-bold py-0.5 text-left pl-2 font-mono">{data.ebill_no || '-'}</td>
                                 </tr>
                                 <tr>
                                     <td className="font-bold py-0.5">Vehicle No</td>
                                     <td className="font-bold py-0.5">:</td>
-                                    <td className="font-bold py-0.5 text-right uppercase font-mono">{data.vehicle_no || '-'}</td>
+                                    <td className="font-bold py-0.5 text-left pl-2 uppercase font-mono">{data.vehicle_no || '-'}</td>
                                 </tr>
                                 <tr>
                                     <td className="font-bold py-0.5">Delivery At</td>
                                     <td className="font-bold py-0.5">:</td>
-                                    <td className="font-bold py-0.5 text-right uppercase">{data.delivery || '-'}</td>
+                                    <td className="font-bold py-0.5 text-left pl-2 uppercase">{data.delivery || '-'}</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -302,6 +303,11 @@ const ModernPrintView = ({ data, listData, getHSN }) => {
                             <div className="font-bold text-[11px] mt-2">
                                 HSN CODE: {hsnCodes.join(', ') || '52052790'}
                             </div>
+                            {data.epcg_no && (
+                                <div className="font-bold text-[10px] mt-2 whitespace-pre-line text-slate-800">
+                                    EPCG NO: {data.epcg_no}
+                                </div>
+                            )}
                         </div>
                         <div className="text-[10px] font-normal pt-4">
                             Whether the Tax Payable on Reverse Charges Basis ? &nbsp;&nbsp;&nbsp;&nbsp; Yes / No
@@ -316,18 +322,14 @@ const ModernPrintView = ({ data, listData, getHSN }) => {
                                     <td className="p-1.5 pl-3 font-bold">TOTAL ASSESSABLE AMOUNT</td>
                                     <td className="p-1.5 pr-3 text-right font-bold">{fmtIN(roundedAssessable, 2)}</td>
                                 </tr>
-                                {roundedCharity > 0 && (
-                                    <tr className="border-b border-black/20">
-                                        <td className="p-1.5 pl-3 font-bold">CHARITY</td>
-                                        <td className="p-1.5 pr-3 text-right font-bold">{fmtIN(roundedCharity, 2)}</td>
-                                    </tr>
-                                )}
-                                {roundedFreight > 0 && (
-                                    <tr className="border-b border-black/20">
-                                        <td className="p-1.5 pl-3 font-bold">FREIGHT</td>
-                                        <td className="p-1.5 pr-3 text-right font-bold">{fmtIN(roundedFreight, 2)}</td>
-                                    </tr>
-                                )}
+                                <tr className="border-b border-black/20">
+                                    <td className="p-1.5 pl-3 font-bold">CHARITY</td>
+                                    <td className="p-1.5 pr-3 text-right font-bold">{fmtIN(roundedCharity, 2)}</td>
+                                </tr>
+                                <tr className="border-b border-black/20">
+                                    <td className="p-1.5 pl-3 font-bold">FREIGHT</td>
+                                    <td className="p-1.5 pr-3 text-right font-bold">{fmtIN(roundedFreight, 2)}</td>
+                                </tr>
                                 <tr className="border-b border-black/20">
                                     <td className="p-1.5 pl-3 font-medium">C.G.S.T &nbsp;&nbsp; : &nbsp; {cgstPer.toFixed(2)} %</td>
                                     <td className="p-1.5 pr-3 text-right font-medium">{roundedCgst > 0 ? fmtIN(roundedCgst, 2) : ''}</td>
@@ -380,7 +382,7 @@ const ModernPrintView = ({ data, listData, getHSN }) => {
                     {/* Right Column */}
                     <div className="col-span-5 p-2.5 flex flex-col justify-between text-center">
                         <div className="font-bold text-[11px]">For KAYAAR EXPORTS PRIVATE LIMITED</div>
-                        <div className="font-bold text-[11px] mt-12">Director/Authorised Signatory</div>
+                        <div className="font-bold text-[11px] mt-12">Authorised Signatory</div>
                     </div>
                 </div>
             </div>
@@ -677,14 +679,14 @@ const InvoicePreparation = () => {
 
         // Right Side: Invoice Meta
         const metaX = midX + 3;
-        const metaValX = right - 3;
+        const metaValX = metaX + 28;
         const labelRow = (lbl, val, rowY, isBoldVal = true) => {
             doc.setFont("helvetica", "bold");
             doc.setFontSize(7.5);
             doc.text(lbl, metaX, rowY);
-            doc.text(":", metaX + 26, rowY);
+            doc.text(":", metaX + 25, rowY);
             doc.setFont("helvetica", isBoldVal ? "bold" : "normal");
-            doc.text(safe(val, "-"), metaValX, rowY, { align: "right" });
+            doc.text(safe(val, "-"), metaValX, rowY, { align: "left" });
         };
 
         labelRow("Invoice No", data.invoice_no, y + 6);
@@ -771,6 +773,13 @@ const InvoicePreparation = () => {
         doc.setFontSize(7.5);
         doc.text(`HSN CODE: ${hsnCodes.join(", ") || "52052790"}`, margin + 3, y + 20);
 
+        if (data.epcg_no) {
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(7);
+            const epcgLines = doc.splitTextToSize(`EPCG NO: ${data.epcg_no}`, midX - margin - 6);
+            doc.text(epcgLines, margin + 3, y + 25);
+        }
+
         doc.setFont("helvetica", "normal");
         doc.setFontSize(7);
         doc.text("Whether the Tax Payable on Reverse Charges Basis ?    Yes / No", margin + 3, y + splitH - 4);
@@ -802,12 +811,8 @@ const InvoicePreparation = () => {
         const roundedNetAmount = roundedSubTotal - roundedTcs;
 
         renderTaxRow("TOTAL ASSESSABLE", roundedAssessable, true);
-        if (roundedCharity > 0) {
-            renderTaxRow("CHARITY", roundedCharity, true);
-        }
-        if (roundedFreight > 0) {
-            renderTaxRow("FREIGHT", roundedFreight, true);
-        }
+        renderTaxRow("CHARITY", roundedCharity, true);
+        renderTaxRow("FREIGHT", roundedFreight, true);
         renderTaxRow(`C.G.S.T   :   ${cgstPer.toFixed(2)} %`, roundedCgst > 0 ? roundedCgst : '');
         renderTaxRow(`S.G.S.T   :   ${sgstPer.toFixed(2)} %`, roundedSgst > 0 ? roundedSgst : '');
         renderTaxRow(`I.G.S.T   :   ${igstPer.toFixed(2)} %`, roundedIgst > 0 ? roundedIgst : '');
@@ -861,34 +866,29 @@ const InvoicePreparation = () => {
         doc.setFont("helvetica", "bold");
         doc.setFontSize(7.5);
         doc.text("For KAYAAR EXPORTS PRIVATE LIMITED", midX + (right - midX) / 2, y + 5.5, { align: "center" });
-        doc.text("Director/Authorised Signatory", midX + (right - midX) / 2, y + signH - 4, { align: "center" });
+        doc.text("Authorised Signatory", midX + (right - midX) / 2, y + signH - 4, { align: "center" });
 
         doc.save(`${data.invoice_no || 'invoice'}.pdf`);
     };
     const exportToJSON = () => {
-        // 1. Prepare the data object
-        const exportData = {
-            ...formData,
-            Details: gridRows // Include the line items
-        };
+        // Prepare GST E-Invoice formatted data strictly adhering to schema
+        const exportData = generateGstEInvoiceJson({
+            formData,
+            gridRows,
+            listData
+        });
 
-        // 2. Convert to JSON string (with 2-space indentation for readability)
+        // Convert to JSON string (with 2-space indentation)
         const jsonString = JSON.stringify(exportData, null, 2);
 
-        // 3. Create a Blob from the JSON string
+        // Create Blob and trigger download
         const blob = new Blob([jsonString], { type: "application/json" });
-
-        // 4. Create a temporary download link
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
-
-        // 5. Set the filename as [invoiceNumber].json
         const fileName = formData.invoice_no ? `${formData.invoice_no}.json` : 'invoice.json';
 
         link.href = url;
         link.download = fileName;
-
-        // 6. Trigger the download and cleanup
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -2052,6 +2052,7 @@ const InvoicePreparation = () => {
                                                 { value: 'GST SALES', label: 'GST SALES' },
                                                 // { value: 'DEPOT SALES', label: 'DEPOT SALES' },
                                                 { value: 'DIRECT SALES', label: 'DIRECT SALES' },
+                                                { value: 'MERCHANT SALES', label: 'MERCHANT SALES' },
                                             ]}
                                             onChange={e => setFormData({
                                                 ...formData,
@@ -2115,7 +2116,18 @@ const InvoicePreparation = () => {
                                             <RowInput label="Form JJ" value={formData.form_j} onChange={e => setFormData({ ...formData, form_j: e.target.value })} />
                                         </div>
                                         <RowInput label="Sales Against" value={formData.sales_against} onChange={e => setFormData({ ...formData, sales_against: e.target.value })} />
-                                        <RowInput label="EPCG No" value={formData.epcg_no} onChange={e => setFormData({ ...formData, epcg_no: e.target.value })} />
+                                        <div className="flex items-start gap-4">
+                                            <label className="text-[10px] font-black text-slate-700 w-[120px] uppercase shrink-0 pt-1">
+                                                EPCG Number
+                                            </label>
+                                            <textarea
+                                                rows={4}
+                                                value={formData.epcg_no || ''}
+                                                onChange={e => setFormData({ ...formData, epcg_no: e.target.value })}
+                                                placeholder="Enter EPCG Number details (up to 4 lines)..."
+                                                className="flex-1 border border-slate-300 p-1.5 text-xs font-bold outline-none focus:border-blue-500 rounded bg-white resize-y"
+                                            />
+                                        </div>
                                     </div>
                                     <div className="col-span-4 bg-slate-50 border border-slate-300 p-4 rounded flex flex-col gap-1 shadow-inner font-black overflow-y-auto">
                                         <h3 className="text-[10px] text-blue-800 mb-1 border-b pb-1 uppercase tracking-tighter font-black">Invoice Summary</h3>

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import * as XLSX from 'xlsx';
 import { mastersAPI, transactionsAPI } from '../service/api';
 import { getNextInvoiceSequence, getPrefixForParty, getNextDepotInvoiceSequence } from '../service/utils';
+import { generateGstEInvoiceJson } from '../service/exportUtils';
 import {
     Save, FileText, Calculator, Plus, MinusCircle,
     Layers, Activity, Search, Hash, Printer,
@@ -234,27 +235,27 @@ const ModernPrintView = ({ data, listData, getHSN }) => {
                                 <tr>
                                     <td className="font-bold py-0.5">Invoice No</td>
                                     <td className="font-bold py-0.5 w-4">:</td>
-                                    <td className="font-bold py-0.5 text-right font-mono">{data.invoice_no || '-'}</td>
+                                    <td className="font-bold py-0.5 text-left pl-2 font-mono">{data.invoice_no || '-'}</td>
                                 </tr>
                                 <tr>
                                     <td className="font-bold py-0.5">Invoice Dt</td>
                                     <td className="font-bold py-0.5">:</td>
-                                    <td className="font-bold py-0.5 text-right">{fmtInvoiceDate(data.date)}</td>
+                                    <td className="font-bold py-0.5 text-left pl-2">{fmtInvoiceDate(data.date)}</td>
                                 </tr>
                                 <tr>
                                     <td className="font-bold py-0.5">E-Way Bill No</td>
                                     <td className="font-bold py-0.5">:</td>
-                                    <td className="font-bold py-0.5 text-right font-mono">{data.ebill_no || '-'}</td>
+                                    <td className="font-bold py-0.5 text-left pl-2 font-mono">{data.ebill_no || '-'}</td>
                                 </tr>
                                 <tr>
                                     <td className="font-bold py-0.5">Vehicle No</td>
                                     <td className="font-bold py-0.5">:</td>
-                                    <td className="font-bold py-0.5 text-right uppercase font-mono">{data.vehicle_no || '-'}</td>
+                                    <td className="font-bold py-0.5 text-left pl-2 uppercase font-mono">{data.vehicle_no || '-'}</td>
                                 </tr>
                                 <tr>
                                     <td className="font-bold py-0.5">Delivery At</td>
                                     <td className="font-bold py-0.5">:</td>
-                                    <td className="font-bold py-0.5 text-right uppercase">{data.delivery || '-'}</td>
+                                    <td className="font-bold py-0.5 text-left pl-2 uppercase">{data.delivery || '-'}</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -305,6 +306,11 @@ const ModernPrintView = ({ data, listData, getHSN }) => {
                             <div className="font-bold text-[11px] mt-2">
                                 HSN CODE: {hsnCodes.join(', ') || '52052790'}
                             </div>
+                            {data.epcg_no && (
+                                <div className="font-bold text-[10px] mt-2 whitespace-pre-line text-slate-800">
+                                    EPCG NO: {data.epcg_no}
+                                </div>
+                            )}
                         </div>
                         <div className="text-[10px] font-normal pt-4">
                             Whether the Tax Payable on Reverse Charges Basis ? &nbsp;&nbsp;&nbsp;&nbsp; Yes / No
@@ -319,18 +325,14 @@ const ModernPrintView = ({ data, listData, getHSN }) => {
                                     <td className="p-1.5 pl-3 font-bold">TOTAL ASSESSABLE AMOUNT</td>
                                     <td className="p-1.5 pr-3 text-right font-bold">{fmtIN(data.total_assessable || totalAssessable, 2)}</td>
                                 </tr>
-                                {num(data.total_charity) > 0 && (
-                                    <tr className="border-b border-black/20">
-                                        <td className="p-1.5 pl-3 font-bold">CHARITY</td>
-                                        <td className="p-1.5 pr-3 text-right font-bold">{fmtIN(data.total_charity, 2)}</td>
-                                    </tr>
-                                )}
-                                {num(data.freight || data.freight_charges) > 0 && (
-                                    <tr className="border-b border-black/20">
-                                        <td className="p-1.5 pl-3 font-bold">FREIGHT</td>
-                                        <td className="p-1.5 pr-3 text-right font-bold">{fmtIN(data.freight || data.freight_charges, 2)}</td>
-                                    </tr>
-                                )}
+                                <tr className="border-b border-black/20">
+                                    <td className="p-1.5 pl-3 font-bold">CHARITY</td>
+                                    <td className="p-1.5 pr-3 text-right font-bold">{fmtIN(data.total_charity, 2)}</td>
+                                </tr>
+                                <tr className="border-b border-black/20">
+                                    <td className="p-1.5 pl-3 font-bold">FREIGHT</td>
+                                    <td className="p-1.5 pr-3 text-right font-bold">{fmtIN(data.freight || data.freight_charges, 2)}</td>
+                                </tr>
                                 <tr className="border-b border-black/20">
                                     <td className="p-1.5 pl-3 font-medium">C.G.S.T &nbsp;&nbsp; : &nbsp; {cgstPer.toFixed(2)} %</td>
                                     <td className="p-1.5 pr-3 text-right font-medium">{totalCgst > 0 ? fmtIN(totalCgst, 2) : ''}</td>
@@ -383,7 +385,7 @@ const ModernPrintView = ({ data, listData, getHSN }) => {
                     {/* Right Column */}
                     <div className="col-span-5 p-2.5 flex flex-col justify-between text-center">
                         <div className="font-bold text-[11px]">For KAYAAR EXPORTS PRIVATE LIMITED</div>
-                        <div className="font-bold text-[11px] mt-12">Director/Authorised Signatory</div>
+                        <div className="font-bold text-[11px] mt-12">Authorised Signatory</div>
                     </div>
                 </div>
             </div>
@@ -435,6 +437,7 @@ const DepotSalesInvoice = () => {
         removal_time: '',
         agent_name: '',
         form_jj: '',
+        epcg_no: '',
 
         // totals
         total_assessable: 0,
@@ -872,14 +875,14 @@ const DepotSalesInvoice = () => {
 
         // Right Side: Invoice Meta
         const metaX = midX + 3;
-        const metaValX = right - 3;
+        const metaValX = metaX + 28;
         const labelRow = (lbl, val, rowY, isBoldVal = true) => {
             doc.setFont("helvetica", "bold");
             doc.setFontSize(7.5);
             doc.text(lbl, metaX, rowY);
-            doc.text(":", metaX + 26, rowY);
+            doc.text(":", metaX + 25, rowY);
             doc.setFont("helvetica", isBoldVal ? "bold" : "normal");
-            doc.text(safe(val, "-"), metaValX, rowY, { align: "right" });
+            doc.text(safe(val, "-"), metaValX, rowY, { align: "left" });
         };
 
         labelRow("Invoice No", data.invoice_no, y + 6);
@@ -966,6 +969,13 @@ const DepotSalesInvoice = () => {
         doc.setFontSize(7.5);
         doc.text(`HSN CODE: ${hsnCodes.join(", ") || "52052790"}`, margin + 3, y + 20);
 
+        if (data.epcg_no) {
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(7);
+            const epcgLines = doc.splitTextToSize(`EPCG NO: ${data.epcg_no}`, midX - margin - 6);
+            doc.text(epcgLines, margin + 3, y + 25);
+        }
+
         doc.setFont("helvetica", "normal");
         doc.setFontSize(7);
         doc.text("Whether the Tax Payable on Reverse Charges Basis ?    Yes / No", margin + 3, y + splitH - 4);
@@ -987,12 +997,8 @@ const DepotSalesInvoice = () => {
         };
 
         renderTaxRow("TOTAL ASSESSABLE", data.total_assessable || totalAssessable, true);
-        if (num(data.total_charity) > 0) {
-            renderTaxRow("CHARITY", data.total_charity, true);
-        }
-        if (num(data.freight || data.freight_charges) > 0) {
-            renderTaxRow("FREIGHT", data.freight || data.freight_charges, true);
-        }
+        renderTaxRow("CHARITY", data.total_charity || 0, true);
+        renderTaxRow("FREIGHT", data.freight || data.freight_charges || 0, true);
         renderTaxRow(`C.G.S.T   :   ${cgstPer.toFixed(2)} %`, totalCgst > 0 ? totalCgst : '');
         renderTaxRow(`S.G.S.T   :   ${sgstPer.toFixed(2)} %`, totalSgst > 0 ? totalSgst : '');
         renderTaxRow(`I.G.S.T   :   ${igstPer.toFixed(2)} %`, totalIgst > 0 ? totalIgst : '');
@@ -1046,42 +1052,29 @@ const DepotSalesInvoice = () => {
         doc.setFont("helvetica", "bold");
         doc.setFontSize(7.5);
         doc.text("For KAYAAR EXPORTS PRIVATE LIMITED", midX + (right - midX) / 2, y + 5.5, { align: "center" });
-        doc.text("Director/Authorised Signatory", midX + (right - midX) / 2, y + signH - 4, { align: "center" });
+        doc.text("Authorised Signatory", midX + (right - midX) / 2, y + signH - 4, { align: "center" });
 
         doc.save(`${data.invoice_no || 'invoice'}.pdf`);
     };
     const exportToJSON = () => {
-        // 1. Find the Depot Name from the list based on selection
-        const selectedDepot = listData.depots.find(d => d.id === parseInt(formData.depot_id));
-        const depotName = selectedDepot ? selectedDepot.account_name : "INV";
+        // Prepare GST E-Invoice formatted data strictly adhering to schema
+        const exportData = generateGstEInvoiceJson({
+            formData,
+            gridRows,
+            listData
+        });
 
-        // 2. Generate Initials (e.g., "Depot Mumbai" -> "DM")
-        const shortName = depotName
-            .split(' ')                  // Split by space ["Depot", "Mumbai"]
-            .filter(word => word.length > 0)
-            .map(word => word[0])        // Take first letter ["D", "M"]
-            .join('')                    // Join them "DM"
-            .toUpperCase();              // Ensure uppercase
-
-        // 3. Construct Filename: [Initials]-[InvoiceNo].json
-        const invNo = formData.invoice_no || '000';
-        const fileName = formData.invoice_no ? `${formData.invoice_no}.json` : 'depot_invoice.json';
-
-        // 4. Data Preparation
-        const exportData = {
-            ...formData,
-            Details: gridRows
-        };
-
-        // 5. Blob and Download execution
+        // Convert to JSON string (with 2-space indentation)
         const jsonString = JSON.stringify(exportData, null, 2);
+
+        // Blob and Download execution
         const blob = new Blob([jsonString], { type: "application/json" });
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
+        const fileName = formData.invoice_no ? `${formData.invoice_no}.json` : 'depot_invoice.json';
 
         link.href = url;
-        link.download = fileName; // Uses the generated name (e.g., DM-101.json)
-
+        link.download = fileName;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -1976,6 +1969,19 @@ const DepotSalesInvoice = () => {
                                                 onChange={e => setFormData({ ...formData, remarks: e.target.value })}
                                             />
 
+                                        </div>
+
+                                        <div className="flex items-start gap-4 pt-2 border-t">
+                                            <label className="text-[10px] font-black text-slate-700 w-[120px] uppercase shrink-0 pt-1">
+                                                EPCG Number
+                                            </label>
+                                            <textarea
+                                                rows={4}
+                                                value={formData.epcg_no || ''}
+                                                onChange={e => setFormData({ ...formData, epcg_no: e.target.value })}
+                                                placeholder="Enter EPCG Number details (up to 4 lines)..."
+                                                className="flex-1 border border-slate-300 p-1.5 text-xs font-bold outline-none focus:border-blue-500 rounded bg-white resize-y"
+                                            />
                                         </div>
                                     </div>
                                     <div className="col-span-4 bg-slate-50 border border-slate-300 p-4 rounded flex flex-col gap-1 shadow-inner font-black overflow-y-auto">

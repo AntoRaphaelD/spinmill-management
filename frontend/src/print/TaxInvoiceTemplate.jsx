@@ -59,27 +59,27 @@ const TaxInvoiceTemplate = forwardRef(({ data }, ref) => {
                                 <tr className="border-b border-black">
                                     <td className="p-1 font-bold pl-2">Invoice No</td>
                                     <td className="p-1">:</td>
-                                    <td className="p-1 font-bold text-right pr-4">{data.invoice_no}</td>
+                                    <td className="p-1 font-bold text-left pl-2">{data.invoice_no}</td>
                                 </tr>
                                 <tr className="border-b border-black">
                                     <td className="p-1 font-bold pl-2">Invoice Dt</td>
                                     <td className="p-1">:</td>
-                                    <td className="p-1 font-bold text-right pr-4">{data.date}</td>
+                                    <td className="p-1 font-bold text-left pl-2">{data.date}</td>
                                 </tr>
                                 <tr className="border-b border-black">
                                     <td className="p-1 font-bold pl-2">E-Way Bill No</td>
                                     <td className="p-1">:</td>
-                                    <td className="p-1 text-right pr-4">{data.remarks?.match(/EWAY:(\d+)/)?.[1] || '-'}</td>
+                                    <td className="p-1 text-left pl-2">{data.remarks?.match(/EWAY:(\d+)/)?.[1] || '-'}</td>
                                 </tr>
                                 <tr className="border-b border-black">
                                     <td className="p-1 font-bold pl-2">Vehicle No</td>
                                     <td className="p-1">:</td>
-                                    <td className="p-1 text-right pr-4 uppercase">{data.vehicle_no}</td>
+                                    <td className="p-1 text-left pl-2 uppercase">{data.vehicle_no}</td>
                                 </tr>
                                 <tr>
                                     <td className="p-1 font-bold pl-2">Delivery At</td>
                                     <td className="p-1">:</td>
-                                    <td className="p-1 text-right pr-4 uppercase">{data.delivery}</td>
+                                    <td className="p-1 text-left pl-2 uppercase">{data.delivery}</td>
                                 </tr>
                             </tbody>
                         </table>

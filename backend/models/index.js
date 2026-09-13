@@ -459,7 +459,7 @@ const InvoiceHeader = sequelize.define('InvoiceHeader', {
   },
 
   epcg_no: {
-    type: DataTypes.STRING
+    type: DataTypes.TEXT
   },
 
   remarks: {
@@ -928,6 +928,10 @@ addr3: {
 
   form_jj: {
     type: DataTypes.STRING
+  },
+
+  epcg_no: {
+    type: DataTypes.TEXT
   },
 
   // =============================
