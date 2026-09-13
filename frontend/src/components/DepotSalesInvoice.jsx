@@ -2,10 +2,10 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import * as XLSX from 'xlsx';
 import { mastersAPI, transactionsAPI } from '../service/api';
 import { getNextInvoiceSequence, getPrefixForParty, getNextDepotInvoiceSequence } from '../service/utils';
-import { generateGstEInvoiceJson } from '../service/exportUtils';
+import { generateGstEInvoiceJson, printPDFDocument } from '../service/exportUtils';
 import {
     Save, FileText, Calculator, Plus, MinusCircle,
-    Layers, Activity, Search, Hash, Printer,
+    Layers, Activity, Search, Hash, Printer, FileJson,
     Warehouse, X, Database, CheckCircle, Trash2, Square, CheckSquare,
     FileSpreadsheet, UploadCloud
 } from 'lucide-react';
@@ -509,10 +509,11 @@ const DepotSalesInvoice = () => {
     }, [listData.products]);
 
     const handlePrint = (item) => {
-        setPrintData(item);
-        setTimeout(() => {
-            window.print();
-        }, 800);
+        if (item && (item.invoice_no || item.id || item.party_id)) {
+            exportToPDF(true, item, item.Details || item.InvoiceDetails || []);
+        } else {
+            exportToPDF(true);
+        }
     };
 
     // Add this near your other useMemo/useEffect hooks
@@ -717,9 +718,9 @@ const DepotSalesInvoice = () => {
     // ==========================================
     // 3. EXPORT TO PDF - COMPACT TAX INVOICE FORMAT
     // ==========================================
-    const exportToPDF = async () => {
+    const exportToPDF = async (isPrint = false, customData = null, customItems = null) => {
         const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-        const data = formData;
+        const data = customData || formData;
         const pageWidth = doc.internal.pageSize.getWidth();
         const pageHeight = doc.internal.pageSize.getHeight();
         const margin = 8;
@@ -743,7 +744,7 @@ const DepotSalesInvoice = () => {
 
         const party = listData.parties.find(p => String(p.id) === String(data.party_id)) || data.Party || {};
         const config = listData.types.find(t => String(t.id) === String(data.invoice_type_id)) || {};
-        const items = gridRows.length ? gridRows : (data.Details || data.InvoiceDetails || []);
+        const items = (customItems && customItems.length) ? customItems : (gridRows.length ? gridRows : (data.Details || data.InvoiceDetails || []));
 
         const gstPer = num(config.gst_percentage);
         let cgstPer = num(config.cgst_percentage) || (items.length ? num(items[0]?.cgst_per) : 0);
@@ -1069,7 +1070,11 @@ const DepotSalesInvoice = () => {
         doc.text("For KAYAAR EXPORTS PRIVATE LIMITED", midX + (right - midX) / 2, y + 5.5, { align: "center" });
         doc.text("Authorised Signatory", midX + (right - midX) / 2, y + signH - 4, { align: "center" });
 
-        doc.save(`${data.invoice_no || 'invoice'}.pdf`);
+        if (isPrint) {
+            printPDFDocument(doc);
+        } else {
+            doc.save(`${data.invoice_no || 'invoice'}.pdf`);
+        }
     };
     const exportToJSON = () => {
         // Prepare GST E-Invoice formatted data strictly adhering to schema
@@ -2166,30 +2171,55 @@ const DepotSalesInvoice = () => {
                                 </div>
                             )}
                         </div>
-                        <div className="bg-[#D9E5F7] p-3 border-t border-slate-400 flex justify-between gap-3 px-6 shadow-inner">
-                            <div className="flex gap-2">
+                        {/* Modal Footer */}
+                        <div className="bg-slate-100/95 backdrop-blur p-3 border-t border-slate-300 flex flex-wrap justify-between items-center gap-3 px-6 shadow-inner">
+                            {/* Left: Export & Print Actions */}
+                            <div className="flex flex-wrap items-center gap-2">
                                 <button
                                     onClick={() => handlePrint({ ...formData, Details: gridRows, InvoiceDetails: gridRows })}
                                     disabled={gridRows.length === 0}
-                                    className="bg-indigo-600 text-white px-5 py-2 text-[11px] font-black rounded flex items-center gap-2 shadow hover:bg-indigo-700 transition-all"
+                                    className="bg-gradient-to-r from-slate-700 to-slate-800 hover:from-slate-800 hover:to-slate-900 text-white px-4 py-2 text-xs font-bold rounded-lg flex items-center gap-2 shadow-sm hover:shadow-md transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    title="Print Tax Invoice"
                                 >
-                                    <Printer size={16} /> PRINT INVOICE
+                                    <Printer size={15} className="text-slate-300" />
+                                    <span>PRINT INVOICE</span>
                                 </button>
-                                <button onClick={exportToPDF} disabled={gridRows.length === 0} className="bg-emerald-600 text-white px-6 py-2 text-[11px] font-black rounded flex items-center gap-2 shadow hover:bg-emerald-700">
-                                    <FileText size={16} /> DOWNLOAD PDF
+                                <button
+                                    onClick={exportToPDF}
+                                    disabled={gridRows.length === 0}
+                                    className="bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-700 hover:to-red-700 text-white px-4 py-2 text-xs font-bold rounded-lg flex items-center gap-2 shadow-sm hover:shadow-md transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    title="Download Tax Invoice PDF"
+                                >
+                                    <FileText size={15} className="text-rose-200" />
+                                    <span>DOWNLOAD PDF</span>
+                                </button>
+                                <button
+                                    onClick={exportToJSON}
+                                    disabled={gridRows.length === 0 || !formData.depot_id}
+                                    className="bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white px-4 py-2 text-xs font-bold rounded-lg flex items-center gap-2 shadow-sm hover:shadow-md transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    title="Export GST E-Invoice formatted JSON"
+                                >
+                                    <FileJson size={15} className="text-violet-200" />
+                                    <span>JSON EXPORT</span>
                                 </button>
                             </div>
-                            <button
-                                onClick={exportToJSON}
-                                disabled={gridRows.length === 0 || !formData.depot_id}
-                                className="bg-indigo-600 text-white px-6 py-2 text-[11px] font-black rounded flex items-center gap-2 shadow hover:bg-indigo-700 transition-all active:scale-95 disabled:bg-slate-400 disabled:cursor-not-allowed"
-                            >
-                                <Calculator size={16} /> JSON EXPORT
-                            </button>
-                            <div className="flex gap-3">
-                                <button onClick={() => setIsModalOpen(false)} className="bg-white border border-slate-400 px-10 py-2 text-[11px] font-black rounded uppercase hover:bg-slate-50">Cancel</button>
-                                <button onClick={handleSave} disabled={submitLoading || gridRows.length === 0} className="bg-blue-600 text-white border border-blue-700 px-12 py-2 text-[11px] font-black rounded flex items-center gap-2 hover:bg-blue-700 shadow-md">
-                                    <Save size={16} /> {submitLoading ? "SAVING..." : "COMMIT INVOICE"}
+
+                            {/* Right: Cancel + Commit Actions */}
+                            <div className="flex items-center gap-3">
+                                <button
+                                    onClick={() => setIsModalOpen(false)}
+                                    className="bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 hover:border-slate-400 px-6 py-2.5 text-sm font-bold rounded-lg uppercase tracking-wider flex items-center gap-2 shadow-sm hover:shadow-md transition-all active:scale-95"
+                                >
+                                    <X size={17} className="text-slate-500" />
+                                    <span>Cancel</span>
+                                </button>
+                                <button
+                                    onClick={handleSave}
+                                    disabled={submitLoading || (gridRows.length === 0 && !formData.id)}
+                                    className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-8 py-2.5 text-sm font-bold rounded-lg flex items-center gap-2.5 shadow-md shadow-blue-500/25 hover:shadow-lg hover:shadow-blue-500/35 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed uppercase tracking-wider"
+                                >
+                                    <Save size={17} className="text-blue-100" />
+                                    <span>{submitLoading ? 'SAVING...' : 'COMMIT INVOICE'}</span>
                                 </button>
                             </div>
                         </div>

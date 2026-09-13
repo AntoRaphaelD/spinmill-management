@@ -215,3 +215,62 @@ export const generateGstEInvoiceJson = ({ formData = {}, gridRows = [], listData
         }
     ];
 };
+
+/**
+ * Direct print of jsPDF document via hidden iframe without downloading
+ */
+export const printPDFDocument = (doc) => {
+    try {
+        doc.autoPrint();
+        const blob = doc.output('blob');
+        const blobUrl = URL.createObjectURL(blob);
+
+        const iframe = document.createElement('iframe');
+        iframe.style.position = 'fixed';
+        iframe.style.right = '0';
+        iframe.style.bottom = '0';
+        iframe.style.width = '0';
+        iframe.style.height = '0';
+        iframe.style.border = '0';
+        iframe.src = blobUrl;
+
+        let printed = false;
+        const triggerPrint = () => {
+            if (printed) return;
+            printed = true;
+            try {
+                iframe.contentWindow.focus();
+                iframe.contentWindow.print();
+            } catch (err) {
+                console.error("Iframe direct print failed, falling back to window.open", err);
+                const win = window.open(blobUrl, '_blank');
+                if (win) win.focus();
+            }
+        };
+
+        iframe.onload = () => {
+            setTimeout(triggerPrint, 300);
+        };
+
+        document.body.appendChild(iframe);
+
+        // Fallback in case onload is not triggered for PDF blob
+        setTimeout(() => {
+            if (!printed) {
+                triggerPrint();
+            }
+        }, 800);
+
+        // Revoke and remove after 60s
+        setTimeout(() => {
+            try {
+                if (document.body.contains(iframe)) {
+                    document.body.removeChild(iframe);
+                }
+                URL.revokeObjectURL(blobUrl);
+            } catch (e) {}
+        }, 60000);
+    } catch (e) {
+        console.error("Error initiating direct PDF print:", e);
+    }
+};

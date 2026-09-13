@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { mastersAPI, transactionsAPI } from '../service/api';
 import { getNextInvoiceSequence, getPrefixForParty } from '../service/utils';
-import { generateGstEInvoiceJson } from '../service/exportUtils';
+import { generateGstEInvoiceJson, printPDFDocument } from '../service/exportUtils';
 import * as XLSX from 'xlsx';
 import {
     Save, FileText, Calculator, RefreshCw, X, Plus,
@@ -527,9 +527,9 @@ const InvoicePreparation = () => {
         const prod = listData.products.find(p => String(p.id) === String(productId));
         return prod?.short_description || '';
     };
-    const exportToPDF = async () => {
+    const exportToPDF = async (isPrint = false, customData = null, customItems = null) => {
         const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-        const data = formData;
+        const data = customData || formData;
         const pageWidth = doc.internal.pageSize.getWidth();
         const pageHeight = doc.internal.pageSize.getHeight();
         const margin = 8;
@@ -553,7 +553,7 @@ const InvoicePreparation = () => {
 
         const party = listData.parties.find(p => String(p.id) === String(data.party_id)) || data.Party || {};
         const config = listData.types.find(t => String(t.id) === String(data.invoice_type_id)) || {};
-        const items = gridRows.length ? gridRows : (data.Details || data.InvoiceDetails || []);
+        const items = (customItems && customItems.length) ? customItems : (gridRows.length ? gridRows : (data.Details || data.InvoiceDetails || []));
 
         const gstPer = num(config.gst_percentage);
         let cgstPer = num(config.cgst_percentage) || (items.length ? num(items[0]?.cgst_per) : 0);
@@ -883,7 +883,11 @@ const InvoicePreparation = () => {
         doc.text("For KAYAAR EXPORTS PRIVATE LIMITED", midX + (right - midX) / 2, y + 5.5, { align: "center" });
         doc.text("Authorised Signatory", midX + (right - midX) / 2, y + signH - 4, { align: "center" });
 
-        doc.save(`${data.invoice_no || 'invoice'}.pdf`);
+        if (isPrint) {
+            printPDFDocument(doc);
+        } else {
+            doc.save(`${data.invoice_no || 'invoice'}.pdf`);
+        }
     };
     const exportToJSON = () => {
         // Prepare GST E-Invoice formatted data strictly adhering to schema
@@ -990,10 +994,11 @@ const InvoicePreparation = () => {
     // 2. MATH ENGINE (Strict Logic: H -> A -> Tax -> Deductions)
     // ==========================================
     const handlePrint = (item) => {
-        setPrintData(item);
-        setTimeout(() => {
-            window.print();
-        }, 800);
+        if (item && (item.invoice_no || item.id || item.party_id)) {
+            exportToPDF(true, item, item.Details || item.InvoiceDetails || []);
+        } else {
+            exportToPDF(true);
+        }
     };
     const evaluateFormula = (formula, ctx) => {
 
@@ -2356,82 +2361,98 @@ const InvoicePreparation = () => {
                         </div>
 
                         {/* Modal Footer */}
-                        <div className="bg-[#D9E5F7] p-3 border-t border-slate-400 flex flex-wrap justify-between items-center gap-3 px-6 shadow-inner">
-                            <div className="flex items-center gap-2">
-                                <input type="checkbox" checked={formData.is_approved} onChange={e => setFormData({ ...formData, is_approved: e.target.checked })} className="w-4 h-4" />
-                                <span className="text-xs font-black text-blue-800">Approval</span>
+                        <div className="bg-slate-100/95 backdrop-blur p-3.5 border-t border-slate-300 flex flex-col gap-3 px-6 shadow-inner">
+                            {/* Top Row: Left Approval + Utility & Export Actions */}
+                            <div className="flex flex-wrap justify-between items-center gap-3">
+                                {/* Left: Approval checkbox */}
+                                <label className="flex items-center gap-2 cursor-pointer bg-white hover:bg-slate-50 px-3.5 py-1.5 rounded-lg border border-slate-300 shadow-sm transition-all select-none">
+                                    <input
+                                        type="checkbox"
+                                        checked={formData.is_approved}
+                                        onChange={e => setFormData({ ...formData, is_approved: e.target.checked })}
+                                        className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer accent-blue-600"
+                                    />
+                                    <span className="text-xs font-bold text-slate-700 tracking-tight">Approved</span>
+                                </label>
+
+                                {/* Right: Utility & Export Actions */}
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                    <FooterBtn icon={<FileText size={14} />} label="Form JJ" />
+                                    <FooterBtn icon={<Layers size={14} />} label="GC" />
+                                    <FooterBtn icon={<Activity size={14} />} label="Lap Yarn" />
+                                    <FooterBtn icon={<Hash size={14} />} label="GST" />
+                                    <FooterBtn icon={<Database size={14} />} label="A4" />
+                                    <FooterBtn icon={<Printer size={14} />} label="Report [A80]" />
+
+                                    <div className="h-6 w-px bg-slate-300 mx-1 hidden sm:block" />
+
+                                    <button
+                                        onClick={exportToJSON}
+                                        className="bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-700 hover:to-orange-700 text-white px-4 py-2 text-xs font-bold rounded-lg flex items-center gap-2 shadow-sm hover:shadow-md transition-all active:scale-95"
+                                        title="Export GST E-Invoice formatted JSON"
+                                    >
+                                        <FileJson size={15} className="text-violet-200" />
+                                        <span>EXPORT JSON</span>
+                                    </button>
+                                    <button
+                                        onClick={exportToExcel}
+                                        disabled={gridRows.length === 0}
+                                        className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white px-4 py-2 text-xs font-bold rounded-lg flex items-center gap-2 shadow-sm hover:shadow-md transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        title="Export to Excel Spreadsheet"
+                                    >
+                                        <FileSpreadsheet size={15} className="text-emerald-200" />
+                                        <span>EXPORT EXCEL</span>
+                                    </button>
+                                    <button
+                                        onClick={() => handlePrint({ ...formData, Details: gridRows, InvoiceDetails: gridRows })}
+                                        disabled={gridRows.length === 0}
+                                        className="bg-gradient-to-r from-slate-700 to-slate-800 hover:from-slate-800 hover:to-slate-900 text-white px-4 py-2 text-xs font-bold rounded-lg flex items-center gap-2 shadow-sm hover:shadow-md transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        title="Print Tax Invoice"
+                                    >
+                                        <Printer size={15} className="text-slate-300" />
+                                        <span>PRINT INVOICE</span>
+                                    </button>
+                                    <button
+                                        onClick={exportToPDF}
+                                        disabled={gridRows.length === 0}
+                                        className="bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-700 hover:to-red-700 text-white px-4 py-2 text-xs font-bold rounded-lg flex items-center gap-2 shadow-sm hover:shadow-md transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        title="Download Tax Invoice PDF"
+                                    >
+                                        <FileText size={15} className="text-rose-200" />
+                                        <span>DOWNLOAD PDF</span>
+                                    </button>
+                                </div>
                             </div>
-                            <div className="flex gap-1.5">
-                                <FooterBtn icon={<FileText size={14} />} label="Form JJ" />
-                                <FooterBtn icon={<Layers size={14} />} label="GC" />
-                                <FooterBtn icon={<Activity size={14} />} label="Lap Yarn" />
-                                <FooterBtn icon={<Hash size={14} />} label="GST" />
-                                <FooterBtn icon={<Database size={14} />} label="A4" />
-                                <FooterBtn icon={<Printer size={14} />} label="Report [A80]" />
-                                <button
-                                    onClick={exportToJSON}
-                                    className="bg-indigo-600 text-white px-6 py-2 text-[11px] font-black rounded flex items-center gap-2 shadow hover:bg-indigo-700 transition-all active:scale-95"
-                                >
-                                    <FileJson size={14} className="text-indigo-100" />
-                                    EXPORT JSON
-                                </button>
-                                <button
-                                    onClick={exportToExcel}
-                                    disabled={gridRows.length === 0}
-                                    className="bg-emerald-600 text-white px-6 py-2 text-[11px] font-black rounded flex items-center gap-2 shadow hover:bg-emerald-700 transition-all active:scale-95 disabled:opacity-50"
-                                >
-                                    <FileSpreadsheet size={14} className="text-emerald-100" />
-                                    EXPORT EXCEL
-                                </button>
-                            </div>
-                            <div className="flex gap-3">
+
+                            {/* Centered Actions Row: Delete + Cancel + Commit Actions */}
+                            <div className="flex justify-center items-center gap-4 pt-1.5 border-t border-slate-200/90">
                                 {formData.id && (
                                     <button
                                         onClick={handleDelete}
                                         disabled={submitLoading}
-                                        className="bg-red-600 hover:bg-red-700 text-white border border-red-700 px-6 py-2 text-[11px] font-black rounded flex items-center gap-2 shadow-md transition-all active:scale-95 mr-6"
+                                        className="bg-rose-50 hover:bg-rose-600 text-rose-700 hover:text-white border border-rose-300 hover:border-rose-600 px-6 py-2.5 text-sm font-bold rounded-lg flex items-center gap-2 shadow-sm hover:shadow-md transition-all active:scale-95 disabled:opacity-50"
                                     >
                                         <Trash2 size={16} />
-                                        DELETE INVOICE
+                                        <span>DELETE</span>
                                     </button>
                                 )}
 
-                                {/* PRINT INVOICE BUTTON */}
-                                {/* <button
-                                    onClick={() => handlePrint({ ...formData, Details: gridRows, InvoiceDetails: gridRows })}
-                                    disabled={gridRows.length === 0}
-                                    className="bg-indigo-600 text-white px-5 py-2 text-[11px] font-black rounded flex items-center gap-2 shadow hover:bg-indigo-700 transition-all"
-                                >
-                                    <Printer size={16} /> PRINT INVOICE
-                                </button> */}
-
-                                {/* EXPORT PDF BUTTON */}
-                                <button
-                                    onClick={exportToPDF}
-                                    disabled={gridRows.length === 0}
-                                    className="bg-emerald-600 text-white px-5 py-2 text-[11px] font-black rounded flex items-center gap-2 shadow hover:bg-emerald-700 transition-all"
-                                >
-                                    <FileText size={16} /> DOWNLOAD PDF
-                                </button>
-
-                                {/* UPDATE BUTTON */}
-                                <button
-                                    onClick={handleSave}
-                                    disabled={submitLoading}
-                                    className="bg-blue-600 text-white border border-blue-700 px-12 py-2 text-[11px] font-black rounded flex items-center gap-2 hover:bg-blue-700 shadow-md"
-                                >
-                                    <Save size={16} className="text-blue-700" />
-                                    {submitLoading ? 'SAVING...' : 'COMMIT INVOICE'}
-                                </button>
-
-                                {/* CANCEL BUTTON */}
                                 <button
                                     onClick={() => setIsModalOpen(false)}
-                                    className="bg-white border border-slate-400 px-10 py-2 text-[11px] font-black rounded uppercase hover:bg-slate-50"
+                                    className="bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 hover:border-slate-400 px-7 py-2.5 text-sm font-bold rounded-lg uppercase tracking-wider flex items-center gap-2 shadow-sm hover:shadow-md transition-all active:scale-95"
                                 >
-                                    <X size={16} className="text-red-600" /> Cancel
+                                    <X size={17} className="text-slate-500" />
+                                    <span>Cancel</span>
                                 </button>
 
+                                <button
+                                    onClick={handleSave}
+                                    disabled={submitLoading || (gridRows.length === 0 && !formData.id)}
+                                    className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-10 py-2.5 text-sm font-bold rounded-lg flex items-center gap-2.5 shadow-md shadow-blue-500/25 hover:shadow-lg hover:shadow-blue-500/35 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed uppercase tracking-wider"
+                                >
+                                    <Save size={17} className="text-blue-100" />
+                                    <span>{submitLoading ? 'SAVING...' : 'COMMIT INVOICE'}</span>
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -2779,8 +2800,8 @@ const TotalRow = ({ label, value, isEditable = false, onChange, color = "text-sl
 };
 
 const FooterBtn = ({ label, icon }) => (
-    <button className="bg-white border border-slate-400 px-3 py-1.5 text-[10px] font-black flex items-center gap-1.5 hover:bg-slate-50 shadow-sm transition-colors">
-        <span className="text-blue-700">{icon}</span> {label}
+    <button className="bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 hover:border-slate-400 px-3 py-1.5 text-[11px] font-bold rounded-lg flex items-center gap-1.5 shadow-sm transition-all hover:shadow active:scale-95">
+        <span className="text-blue-600">{icon}</span> {label}
     </button>
 );
 
