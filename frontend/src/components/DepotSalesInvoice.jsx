@@ -621,27 +621,27 @@ const DepotSalesInvoice = () => {
             } else {
                 // REVERSE CALCULATION FLOW:
                 const rawTotalInvoiceAmount = is68Product ? (10 * packs * rateInput) : (totalKgs * rateInput);
-                totalInvoiceAmount = is68Product ? rawTotalInvoiceAmount : Math.round(rawTotalInvoiceAmount);
+                totalInvoiceAmount = Math.round(rawTotalInvoiceAmount);
 
                 const taxDivisor = 1 + (taxPercentage / 100);
                 const baseAmount = taxDivisor > 0 ? (totalInvoiceAmount / taxDivisor) : totalInvoiceAmount;
-                gstAmount = (baseAmount * taxPercentage) / 100;
-                assessableValue = totalInvoiceAmount - num(item.freight_amt) - charity - gstAmount;
+                gstAmount = Math.round((baseAmount * taxPercentage) / 100);
+                assessableValue = totalInvoiceAmount - Math.round(num(item.freight_amt)) - charity - gstAmount;
 
-                vat = (assessableValue * num(item.vat_per)) / 100;
-                cenvat = (assessableValue * num(item.cenvat_per)) / 100;
-                duty = (assessableValue * num(item.duty_per)) / 100;
-                cess = (assessableValue * num(item.cess_per)) / 100;
-                hcess = (assessableValue * num(item.hcess_per)) / 100;
-                tcs = (totalInvoiceAmount * num(item.tcs_per)) / 100;
+                vat = Math.round((assessableValue * num(item.vat_per)) / 100);
+                cenvat = Math.round((assessableValue * num(item.cenvat_per)) / 100);
+                duty = Math.round((assessableValue * num(item.duty_per)) / 100);
+                cess = Math.round((assessableValue * num(item.cess_per)) / 100);
+                hcess = Math.round((assessableValue * num(item.hcess_per)) / 100);
+                tcs = Math.round((totalInvoiceAmount * num(item.tcs_per)) / 100);
 
-                basis = assessableValue + vat + cenvat + duty + cess + hcess + gstAmount + tcs + charity + num(item.other_amt) + num(item.freight_amt);
-                discAmt = (num(item.discount_percentage) * basis) / 100;
+                basis = assessableValue + vat + cenvat + duty + cess + hcess + gstAmount + tcs + charity + num(item.other_amt) + Math.round(num(item.freight_amt));
+                discAmt = Math.round((num(item.discount_percentage) * basis) / 100);
                 rowTotal = basis - discAmt;
 
                 igstAmount = igstPer > 0 ? gstAmount : 0;
-                sgstAmount = igstPer > 0 ? 0 : (sgstPer > 0 ? (gstAmount * sgstPer / taxPercentage) : (gstAmount / 2));
-                cgstAmount = igstPer > 0 ? 0 : (cgstPer > 0 ? (gstAmount * cgstPer / taxPercentage) : (gstAmount / 2));
+                sgstAmount = igstPer > 0 ? 0 : (sgstPer > 0 ? Math.round(gstAmount * sgstPer / taxPercentage) : Math.round(gstAmount / 2));
+                cgstAmount = igstPer > 0 ? 0 : (cgstPer > 0 ? Math.round(gstAmount * cgstPer / taxPercentage) : Math.round(gstAmount / 2));
             }
 
             hTotals.assess += assessableValue;

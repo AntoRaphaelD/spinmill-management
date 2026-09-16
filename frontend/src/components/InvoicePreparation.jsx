@@ -1161,7 +1161,7 @@ const InvoicePreparation = () => {
 
                 const roundedRowFreight = Math.round(rowFreight);
                 const taxDivisor = 1 + (taxPercentage / 100);
-                const baseAmount = taxDivisor > 0 ? ((totalInvoiceAmount - roundedRowFreight - charity) / taxDivisor) : (totalInvoiceAmount - roundedRowFreight - charity);
+                const baseAmount = taxDivisor > 0 ? (totalInvoiceAmount / taxDivisor) : totalInvoiceAmount;
 
                 const rawGstAmount = (baseAmount * taxPercentage) / 100;
                 gstAmount = Math.round(rawGstAmount);
