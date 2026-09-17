@@ -239,6 +239,13 @@ const ModernPrintView = ({ data, listData, getHSN }) => {
                                     <td className="font-bold py-0.5">:</td>
                                     <td className="font-bold py-0.5 text-left pl-2">{fmtInvoiceDate(data.date)}</td>
                                 </tr>
+                                {String(data.sales_type || '').trim().toUpperCase() === 'MERCHANT SALES' && (
+                                    <tr>
+                                        <td className="font-bold py-0.5">Despatch Details</td>
+                                        <td className="font-bold py-0.5">:</td>
+                                        <td className="font-bold py-0.5 text-left pl-2 uppercase font-mono">Merchant Export</td>
+                                    </tr>
+                                )}
                                 <tr>
                                     <td className="font-bold py-0.5">E-Way Bill No</td>
                                     <td className="font-bold py-0.5">:</td>
@@ -268,10 +275,11 @@ const ModernPrintView = ({ data, listData, getHSN }) => {
                 {/* 4. Column Headers */}
                 <div className="border-b border-black grid grid-cols-12 text-[11px] font-bold text-center">
                     <div className="col-span-2 py-1.5 border-r border-black">No of Bags</div>
+                    <div className="col-span-2 py-1.5 border-r border-black">Avg Content</div>
                     <div className="col-span-2 py-1.5 border-r border-black">Net Weight</div>
-                    <div className="col-span-3 py-1.5 border-r border-black">S.L No</div>
+                    <div className="col-span-2 py-1.5 border-r border-black">S.L No</div>
                     <div className="col-span-2 py-1.5 border-r border-black">Rate Per Kgs</div>
-                    <div className="col-span-3 py-1.5">Assessable Value</div>
+                    <div className="col-span-2 py-1.5 text-right pr-3 font-bold">Assessable Value</div>
                 </div>
 
                 {/* 5. Item Rows */}
@@ -280,13 +288,15 @@ const ModernPrintView = ({ data, listData, getHSN }) => {
                         const rowWeight = num(item.total_kgs);
                         const rowAssessable = Math.round(num(item.assessable_value || (rowWeight * num(item.rate))));
                         const assessableRatePerKg = rowWeight > 0 ? (rowAssessable / rowWeight) : num(item.rate);
+                        const avgContent = num(item.avg_content || (num(item.packs) > 0 ? (rowWeight / num(item.packs)) : 0));
                         return (
                             <div key={idx} className="grid grid-cols-12 text-[11px] py-1 border-b border-black/20 last:border-b-0">
                                 <div className="col-span-2 text-center font-bold border-r border-black px-1">{item.packs}</div>
+                                <div className="col-span-2 text-center font-bold border-r border-black px-1">{fmtIN(avgContent, 2)}</div>
                                 <div className="col-span-2 text-center font-bold border-r border-black px-1">{fmtIN(rowWeight, 2)}</div>
-                                <div className="col-span-3 text-center border-r border-black px-1 font-mono">{[item.from_no, item.to_no].filter(Boolean).join(' - ') || item.sl_no || '-'}</div>
-                                <div className="col-span-2 text-right font-bold border-r border-black px-2">{fmtIN(assessableRatePerKg, 2)}</div>
-                                <div className="col-span-3 text-right font-bold px-3">{fmtIN(rowAssessable, 2)}</div>
+                                <div className="col-span-2 text-center border-r border-black px-1 font-mono">{[item.from_no, item.to_no].filter(Boolean).join(' - ') || item.sl_no || '-'}</div>
+                                <div className="col-span-2 text-center font-bold border-r border-black px-1">{fmtIN(assessableRatePerKg, 2)}</div>
+                                <div className="col-span-2 text-right font-bold pr-3">{fmtIN(rowAssessable, 2)}</div>
                             </div>
                         );
                     })}
@@ -692,11 +702,22 @@ const InvoicePreparation = () => {
             doc.text(safe(val, "-"), metaValX, rowY, { align: "left" });
         };
 
-        labelRow("Invoice No", data.invoice_no, y + 6);
-        labelRow("Invoice Dt", fmtInvoiceDate(data.date), y + 12);
-        labelRow("E-Way Bill No", data.ebill_no, y + 18);
-        labelRow("Vehicle No", safe(data.vehicle_no).toUpperCase(), y + 24);
-        labelRow("Delivery At", safe(data.delivery).toUpperCase(), y + 30);
+        const isMerchantSales = String(data.sales_type || formData.sales_type || '').trim().toUpperCase() === 'MERCHANT SALES';
+
+        if (isMerchantSales) {
+            labelRow("Invoice No", data.invoice_no, y + 5);
+            labelRow("Invoice Dt", fmtInvoiceDate(data.date), y + 10.5);
+            labelRow("Despatch Details", "Merchant Export", y + 16);
+            labelRow("E-Way Bill No", data.ebill_no, y + 21.5);
+            labelRow("Vehicle No", safe(data.vehicle_no).toUpperCase(), y + 27);
+            labelRow("Delivery At", safe(data.delivery).toUpperCase(), y + 32.5);
+        } else {
+            labelRow("Invoice No", data.invoice_no, y + 6);
+            labelRow("Invoice Dt", fmtInvoiceDate(data.date), y + 12);
+            labelRow("E-Way Bill No", data.ebill_no, y + 18);
+            labelRow("Vehicle No", safe(data.vehicle_no).toUpperCase(), y + 24);
+            labelRow("Delivery At", safe(data.delivery).toUpperCase(), y + 30);
+        }
 
         // 4. Description Bar & Table Header
         y += partyHeight;
@@ -706,13 +727,15 @@ const InvoicePreparation = () => {
         doc.text("DESCRIPTION OF GOODS", margin + (midX - margin) / 2, y + 4.5, { align: "center" });
 
         y += 6.5;
-        const colW = [24, 30, 44, 34, contentWidth - (24 + 30 + 44 + 34)]; // sums to contentWidth (194)
+        const colW = [22, 24, 28, 38, 38, 44]; // sums to contentWidth (194)
         const tableBody = (items.length ? items : [{}]).map(item => {
             const rowWeight = num(item.total_kgs);
             const rowAssessable = Math.round(num(item.assessable_value || (rowWeight * num(item.rate))));
             const assessableRatePerKg = rowWeight > 0 ? (rowAssessable / rowWeight) : num(item.rate);
+            const avgContent = num(item.avg_content || (num(item.packs) > 0 ? (rowWeight / num(item.packs)) : 0));
             return [
                 String(item.packs || ''),
+                fmt(avgContent, 2),
                 fmt(rowWeight, 2),
                 [item.from_no, item.to_no].filter(Boolean).join(" - ") || item.sl_no || '-',
                 fmt(assessableRatePerKg, 2),
@@ -724,7 +747,7 @@ const InvoicePreparation = () => {
             startY: y,
             margin: { left: margin, right: margin },
             tableWidth: contentWidth,
-            head: [["No of Bags", "Net Weight", "S.L No", "Rate Per Kgs", "Assessable Value"]],
+            head: [["No of Bags", "Avg Content", "Net Weight", "S.L No", "Rate Per Kgs", "Assessable Value"]],
             body: tableBody,
             theme: "grid",
             styles: {
@@ -752,8 +775,9 @@ const InvoicePreparation = () => {
                 0: { cellWidth: colW[0], halign: "center" },
                 1: { cellWidth: colW[1], halign: "center" },
                 2: { cellWidth: colW[2], halign: "center" },
-                3: { cellWidth: colW[3], halign: "right" },
-                4: { cellWidth: colW[4], halign: "right" }
+                3: { cellWidth: colW[3], halign: "center" },
+                4: { cellWidth: colW[4], halign: "center" },
+                5: { cellWidth: colW[5], halign: "right", cellPadding: { top: 2, bottom: 2, left: 2, right: 3 } }
             }
         });
 
@@ -825,7 +849,7 @@ const InvoicePreparation = () => {
         const roundedTcs = Math.round(num(data.total_tcs || 0));
         const roundedNetAmount = roundedSubTotal - roundedTcs;
 
-        renderTaxRow("TOTAL ASSESSABLE", roundedAssessable, true);
+        renderTaxRow("TOTAL ASSESSABLE VALUE", roundedAssessable, true);
         renderTaxRow("CHARITY", roundedCharity, true);
         renderTaxRow("FREIGHT", roundedFreight, true);
         renderTaxRow(`C.G.S.T   :   ${cgstPer.toFixed(2)} %`, roundedCgst > 0 ? roundedCgst : '');
@@ -1373,7 +1397,7 @@ const InvoicePreparation = () => {
                 return {
                     ...r,
                     packs: bags,
-                    avg_content: bags > 0 ? (kgs / bags).toFixed(3) : 0
+                    avg_content: bags > 0 ? (kgs / bags).toFixed(2) : 0
                 };
             });
             return runCalculations(updatedRows, updatedForm.invoice_type_id, load.freight, updatedForm.sales_type);
@@ -1444,7 +1468,7 @@ const InvoicePreparation = () => {
 
         if (field === 'total_kgs') {
             const p = num(row.packs);
-            row.avg_content = p > 0 ? (num(val) / p).toFixed(3) : 0;
+            row.avg_content = p > 0 ? (num(val) / p).toFixed(2) : 0;
             console.log(`%c KGS CHANGED: ${row.product_description}`, "color: #f59e0b;");
             console.log(`New Avg Content: ${val}kg / ${p} packs = ${row.avg_content}`);
         }
@@ -1509,7 +1533,7 @@ const InvoicePreparation = () => {
             packs,
             packing_type: firstValue(row.packing_type, product?.packing_type, 'BAGS'),
             total_kgs: totalKgs,
-            avg_content: packs > 0 ? (totalKgs / packs).toFixed(3) : num(avgContent).toFixed(3),
+            avg_content: packs > 0 ? (totalKgs / packs).toFixed(2) : num(avgContent).toFixed(2),
             rate: num(firstValue(row.rate, row.rate_cr, row.rate_imm)),
             rate_per: firstValue(row.rate_per, product?.rate_per, 'KG'),
             identification_mark: firstValue(row.identification_mark, ''),
