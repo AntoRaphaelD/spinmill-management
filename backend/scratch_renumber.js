@@ -10,6 +10,7 @@ const renumberInvoices = async (transaction) => {
     let normalCounter = 0;
     let dmCounter = 0;
     let diCounter = 0;
+    let meCounter = 0;
 
     let lastWasYarnTesting = false;
     let lastYarnTestingInvoiceNo = '';
@@ -18,8 +19,12 @@ const renumberInvoices = async (transaction) => {
 
     for (const inv of invoices) {
         const partyName = String(inv.Party?.account_name || inv.party_name || '').toUpperCase().trim();
+        const salesType = String(inv.sales_type || '').toUpperCase().trim();
         let newInvNo = '';
-        if (partyName === 'DEPOT - MUMBAI') {
+        if (salesType === 'MERCHANT SALES') {
+            meCounter++;
+            newInvNo = `ME-${meCounter}`;
+        } else if (partyName === 'DEPOT - MUMBAI') {
             dmCounter++;
             newInvNo = `DM-${dmCounter}`;
         } else if (partyName.includes('KAYAAR EXPORTS PRIVATE LIMITED')) {

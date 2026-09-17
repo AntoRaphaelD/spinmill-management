@@ -1118,8 +1118,10 @@ const InvoicePreparation = () => {
                     : (totalKgs * rateInput));
 
                 // 2. Charity
-                if (salesType === 'GST SALES' || salesType === "DEPOT SALES" || config.charity_checked) {
+                if (salesType === 'GST SALES' || salesType === "DEPOT SALES") {
                     charity = Math.round(totalKgs * charityPerBale);
+                } else if (config.charity_checked) {
+                    charity = Math.round((assessableValue * charityPerBale) / 100);
                 } else {
                     charity = 0;
                 }
@@ -1155,6 +1157,8 @@ const InvoicePreparation = () => {
 
                 if (salesType === 'GST SALES' || salesType === "DEPOT SALES") {
                     charity = Math.round(totalKgs * charityPerBale);
+                } else if (config.charity_checked) {
+                    charity = Math.round((totalInvoiceAmount * charityPerBale) / 100);
                 } else {
                     charity = 0;
                 }
@@ -1327,7 +1331,7 @@ const InvoicePreparation = () => {
 
         setFormData(prev => {
             let updatedInvNo = prev.invoice_no;
-            const prefix = getPrefixForParty(acc.account_name);
+            const prefix = getPrefixForParty(acc.account_name, prev.sales_type);
             const historyExcludingCurrent = prev.id 
                 ? listData.history.filter(item => item.id !== prev.id)
                 : listData.history;
@@ -2074,11 +2078,24 @@ const InvoicePreparation = () => {
                                                 { value: 'DIRECT SALES', label: 'DIRECT SALES' },
                                                 { value: 'MERCHANT SALES', label: 'MERCHANT SALES' },
                                             ]}
-                                            onChange={e => setFormData({
-                                                ...formData,
-                                                sales_type: e.target.value,
-                                                invoice_type_id: '' // 🟢 Clear selected ID when type changes
-                                            })}
+                                            onChange={e => {
+                                                const newSalesType = e.target.value;
+                                                setFormData(prev => {
+                                                    const acc = listData.parties.find(a => a.id === parseInt(prev.party_id));
+                                                    const prefix = getPrefixForParty(acc?.account_name, newSalesType);
+                                                    const historyExcludingCurrent = prev.id 
+                                                        ? listData.history.filter(item => item.id !== prev.id)
+                                                        : listData.history;
+                                                    const seq = getNextInvoiceSequence(historyExcludingCurrent, prefix, acc?.account_name || '');
+                                                    const updatedInvNo = prefix ? `${prefix}${seq}` : seq.toString();
+                                                    return {
+                                                        ...prev,
+                                                        sales_type: newSalesType,
+                                                        invoice_type_id: '', // 🟢 Clear selected ID when type changes
+                                                        invoice_no: updatedInvNo
+                                                    };
+                                                });
+                                            }}
                                         />
                                         <RowSelect
                                             label="Invoice Type"

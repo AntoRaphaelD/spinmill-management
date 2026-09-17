@@ -169,6 +169,8 @@ const ensureInvoiceHeaderColumns = async () => {
     const existingInv = await queryInterface.describeTable(invHeadersTable);
     if (!existingInv.epcg_no) {
       await queryInterface.addColumn(invHeadersTable, 'epcg_no', { type: DataTypes.TEXT, allowNull: true });
+    } else {
+      await queryInterface.changeColumn(invHeadersTable, 'epcg_no', { type: DataTypes.TEXT, allowNull: true });
     }
 
     // tbl_DepotSalesHeaders
@@ -176,6 +178,8 @@ const ensureInvoiceHeaderColumns = async () => {
     const existingDepot = await queryInterface.describeTable(depotHeadersTable);
     if (!existingDepot.epcg_no) {
       await queryInterface.addColumn(depotHeadersTable, 'epcg_no', { type: DataTypes.TEXT, allowNull: true });
+    } else {
+      await queryInterface.changeColumn(depotHeadersTable, 'epcg_no', { type: DataTypes.TEXT, allowNull: true });
     }
   } catch (err) {
     console.error('ensureInvoiceHeaderColumns error:', err.message);

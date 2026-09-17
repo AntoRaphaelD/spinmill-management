@@ -1,20 +1,9 @@
 export const getNextInvoiceSequence = (history, prefix, currentPartyName = '') => {
-    if (prefix === 'DM-') {
+    if (prefix === 'DM-' || prefix === 'DI-' || prefix === 'ME-') {
         const maxNo = history.reduce((max, item) => {
             const invNo = String(item.invoice_no || '').trim();
-            if (invNo.startsWith('DM-')) {
-                const cleanNo = invNo.substring(3);
-                const numVal = parseInt(cleanNo, 10);
-                return Math.max(max, isNaN(numVal) ? 0 : numVal);
-            }
-            return max;
-        }, 0);
-        return maxNo + 1;
-    } else if (prefix === 'DI-') {
-        const maxNo = history.reduce((max, item) => {
-            const invNo = String(item.invoice_no || '').trim();
-            if (invNo.startsWith('DI-')) {
-                const cleanNo = invNo.substring(3);
+            if (invNo.startsWith(prefix)) {
+                const cleanNo = invNo.substring(prefix.length);
                 const numVal = parseInt(cleanNo, 10);
                 return Math.max(max, isNaN(numVal) ? 0 : numVal);
             }
@@ -27,7 +16,7 @@ export const getNextInvoiceSequence = (history, prefix, currentPartyName = '') =
     const sortedNormalHistory = [...history]
         .filter(item => {
             const invNo = String(item.invoice_no || '').trim();
-            return !invNo.startsWith('DM-') && !invNo.startsWith('DI-');
+            return !invNo.startsWith('DM-') && !invNo.startsWith('DI-') && !invNo.startsWith('ME-');
         })
         .sort((a, b) => {
             const dateA = new Date(a.date || 0).getTime();
@@ -68,7 +57,11 @@ export const getNextInvoiceSequence = (history, prefix, currentPartyName = '') =
     }
 };
 
-export const getPrefixForParty = (partyName) => {
+export const getPrefixForParty = (partyName, salesType = '') => {
+    const sType = String(salesType || '').toUpperCase().trim();
+    if (sType === 'MERCHANT SALES') {
+        return 'ME-';
+    }
     const name = String(partyName || '').toUpperCase().trim();
     if (name === 'DEPOT - MUMBAI') {
         return 'DM-';

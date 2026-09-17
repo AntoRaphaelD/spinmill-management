@@ -324,7 +324,13 @@ const calculateInvoiceBreakdown = ({ Details = [], config, freight_charges, sale
         if (isForward) {
             // FORWARD FLOW:
             assessableValue = Math.round(is68Product ? (10 * packs * rateInput) : (totalKgs * rateInput));
-            charity = (isGstSale || config?.charity_checked) ? Math.round(totalKgs * charityPerBale) : 0;
+            if (isGstSale) {
+                charity = Math.round(totalKgs * charityPerBale);
+            } else if (config?.charity_checked) {
+                charity = Math.round((assessableValue * charityPerBale) / 100);
+            } else {
+                charity = 0;
+            }
             const roundedRowFreight = Math.round(rowFreight);
 
             gstAmount = Math.round((assessableValue * taxPercentage) / 100);
@@ -348,9 +354,13 @@ const calculateInvoiceBreakdown = ({ Details = [], config, freight_charges, sale
         } else {
             // REVERSE FLOW:
             totalInvoiceAmount = Math.round(10 * packs * rateInput);
-            charity = isGstSale
-                ? Math.round(totalKgs * charityPerBale)
-                : Math.round((totalInvoiceAmount * charityPerBale) / 100);
+            if (isGstSale) {
+                charity = Math.round(totalKgs * charityPerBale);
+            } else if (config?.charity_checked) {
+                charity = Math.round((totalInvoiceAmount * charityPerBale) / 100);
+            } else {
+                charity = 0;
+            }
             const roundedRowFreight = Math.round(rowFreight);
             const adjustedAmount = totalInvoiceAmount - roundedRowFreight - charity;
             const baseAmount = divisor > 0 ? (adjustedAmount / divisor) * 100 : adjustedAmount;
@@ -434,6 +444,7 @@ const renumberInvoices = async (transaction) => {
     let normalCounter = 0;
     let dmCounter = 0;
     let diCounter = 0;
+    let meCounter = 0;
 
     let lastWasYarnTesting = false;
     let lastYarnTestingInvoiceNo = '';
@@ -442,8 +453,12 @@ const renumberInvoices = async (transaction) => {
 
     for (const inv of invoices) {
         const partyName = String(inv.Party?.account_name || inv.party_name || '').toUpperCase().trim();
+        const salesType = String(inv.sales_type || '').toUpperCase().trim();
         let newInvNo = '';
-        if (partyName === 'DEPOT - MUMBAI') {
+        if (salesType === 'MERCHANT SALES') {
+            meCounter++;
+            newInvNo = `ME-${meCounter}`;
+        } else if (partyName === 'DEPOT - MUMBAI') {
             dmCounter++;
             newInvNo = `DM-${dmCounter}`;
         } else if (partyName.includes('KAYAAR EXPORTS PRIVATE LIMITED')) {
@@ -1888,10 +1903,13 @@ const bulkImportSave = async (req, res) => {
                 sales_type: salesType
             });
 
-            // Handle DI and DM prefixes according to business logic
+            // Handle ME, DI and DM prefixes according to business logic
             let rawInvNo = String(inv.excelInvNo || '').trim();
             let finalInvoiceNo = rawInvNo;
-            if (isDepotMumbai) {
+            if (String(salesType || '').toUpperCase().trim() === 'MERCHANT SALES') {
+                const stripped = rawInvNo.replace(/^ME-?/i, '');
+                finalInvoiceNo = `ME-${stripped}`;
+            } else if (isDepotMumbai) {
                 const stripped = rawInvNo.replace(/^DM-?/i, '');
                 finalInvoiceNo = `DM-${stripped}`;
             } else if (isKayaarExports) {
