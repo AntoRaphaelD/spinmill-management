@@ -275,7 +275,7 @@ const ModernPrintView = ({ data, listData, getHSN }) => {
                 {/* 4. Column Headers */}
                 <div className="border-b border-black grid grid-cols-12 text-[11px] font-bold text-center">
                     <div className="col-span-2 py-1.5 border-r border-black">No of Bags</div>
-                    <div className="col-span-2 py-1.5 border-r border-black">Avg Content</div>
+                    <div className="col-span-2 py-1.5 border-r border-black">Avg Content Per Package</div>
                     <div className="col-span-2 py-1.5 border-r border-black">Net Weight</div>
                     <div className="col-span-2 py-1.5 border-r border-black">S.L No</div>
                     <div className="col-span-2 py-1.5 border-r border-black">Rate Per Kgs</div>
@@ -747,7 +747,7 @@ const InvoicePreparation = () => {
             startY: y,
             margin: { left: margin, right: margin },
             tableWidth: contentWidth,
-            head: [["No of Bags", "Avg Content", "Net Weight", "S.L No", "Rate Per Kgs", "Assessable Value"]],
+            head: [["No of Bags", "Avg Content Per Package", "Net Weight", "S.L No", "Rate Per Kgs", "Assessable Value"]],
             body: tableBody,
             theme: "grid",
             styles: {
