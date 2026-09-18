@@ -221,6 +221,8 @@ const ModernPrintView = ({ data, listData, getHSN }) => {
                                 {data.addr1 && <div>{data.addr1}</div>}
                                 {data.addr2 && <div>{data.addr2}</div>}
                                 {data.addr3 && <div>{data.addr3}</div>}
+                                {data.addr4 && <div>{data.addr4}</div>}
+                                {data.addr5 && <div>{data.addr5}</div>}
                             </div>
                         </div>
                         <div className="font-bold text-[11px] mt-2">
@@ -277,9 +279,9 @@ const ModernPrintView = ({ data, listData, getHSN }) => {
 
                 {/* 4. Column Headers */}
                 <div className="border-b border-black grid grid-cols-12 text-[11px] font-bold text-center">
-                    <div className="col-span-2 py-1.5 border-r border-black">No of Bags</div>
+                    <div className="col-span-2 py-1.5 border-r border-black">No of Bags / Boxes</div>
                     <div className="col-span-2 py-1.5 border-r border-black">Avg Content Per Package</div>
-                    <div className="col-span-2 py-1.5 border-r border-black">Net Weight</div>
+                    <div className="col-span-2 py-1.5 border-r border-black">Net Weight in Kgs</div>
                     <div className="col-span-2 py-1.5 border-r border-black">S.L No</div>
                     <div className="col-span-2 py-1.5 border-r border-black">Rate Per Kgs</div>
                     <div className="col-span-2 py-1.5 text-right pr-3 font-bold">Assessable Value</div>
@@ -295,7 +297,7 @@ const ModernPrintView = ({ data, listData, getHSN }) => {
                         return (
                             <div key={idx} className="grid grid-cols-12 text-[11px] py-1 border-b border-black/20 last:border-b-0">
                                 <div className="col-span-2 text-center font-bold border-r border-black px-1">{item.packs}</div>
-                                <div className="col-span-2 text-center font-bold border-r border-black px-1">{fmtIN(avgContent, 2)}</div>
+                                <div className="col-span-2 text-center font-bold border-r border-black px-1">{fmtIN(avgContent, 2)} kgs</div>
                                 <div className="col-span-2 text-center font-bold border-r border-black px-1">{fmtIN(rowWeight, 2)}</div>
                                 <div className="col-span-2 text-center border-r border-black px-1 font-mono">{[item.from_no, item.to_no].filter(Boolean).join(' - ') || item.sl_no || '-'}</div>
                                 <div className="col-span-2 text-center font-bold border-r border-black px-1">{fmtIN(assessableRatePerKg, 2)}</div>
@@ -322,6 +324,22 @@ const ModernPrintView = ({ data, listData, getHSN }) => {
                                     <div className="flex-1 whitespace-pre-line">
                                         {data.epcg_no}
                                     </div>
+                                </div>
+                            )}
+                            {(data.po_no || data.po_date) && (
+                                <div className="font-bold text-[10px] mt-3 flex items-center flex-wrap gap-x-6 text-slate-800">
+                                    {data.po_no && (
+                                        <div className="flex items-center">
+                                            <span className="w-20 shrink-0">PO NO :</span>
+                                            <span>{data.po_no}</span>
+                                        </div>
+                                    )}
+                                    {data.po_date && (
+                                        <div className="flex items-center">
+                                            <span className="w-20 shrink-0">PO DATE :</span>
+                                            <span>{fmtInvoiceDate(data.po_date)}</span>
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>
@@ -426,10 +444,14 @@ const DepotSalesInvoice = () => {
         addr1: '',
         addr2: '',
         addr3: '',
+        addr4: '',
+        addr5: '',
 
         del1: '',
         del2: '',
         del3: '',
+        del4: '',
+        del5: '',
 
         credit_days: 0,
         interest_pct: 0,
@@ -451,6 +473,8 @@ const DepotSalesInvoice = () => {
         agent_name: '',
         form_jj: '',
         epcg_no: '',
+        po_no: '',
+        po_date: '',
 
         // totals
         total_assessable: 0,
@@ -876,13 +900,27 @@ const DepotSalesInvoice = () => {
         doc.text(safe(party.account_name || data.party_name, "N/A").toUpperCase(), margin + 3, y + 10);
 
         doc.setFont("helvetica", "normal");
-        doc.setFontSize(7.5);
-        const addressLines = [data.addr1, data.addr2, data.addr3].filter(Boolean);
-        addressLines.slice(0, 3).forEach((line, idx) => {
-            doc.text(safe(line).toUpperCase(), margin + 3, y + 14.5 + (idx * 4.2));
+        doc.setFontSize(7);
+        const addressLines = [
+            data.addr1 || party.addr1,
+            data.addr2 || party.addr2,
+            data.addr3 || party.addr3,
+            data.addr4 || party.addr4,
+            data.addr5 || party.addr5
+        ].filter(Boolean);
+
+        if (addressLines.length === 0 && (party.address || data.address)) {
+            const raw = String(party.address || data.address).split('\n').map(l => l.trim()).filter(Boolean);
+            addressLines.push(...raw.slice(0, 5));
+        }
+
+        const lineStep = addressLines.length > 3 ? 3.5 : 4.2;
+        addressLines.slice(0, 5).forEach((line, idx) => {
+            doc.text(safe(line).toUpperCase(), margin + 3, y + 13.5 + (idx * lineStep));
         });
 
         doc.setFont("helvetica", "bold");
+        doc.setFontSize(7.5);
         doc.text(`GST No: ${safe(party.gst_no || data.gst_no, "N/A")}`, margin + 3, y + 33.5);
 
         // Right Side: Invoice Meta
@@ -930,7 +968,7 @@ const DepotSalesInvoice = () => {
             const avgContent = num(item.avg_content || (num(item.packs) > 0 ? (rowWeight / num(item.packs)) : 0));
             return [
                 String(item.packs || ''),
-                fmt(avgContent, 2),
+                `${fmt(avgContent, 2)} kgs`,
                 fmt(rowWeight, 2),
                 [item.from_no, item.to_no].filter(Boolean).join(" - ") || item.sl_no || '-',
                 fmt(assessableRatePerKg, 2),
@@ -942,7 +980,7 @@ const DepotSalesInvoice = () => {
             startY: y,
             margin: { left: margin, right: margin },
             tableWidth: contentWidth,
-            head: [["No of Bags", "Avg Content Per Package", "Net Weight", "S.L No", "Rate Per Kgs", "Assessable Value"]],
+            head: [["No of Bags / Boxes", "Avg Content Per Package", "Net Weight in Kgs", "S.L No", "Rate Per Kgs", "Assessable Value"]],
             body: tableBody,
             theme: "grid",
             styles: {
@@ -993,15 +1031,16 @@ const DepotSalesInvoice = () => {
         });
 
         doc.setFontSize(7.5);
-        doc.text(`HSN CODE: ${hsnCodes.join(", ") || "52052790"}`, margin + 3, y + 20);
+        doc.text(`HSN CODE: ${hsnCodes.join(", ") || "52052790"}`, margin + 3, y + 17);
 
+        let currLeftY = y + 22;
         if (data.epcg_no) {
             doc.setFont("helvetica", "bold");
             doc.setFontSize(7);
             const epcgLabel = "EPCG NO : ";
             const epcgX = margin + 3;
             const epcgValX = epcgX + 16;
-            let epcgY = y + 25;
+            let epcgY = currLeftY;
             doc.text(epcgLabel, epcgX, epcgY);
             const rawLines = String(data.epcg_no).split('\n');
             rawLines.forEach((lineText, idx) => {
@@ -1012,6 +1051,22 @@ const DepotSalesInvoice = () => {
                     doc.text(subLine, epcgValX, epcgY);
                 });
             });
+            currLeftY = epcgY + 5;
+        }
+
+        if (data.po_no || data.po_date) {
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(7);
+            let poStartX = margin + 3;
+            if (data.po_no) {
+                doc.text("PO NO :", poStartX, currLeftY);
+                doc.text(String(data.po_no), poStartX + 16, currLeftY);
+                poStartX += 52;
+            }
+            if (data.po_date) {
+                doc.text("PO DATE :", poStartX, currLeftY);
+                doc.text(fmtInvoiceDate(data.po_date), poStartX + 18, currLeftY);
+            }
         }
 
         doc.setFont("helvetica", "normal");
@@ -1380,7 +1435,9 @@ const DepotSalesInvoice = () => {
                     : '',
                 addr1: full.addr1 || full.Party?.addr1 || '',
                 addr2: full.addr2 || full.Party?.addr2 || '',
-                addr3: full.addr3 || full.Party?.addr3 || ''
+                addr3: full.addr3 || full.Party?.addr3 || '',
+                addr4: full.addr4 || full.Party?.addr4 || '',
+                addr5: full.addr5 || full.Party?.addr5 || ''
             };
 
             setFormData(formatted);
@@ -1935,6 +1992,8 @@ const DepotSalesInvoice = () => {
                                                     addr1: acc.addr1 ?? '',
                                                     addr2: acc.addr2 ?? '',
                                                     addr3: acc.addr3 ?? '',
+                                                    addr4: acc.addr4 ?? '',
+                                                    addr5: acc.addr5 ?? '',
                                                     invoice_no: updatedInvNo
                                                 }));
                                             }}
@@ -1943,6 +2002,24 @@ const DepotSalesInvoice = () => {
                                         <RowInput label="Address 1" value={formData.addr1} readOnly={formData.header_locked} onChange={e => setFormData({ ...formData, addr1: e.target.value })} />
                                         <RowInput label="Address 2" value={formData.addr2} readOnly={formData.header_locked} onChange={e => setFormData({ ...formData, addr2: e.target.value })} />
                                         <RowInput label="Address 3" value={formData.addr3} readOnly={formData.header_locked} onChange={e => setFormData({ ...formData, addr3: e.target.value })} />
+                                        <RowInput label="Address 4" value={formData.addr4} readOnly={formData.header_locked} onChange={e => setFormData({ ...formData, addr4: e.target.value })} />
+                                        <RowInput label="Address 5" value={formData.addr5} readOnly={formData.header_locked} onChange={e => setFormData({ ...formData, addr5: e.target.value })} />
+                                        {String(formData.sales_type || '').trim().toUpperCase() === 'MERCHANT SALES' && (
+                                            <div className="grid grid-cols-2 gap-4 bg-amber-50/80 p-2 rounded border border-amber-300 shadow-sm">
+                                                <RowInput
+                                                    label="PO No."
+                                                    value={formData.po_no || ''}
+                                                    onChange={e => setFormData({ ...formData, po_no: e.target.value })}
+                                                    placeholder="Enter PO No."
+                                                />
+                                                <RowInput
+                                                    label="PO Date"
+                                                    type="date"
+                                                    value={formData.po_date || ''}
+                                                    onChange={e => setFormData({ ...formData, po_date: e.target.value })}
+                                                />
+                                            </div>
+                                        )}
                                         <div className="grid grid-cols-3 gap-2">
                                             <RowInput label="Credit Days" type="number" value={formData.credit_days} onChange={e => setFormData({ ...formData, credit_days: e.target.value })} />
                                             <RowInput label="Interest %" type="number" value={formData.interest_pct} onChange={e => setFormData({ ...formData, interest_pct: e.target.value })} />

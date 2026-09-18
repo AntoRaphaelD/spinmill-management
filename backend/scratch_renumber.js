@@ -23,7 +23,7 @@ const renumberInvoices = async (transaction) => {
         let newInvNo = '';
         if (salesType === 'MERCHANT SALES') {
             meCounter++;
-            newInvNo = `ME-${meCounter}`;
+            newInvNo = `MEX-${meCounter}`;
         } else if (partyName === 'DEPOT - MUMBAI') {
             dmCounter++;
             newInvNo = `DM-${dmCounter}`;

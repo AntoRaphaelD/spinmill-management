@@ -38,7 +38,7 @@ const ReportPrintView = ({ title, data, type }) => {
           <table className="w-full border border-black text-[11px]">
             <thead className="bg-gray-100 border-b border-black">
               <tr>
-                <th className="border-r border-black p-1">No of Bags</th>
+                <th className="border-r border-black p-1">No of Bags / Boxes</th>
                 <th className="border-r border-black p-1">Description of Goods</th>
                 <th className="border-r border-black p-1">Rate</th>
                 <th className="p-1">Value</th>

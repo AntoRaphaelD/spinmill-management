@@ -1,5 +1,5 @@
 export const getNextInvoiceSequence = (history, prefix, currentPartyName = '') => {
-    if (prefix === 'DM-' || prefix === 'DI-' || prefix === 'ME-') {
+    if (prefix === 'DM-' || prefix === 'DI-' || prefix === 'MEX-') {
         const maxNo = history.reduce((max, item) => {
             const invNo = String(item.invoice_no || '').trim();
             if (invNo.startsWith(prefix)) {
@@ -16,7 +16,7 @@ export const getNextInvoiceSequence = (history, prefix, currentPartyName = '') =
     const sortedNormalHistory = [...history]
         .filter(item => {
             const invNo = String(item.invoice_no || '').trim();
-            return !invNo.startsWith('DM-') && !invNo.startsWith('DI-') && !invNo.startsWith('ME-');
+            return !invNo.startsWith('DM-') && !invNo.startsWith('DI-') && !invNo.startsWith('MEX-');
         })
         .sort((a, b) => {
             const dateA = new Date(a.date || 0).getTime();
@@ -60,7 +60,7 @@ export const getNextInvoiceSequence = (history, prefix, currentPartyName = '') =
 export const getPrefixForParty = (partyName, salesType = '') => {
     const sType = String(salesType || '').toUpperCase().trim();
     if (sType === 'MERCHANT SALES') {
-        return 'ME-';
+        return 'MEX-';
     }
     const name = String(partyName || '').toUpperCase().trim();
     if (name === 'DEPOT - MUMBAI') {

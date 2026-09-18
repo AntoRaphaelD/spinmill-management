@@ -38,9 +38,9 @@ const AccountMaster = () => {
         account_name: '', 
         account_group: 'DEBTORS - YARN SALES', 
         place: '', 
-        // 3-Line UI States
-        addr1: '', addr2: '', addr3: '',
-        del1: '', del2: '', del3: '',
+        // 5-Line UI States
+        addr1: '', addr2: '', addr3: '', addr4: '', addr5: '',
+        del1: '', del2: '', del3: '', del4: '', del5: '',
         pincode: '', 
         state: '',
         tin_no: '', 
@@ -398,6 +398,8 @@ const handleRowClick = async (item) => {
                   <input className="w-full p-2 border rounded text-sm uppercase" placeholder="Line 1" value={formData.addr1} onChange={e => setFormData({...formData, addr1: e.target.value.toUpperCase()})} />
                   <input className="w-full p-2 border rounded text-sm uppercase" placeholder="Line 2" value={formData.addr2} onChange={e => setFormData({...formData, addr2: e.target.value.toUpperCase()})} />
                   <input className="w-full p-2 border rounded text-sm uppercase" placeholder="Line 3" value={formData.addr3} onChange={e => setFormData({...formData, addr3: e.target.value.toUpperCase()})} />
+                  <input className="w-full p-2 border rounded text-sm uppercase" placeholder="Line 4" value={formData.addr4} onChange={e => setFormData({...formData, addr4: e.target.value.toUpperCase()})} />
+                  <input className="w-full p-2 border rounded text-sm uppercase" placeholder="Line 5" value={formData.addr5} onChange={e => setFormData({...formData, addr5: e.target.value.toUpperCase()})} />
                 </div>
               </div>
 
@@ -421,6 +423,8 @@ const handleRowClick = async (item) => {
                   <input className="w-full p-2 border rounded text-sm uppercase" placeholder="Line 1" value={formData.del1} onChange={e => setFormData({...formData, del1: e.target.value.toUpperCase()})} />
                   <input className="w-full p-2 border rounded text-sm uppercase" placeholder="Line 2" value={formData.del2} onChange={e => setFormData({...formData, del2: e.target.value.toUpperCase()})} />
                   <input className="w-full p-2 border rounded text-sm uppercase" placeholder="Line 3" value={formData.del3} onChange={e => setFormData({...formData, del3: e.target.value.toUpperCase()})} />
+                  <input className="w-full p-2 border rounded text-sm uppercase" placeholder="Line 4" value={formData.del4} onChange={e => setFormData({...formData, del4: e.target.value.toUpperCase()})} />
+                  <input className="w-full p-2 border rounded text-sm uppercase" placeholder="Line 5" value={formData.del5} onChange={e => setFormData({...formData, del5: e.target.value.toUpperCase()})} />
                 </div>
               </div>
             </div>

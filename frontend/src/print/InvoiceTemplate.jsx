@@ -41,8 +41,8 @@ export const InvoiceTemplate = React.forwardRef(({ data }, ref) => {
         <table className="w-full border-t-2 border-black text-xs">
             <thead className="border-b-2 border-black">
                 <tr>
-                    <th className="border-r-2 border-black p-1">No of Bags</th>
-                    <th className="border-r-2 border-black p-1">Net Weight</th>
+                    <th className="border-r-2 border-black p-1">No of Bags / Boxes</th>
+                    <th className="border-r-2 border-black p-1">Net Weight in Kgs</th>
                     <th className="border-r-2 border-black p-1">Rate</th>
                     <th className="p-1">Assessable Value</th>
                 </tr>

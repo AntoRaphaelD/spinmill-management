@@ -37,7 +37,7 @@ const extractPin = (party, formData) => {
         if (!isNaN(p) && p > 0) return p;
     }
     // Try to extract 6-digit pin code from address lines
-    const combinedAddr = [formData?.addr1, formData?.addr2, formData?.addr3, party?.address].filter(Boolean).join(' ');
+    const combinedAddr = [formData?.addr1, formData?.addr2, formData?.addr3, formData?.addr4, formData?.addr5, party?.address].filter(Boolean).join(' ');
     const match = combinedAddr.match(/\b\d{6}\b/);
     if (match) {
         return parseInt(match[0], 10);

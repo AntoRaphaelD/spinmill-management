@@ -123,10 +123,11 @@ const sanitizeData = (data) => {
         'original_no_of_bags', 'original_freight'
     ];
 
-    // 🔵 NEW ADDRESS FIELDS
+    // 🔵 NEW ADDRESS & PO FIELDS
     const textFields = [
-        'addr1','addr2','addr3',
-        'del1','del2','del3'
+        'addr1','addr2','addr3','addr4','addr5',
+        'del1','del2','del3','del4','del5',
+        'po_no','po_date'
     ];
 
     idFields.forEach(field => {
@@ -457,7 +458,7 @@ const renumberInvoices = async (transaction) => {
         let newInvNo = '';
         if (salesType === 'MERCHANT SALES') {
             meCounter++;
-            newInvNo = `ME-${meCounter}`;
+            newInvNo = `MEX-${meCounter}`;
         } else if (partyName === 'DEPOT - MUMBAI') {
             dmCounter++;
             newInvNo = `DM-${dmCounter}`;
@@ -1907,8 +1908,8 @@ const bulkImportSave = async (req, res) => {
             let rawInvNo = String(inv.excelInvNo || '').trim();
             let finalInvoiceNo = rawInvNo;
             if (String(salesType || '').toUpperCase().trim() === 'MERCHANT SALES') {
-                const stripped = rawInvNo.replace(/^ME-?/i, '');
-                finalInvoiceNo = `ME-${stripped}`;
+                const stripped = rawInvNo.replace(/^MEX-?/i, '');
+                finalInvoiceNo = `MEX-${stripped}`;
             } else if (isDepotMumbai) {
                 const stripped = rawInvNo.replace(/^DM-?/i, '');
                 finalInvoiceNo = `DM-${stripped}`;

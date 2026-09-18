@@ -49,9 +49,18 @@ const TaxInvoiceTemplate = forwardRef(({ data }, ref) => {
                 <div className="border-b-2 border-black grid grid-cols-4 min-h-[150px]">
                     <div className="col-span-3 p-4 border-r-2 border-black">
                         <p className="font-bold underline mb-1">Party Name & Address</p>
-                        <h3 className="font-black text-sm uppercase">{data.Party?.account_name}</h3>
-                        <p className="whitespace-pre-wrap">{data.Party?.address}</p>
-                        <p className="mt-2 font-bold uppercase">GST No: {data.Party?.gst_no}</p>
+                        <h3 className="font-black text-sm uppercase">{data.Party?.account_name || data.party_name}</h3>
+                        <div className="text-xs">
+                            {data.addr1 && <p>{data.addr1}</p>}
+                            {data.addr2 && <p>{data.addr2}</p>}
+                            {data.addr3 && <p>{data.addr3}</p>}
+                            {data.addr4 && <p>{data.addr4}</p>}
+                            {data.addr5 && <p>{data.addr5}</p>}
+                            {!data.addr1 && !data.addr2 && !data.addr3 && !data.addr4 && !data.addr5 && (
+                                <p className="whitespace-pre-wrap">{data.Party?.address}</p>
+                            )}
+                        </div>
+                        <p className="mt-2 font-bold uppercase">GST No: {data.Party?.gst_no || data.gst_no}</p>
                     </div>
                     <div className="w-[300px]">
                         <table className="w-full h-full text-xs">
@@ -90,8 +99,8 @@ const TaxInvoiceTemplate = forwardRef(({ data }, ref) => {
                 <table className="w-full border-collapse text-xs">
                     <thead>
                         <tr className="border-b-2 border-black font-bold text-center">
-                            <th className="border-r-2 border-black p-2 w-20">No of Bags</th>
-                            <th className="border-r-2 border-black p-2 w-32">Net Weight</th>
+                            <th className="border-r-2 border-black p-2 w-20">No of Bags / Boxes</th>
+                            <th className="border-r-2 border-black p-2 w-32">Net Weight in Kgs</th>
                             <th className="border-r-2 border-black p-2 w-40">S.L No</th>
                             <th className="border-r-2 border-black p-2 w-32">Rate Per Kgs</th>
                             <th className="p-2">Assessable Value</th>
@@ -120,6 +129,22 @@ const TaxInvoiceTemplate = forwardRef(({ data }, ref) => {
                                                     <div className="flex-1 whitespace-pre-line">
                                                         {data.epcg_no}
                                                     </div>
+                                                </div>
+                                            )}
+                                            {(data.po_no || data.po_date) && (
+                                                <div className="font-bold text-xs mt-3 flex items-center flex-wrap gap-x-8">
+                                                    {data.po_no && (
+                                                        <div className="flex items-center">
+                                                            <span className="w-24 shrink-0">PO NO :</span>
+                                                            <span>{data.po_no}</span>
+                                                        </div>
+                                                    )}
+                                                    {data.po_date && (
+                                                        <div className="flex items-center">
+                                                            <span className="w-24 shrink-0">PO DATE :</span>
+                                                            <span>{data.po_date}</span>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             )}
                                         </td>

@@ -150,10 +150,14 @@ const Account = sequelize.define('Account', {
   addr1: { type: DataTypes.STRING },
   addr2: { type: DataTypes.STRING },
   addr3: { type: DataTypes.STRING },
+  addr4: { type: DataTypes.STRING },
+  addr5: { type: DataTypes.STRING },
 
   del1: { type: DataTypes.STRING },
   del2: { type: DataTypes.STRING },
   del3: { type: DataTypes.STRING },
+  del4: { type: DataTypes.STRING },
+  del5: { type: DataTypes.STRING },
 
   pincode: {
     type: DataTypes.STRING
@@ -414,6 +418,26 @@ const InvoiceHeader = sequelize.define('InvoiceHeader', {
 
   address: {                         // Snapshot of party address
     type: DataTypes.TEXT
+  },
+
+  addr1: { type: DataTypes.STRING },
+  addr2: { type: DataTypes.STRING },
+  addr3: { type: DataTypes.STRING },
+  addr4: { type: DataTypes.STRING },
+  addr5: { type: DataTypes.STRING },
+
+  del1: { type: DataTypes.STRING },
+  del2: { type: DataTypes.STRING },
+  del3: { type: DataTypes.STRING },
+  del4: { type: DataTypes.STRING },
+  del5: { type: DataTypes.STRING },
+
+  po_no: {
+    type: DataTypes.STRING
+  },
+
+  po_date: {
+    type: DataTypes.DATEONLY
   },
 
   credit_days: {
@@ -784,6 +808,8 @@ const DirectInvoiceHeader = sequelize.define('DirectInvoiceHeader', {
   vehicle_no: { type: DataTypes.STRING },
   is_cancelled: { type: DataTypes.BOOLEAN, defaultValue: false },
   status: { type: DataTypes.STRING, defaultValue: 'OPEN' },
+  po_no: { type: DataTypes.STRING },
+  po_date: { type: DataTypes.DATEONLY },
   final_invoice_value: { type: DataTypes.DECIMAL(15, 2), defaultValue: 0 },
   is_depot_inwarded: { type: DataTypes.BOOLEAN, defaultValue: false },
   depot_id: { type: DataTypes.INTEGER },
@@ -865,16 +891,35 @@ const DepotSalesHeader = sequelize.define('DepotSalesHeader', {
   },
 
   addr1: {
-  type: DataTypes.STRING
-},
-
-addr2: {
-  type: DataTypes.STRING
-},
-
-addr3: {
-  type: DataTypes.STRING
-},
+    type: DataTypes.STRING
+  },
+  addr2: {
+    type: DataTypes.STRING
+  },
+  addr3: {
+    type: DataTypes.STRING
+  },
+  addr4: {
+    type: DataTypes.STRING
+  },
+  addr5: {
+    type: DataTypes.STRING
+  },
+  del1: {
+    type: DataTypes.STRING
+  },
+  del2: {
+    type: DataTypes.STRING
+  },
+  del3: {
+    type: DataTypes.STRING
+  },
+  del4: {
+    type: DataTypes.STRING
+  },
+  del5: {
+    type: DataTypes.STRING
+  },
 
   credit_days: {
     type: DataTypes.INTEGER,
@@ -932,6 +977,14 @@ addr3: {
 
   epcg_no: {
     type: DataTypes.TEXT
+  },
+
+  po_no: {
+    type: DataTypes.STRING
+  },
+
+  po_date: {
+    type: DataTypes.DATEONLY
   },
 
   // =============================
