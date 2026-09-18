@@ -160,6 +160,34 @@ const ensureDespatchColumns = async () => {
   }
 };
 
+const ensureAccountColumns = async () => {
+  try {
+    const queryInterface = sequelize.getQueryInterface();
+    const table = 'tbl_Accounts';
+    const existing = await queryInterface.describeTable(table);
+    const columns = {
+      addr1: { type: DataTypes.STRING, allowNull: true },
+      addr2: { type: DataTypes.STRING, allowNull: true },
+      addr3: { type: DataTypes.STRING, allowNull: true },
+      addr4: { type: DataTypes.STRING, allowNull: true },
+      addr5: { type: DataTypes.STRING, allowNull: true },
+      del1: { type: DataTypes.STRING, allowNull: true },
+      del2: { type: DataTypes.STRING, allowNull: true },
+      del3: { type: DataTypes.STRING, allowNull: true },
+      del4: { type: DataTypes.STRING, allowNull: true },
+      del5: { type: DataTypes.STRING, allowNull: true }
+    };
+
+    for (const [name, definition] of Object.entries(columns)) {
+      if (!existing[name]) {
+        await queryInterface.addColumn(table, name, definition);
+      }
+    }
+  } catch (err) {
+    console.error('ensureAccountColumns error:', err.message);
+  }
+};
+
 const ensureInvoiceHeaderColumns = async () => {
   try {
     const queryInterface = sequelize.getQueryInterface();
@@ -167,19 +195,69 @@ const ensureInvoiceHeaderColumns = async () => {
     // tbl_InvoiceHeaders
     const invHeadersTable = 'tbl_InvoiceHeaders';
     const existingInv = await queryInterface.describeTable(invHeadersTable);
-    if (!existingInv.epcg_no) {
-      await queryInterface.addColumn(invHeadersTable, 'epcg_no', { type: DataTypes.TEXT, allowNull: true });
-    } else {
-      await queryInterface.changeColumn(invHeadersTable, 'epcg_no', { type: DataTypes.TEXT, allowNull: true });
+    const invColumns = {
+      epcg_no: { type: DataTypes.TEXT, allowNull: true },
+      po_no: { type: DataTypes.STRING, allowNull: true },
+      po_date: { type: DataTypes.DATEONLY, allowNull: true },
+      addr1: { type: DataTypes.STRING, allowNull: true },
+      addr2: { type: DataTypes.STRING, allowNull: true },
+      addr3: { type: DataTypes.STRING, allowNull: true },
+      addr4: { type: DataTypes.STRING, allowNull: true },
+      addr5: { type: DataTypes.STRING, allowNull: true },
+      del1: { type: DataTypes.STRING, allowNull: true },
+      del2: { type: DataTypes.STRING, allowNull: true },
+      del3: { type: DataTypes.STRING, allowNull: true },
+      del4: { type: DataTypes.STRING, allowNull: true },
+      del5: { type: DataTypes.STRING, allowNull: true }
+    };
+
+    for (const [name, definition] of Object.entries(invColumns)) {
+      if (!existingInv[name]) {
+        await queryInterface.addColumn(invHeadersTable, name, definition);
+      } else if (name === 'epcg_no') {
+        await queryInterface.changeColumn(invHeadersTable, name, definition);
+      }
     }
 
     // tbl_DepotSalesHeaders
     const depotHeadersTable = 'tbl_DepotSalesHeaders';
     const existingDepot = await queryInterface.describeTable(depotHeadersTable);
-    if (!existingDepot.epcg_no) {
-      await queryInterface.addColumn(depotHeadersTable, 'epcg_no', { type: DataTypes.TEXT, allowNull: true });
-    } else {
-      await queryInterface.changeColumn(depotHeadersTable, 'epcg_no', { type: DataTypes.TEXT, allowNull: true });
+    const depotColumns = {
+      epcg_no: { type: DataTypes.TEXT, allowNull: true },
+      po_no: { type: DataTypes.STRING, allowNull: true },
+      po_date: { type: DataTypes.DATEONLY, allowNull: true },
+      addr1: { type: DataTypes.STRING, allowNull: true },
+      addr2: { type: DataTypes.STRING, allowNull: true },
+      addr3: { type: DataTypes.STRING, allowNull: true },
+      addr4: { type: DataTypes.STRING, allowNull: true },
+      addr5: { type: DataTypes.STRING, allowNull: true },
+      del1: { type: DataTypes.STRING, allowNull: true },
+      del2: { type: DataTypes.STRING, allowNull: true },
+      del3: { type: DataTypes.STRING, allowNull: true },
+      del4: { type: DataTypes.STRING, allowNull: true },
+      del5: { type: DataTypes.STRING, allowNull: true }
+    };
+
+    for (const [name, definition] of Object.entries(depotColumns)) {
+      if (!existingDepot[name]) {
+        await queryInterface.addColumn(depotHeadersTable, name, definition);
+      } else if (name === 'epcg_no') {
+        await queryInterface.changeColumn(depotHeadersTable, name, definition);
+      }
+    }
+
+    // tbl_DirectInvoiceHeaders
+    const directHeadersTable = 'tbl_DirectInvoiceHeaders';
+    const existingDirect = await queryInterface.describeTable(directHeadersTable);
+    const directColumns = {
+      po_no: { type: DataTypes.STRING, allowNull: true },
+      po_date: { type: DataTypes.DATEONLY, allowNull: true }
+    };
+
+    for (const [name, definition] of Object.entries(directColumns)) {
+      if (!existingDirect[name]) {
+        await queryInterface.addColumn(directHeadersTable, name, definition);
+      }
     }
   } catch (err) {
     console.error('ensureInvoiceHeaderColumns error:', err.message);
@@ -205,6 +283,7 @@ async function startServer() {
 
     // Safe column migrations: Only adds missing columns non-destructively
     await ensureUserColumns();
+    await ensureAccountColumns();
     await ensureProductColumns();
     await ensureInvoiceDetailColumns();
     await ensureDespatchColumns();
