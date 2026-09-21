@@ -222,6 +222,17 @@ const Account = sequelize.define('Account', {
   timestamps: true
 });
 
+Account.beforeCreate(async (account, options) => {
+  if (!account.account_code || String(account.account_code).trim() === '') {
+    const [results] = await sequelize.query(
+      "SELECT MAX(CAST(account_code AS UNSIGNED)) as max_code FROM tbl_Accounts WHERE account_code REGEXP '^[0-9]+$'",
+      { transaction: options?.transaction }
+    );
+    const maxCode = (results && results[0] && results[0].max_code) ? parseInt(results[0].max_code, 10) : 0;
+    account.account_code = (maxCode + 1).toString();
+  }
+});
+
 // module.exports = Account;
 
 // models/Product.js

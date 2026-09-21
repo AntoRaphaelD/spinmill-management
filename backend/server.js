@@ -188,6 +188,43 @@ const ensureAccountColumns = async () => {
   }
 };
 
+const ensureAccountCodes = async () => {
+  try {
+    const { Account } = require('./models');
+    const [missing] = await sequelize.query(
+      "SELECT COUNT(*) as cnt FROM tbl_Accounts WHERE account_code IS NULL OR TRIM(account_code) = ''"
+    );
+    const missingCount = missing && missing[0] ? missing[0].cnt : 0;
+    if (missingCount > 0) {
+      console.log(`Found ${missingCount} accounts without account_code. Auto-reapplying sequential codes...`);
+      const t = await sequelize.transaction();
+      try {
+        const accounts = await Account.findAll({
+          attributes: ['id'],
+          order: [['id', 'ASC']],
+          transaction: t
+        });
+        await sequelize.query('UPDATE tbl_Accounts SET account_code = NULL', { transaction: t });
+        for (let i = 0; i < accounts.length; i++) {
+          await sequelize.query(
+            'UPDATE tbl_Accounts SET account_code = :code WHERE id = :id',
+            { replacements: { code: (i + 1).toString(), id: accounts[i].id }, transaction: t }
+          );
+        }
+        await t.commit();
+        console.log(`Auto-reapplied sequential codes 1..${accounts.length} successfully.`);
+      } catch (err) {
+        await t.rollback();
+        console.error('ensureAccountCodes error:', err.message);
+      }
+    }
+  } catch (err) {
+    console.error('ensureAccountCodes check error:', err.message);
+  }
+};
+
+
+
 const ensureInvoiceHeaderColumns = async () => {
   try {
     const queryInterface = sequelize.getQueryInterface();
@@ -284,6 +321,7 @@ async function startServer() {
     // Safe column migrations: Only adds missing columns non-destructively
     await ensureUserColumns();
     await ensureAccountColumns();
+    await ensureAccountCodes();
     await ensureProductColumns();
     await ensureInvoiceDetailColumns();
     await ensureDespatchColumns();
