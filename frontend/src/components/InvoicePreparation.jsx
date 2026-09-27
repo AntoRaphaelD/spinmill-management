@@ -1096,7 +1096,7 @@ const InvoicePreparation = () => {
             return 0;
         }
     };
-    const runCalculations = useCallback((rows, typeId, hFreight = formData.freight_charges, salesType = formData.sales_type) => {
+    const runCalculations = useCallback((rows, typeId, hFreight = formData.freight_charges, salesType = formData.sales_type, currentLoadId = formData.load_id) => {
         if (!typeId) return rows;
 
         const config = listData.types.find(t => t.id === parseInt(typeId));
@@ -1126,19 +1126,23 @@ const InvoicePreparation = () => {
         const displayGstPer = splitGstPer > 0 ? splitGstPer : gstPer;
 
         const totalBags = rows.reduce((sum, r) => sum + num(r.packs), 0);
-        const load = formData.load_id ? listData.loads.find(l => l.id === parseInt(formData.load_id)) : null;
-        let freightPerBag = 0;
-        if (num(hFreight) > 0) {
-            freightPerBag = totalBags > 0 ? num(hFreight) / totalBags : 0;
-        } else if (load) {
-            freightPerBag = num(load.freight_per_bag) > 0
+        const load = currentLoadId ? listData.loads.find(l => String(l.id) === String(currentLoadId)) : null;
+        let defaultFreightPerBag = 0;
+        const loadFreightPerBag = load ? (
+            num(load.freight_per_bag) > 0
                 ? num(load.freight_per_bag)
-                : (num(load.no_of_bags) > 0 ? num(load.freight) / num(load.no_of_bags) : 0);
-        } else {
-            freightPerBag = totalBags > 0 ? num(hFreight) / totalBags : 0;
+                : (num(load.original_no_of_bags) > 0
+                    ? num(load.original_freight) / num(load.original_no_of_bags)
+                    : (num(load.no_of_bags) > 0 ? num(load.freight) / num(load.no_of_bags) : 0))
+        ) : 0;
+
+        if (loadFreightPerBag > 0) {
+            defaultFreightPerBag = loadFreightPerBag;
+        } else if (num(hFreight) > 0 && totalBags > 0) {
+            defaultFreightPerBag = num(hFreight) / totalBags;
         }
 
-        console.log(`%c >>> CALCULATION START [Mode: ${isForward ? 'FORWARD' : 'REVERSE'}, Tax: ${taxPercentage}%, TCS: ${tcsPer}%] <<< `, "background: #000; color: #fff;");
+        console.log(`%c >>> CALCULATION START [Mode: ${isForward ? 'FORWARD' : 'REVERSE'}, Tax: ${taxPercentage}%, TCS: ${tcsPer}%, LoadRate: ${loadFreightPerBag}, DefaultFreightPerBag: ${defaultFreightPerBag}] <<< `, "background: #000; color: #fff;");
 
         let hTotals = {
             assess: 0, charity: 0, freight: 0, gst: 0, tcs: 0, gross: 0,
@@ -1151,7 +1155,10 @@ const InvoicePreparation = () => {
             const bagWt = num(item.avg_content);
             const existingTotalKgs = num(item.total_kgs);
             const rateInput = num(item.rate);
-            const rowFreight = packs * freightPerBag;
+            const rowRate = (load && loadFreightPerBag > 0)
+                ? loadFreightPerBag
+                : (num(item.freight_per_bag) > 0 ? num(item.freight_per_bag) : defaultFreightPerBag);
+            const rowFreight = packs * rowRate;
             const productName = String(item.product_description || item.Product?.product_name || '').toLowerCase();
             const is68Product = productName.includes('68');
 
@@ -1292,6 +1299,7 @@ const InvoicePreparation = () => {
                 hcess_per: hcessRowPer,
                 tcs_per: tcsPer,
                 charity_amt: charity,
+                freight_per_bag: rowRate,
                 freight_amt: rowFreightRounded,
                 // Handle SGST/CGST split or IGST
                 igst_amt: igstAmount,
@@ -1320,7 +1328,7 @@ const InvoicePreparation = () => {
             ...prev,
             total_assessable: hTotals.assess,
             total_charity: hTotals.charity,
-            freight_charges: load ? hTotals.freight : Math.round(num(hFreight)),
+            freight_charges: hTotals.freight,
             // Display full GST amount as the combined CGST + SGST value.
             total_gst: igstPer > 0 ? 0 : (hTotals.cgst + hTotals.sgst),
             total_igst: igstPer > 0 ? hTotals.igst : 0,
@@ -1343,8 +1351,8 @@ const InvoicePreparation = () => {
 
     useEffect(() => {
         if (gridRows.length === 0) return;
-        setGridRows(prev => runCalculations(prev, formData.invoice_type_id, formData.freight_charges, formData.sales_type));
-    }, [formData.invoice_type_id, formData.sales_type, formData.freight_charges, runCalculations]);
+        setGridRows(prev => runCalculations(prev, formData.invoice_type_id, formData.freight_charges, formData.sales_type, formData.load_id));
+    }, [formData.invoice_type_id, formData.sales_type, formData.load_id, runCalculations]);
 
     // ==========================================
     // 3. INITIAL LOAD
@@ -1423,8 +1431,14 @@ const InvoicePreparation = () => {
         });
     };
     const handleLoadSync = (loadId) => {
-        const load = listData.loads.find(l => l.id === parseInt(loadId));
+        const load = listData.loads.find(l => String(l.id) === String(loadId));
         if (!load) return;
+
+        const loadRate = num(load.freight_per_bag) > 0
+            ? num(load.freight_per_bag)
+            : (num(load.original_no_of_bags) > 0
+                ? num(load.original_freight) / num(load.original_no_of_bags)
+                : (num(load.no_of_bags) > 0 ? num(load.freight) / num(load.no_of_bags) : 0));
 
         const updatedForm = {
             ...formData,
@@ -1444,14 +1458,17 @@ const InvoicePreparation = () => {
         setGridRows(prev => {
             const updatedRows = prev.map(r => {
                 const bags = num(load.no_of_bags);
-                const kgs = num(r.total_kgs);
+                const product = findProductForRow(r);
+                const avgWt = num(r.avg_content) > 0 ? num(r.avg_content) : num(product?.pack_nett_wt || 0);
+                const kgs = num(r.total_kgs) > 0 ? num(r.total_kgs) : (bags * avgWt);
                 return {
                     ...r,
                     packs: bags,
-                    avg_content: bags > 0 ? (kgs / bags).toFixed(2) : 0
+                    avg_content: bags > 0 ? (kgs / bags).toFixed(2) : (avgWt > 0 ? avgWt.toFixed(2) : 0),
+                    freight_per_bag: loadRate
                 };
             });
-            return runCalculations(updatedRows, updatedForm.invoice_type_id, load.freight, updatedForm.sales_type);
+            return runCalculations(updatedRows, updatedForm.invoice_type_id, load.freight, updatedForm.sales_type, load.id);
         });
     };
 
@@ -1475,7 +1492,7 @@ const InvoicePreparation = () => {
         const config = listData.types.find(t => t.id === parseInt(formData.invoice_type_id));
         if (!config) { alert("Select Invoice Type first."); e.target.value = ""; return; }
 
-        const load = listData.loads.find(l => l.id === parseInt(formData.load_id));
+        const load = listData.loads.find(l => String(l.id) === String(formData.load_id));
         let details = source === 'WITH' ? order.OrderDetails || [] : order.DirectInvoiceDetails || [];
         if (details.length === 0 && order.id) {
             const res = source === 'WITH'
@@ -1495,7 +1512,7 @@ const InvoicePreparation = () => {
 
         const newRows = details.map(d => normalizeInvoiceRow(d, { order, source, config, load }));
 
-        setGridRows(runCalculations([...gridRows, ...newRows], formData.invoice_type_id, formData.freight_charges, formData.sales_type));
+        setGridRows(runCalculations([...gridRows, ...newRows], formData.invoice_type_id, formData.freight_charges, formData.sales_type, formData.load_id));
         setActiveTab('detail');
         e.target.value = "";
     };
@@ -1506,7 +1523,13 @@ const InvoicePreparation = () => {
         const row = { ...updated[idx], [field]: val };
 
         if (field === 'packs') {
-            row.total_kgs = num(val) * num(row.avg_content);
+            const p = num(val);
+            const product = findProductForRow(row);
+            const avgWt = num(row.avg_content) > 0 ? num(row.avg_content) : (num(row.total_kgs) > 0 && p > 0 ? num(row.total_kgs) / p : num(product?.pack_nett_wt || 0));
+            if (avgWt > 0 && !num(row.avg_content)) {
+                row.avg_content = avgWt.toFixed(2);
+            }
+            row.total_kgs = p * (num(row.avg_content) || avgWt);
             console.log(`%c PACKS CHANGED: ${row.product_description}`, "color: #f59e0b;");
             console.log(`New Kgs: ${val} packs x ${row.avg_content}kg = ${row.total_kgs}`);
         }
@@ -1524,14 +1547,20 @@ const InvoicePreparation = () => {
             console.log(`New Avg Content: ${val}kg / ${p} packs = ${row.avg_content}`);
         }
 
+        if (field === 'freight_amt') {
+            const p = num(row.packs);
+            row.freight_per_bag = p > 0 ? num(val) / p : num(val);
+        }
+
         if (field === 'broker_code1') {
             row.broker_code = val;
         }
 
         updated[idx] = row;
-        return runCalculations(updated, formData.invoice_type_id, formData.freight_charges, formData.sales_type);
+        return runCalculations(updated, formData.invoice_type_id, formData.freight_charges, formData.sales_type, formData.load_id);
     });
 };
+
 
     const valueOrFallback = (value, fallback = '') => (
         value === undefined || value === null || value === '' ? fallback : value
@@ -1562,6 +1591,13 @@ const InvoicePreparation = () => {
             : (num(load?.no_of_bags) > 0 ? num(load.no_of_bags) : (num(firstValue(row.packs, row.qty, row.quantity)) || 0));
         const avgContent = num(firstValue(row.avg_content, row.bag_wt, product?.pack_nett_wt));
         const totalKgs = num(firstValue(row.total_kgs, row.kgs, row.net_weight)) || (packs * avgContent);
+        const loadFreightRate = load ? (
+            num(load.freight_per_bag) > 0
+                ? num(load.freight_per_bag)
+                : (num(load.original_no_of_bags) > 0
+                    ? num(load.original_freight) / num(load.original_no_of_bags)
+                    : (num(load.no_of_bags) > 0 ? num(load.freight) / num(load.no_of_bags) : 0))
+        ) : 0;
 
         const {
             id: sourceDetailId,
@@ -1612,6 +1648,7 @@ const InvoicePreparation = () => {
             tcs_per: num(firstValue(row.tcs_per, config.tcs_percentage)),
             other_per: num(firstValue(row.other_per, 0)),
             other_amt: num(firstValue(row.other_amt, 0)),
+            freight_per_bag: num(firstValue(row.freight_per_bag, loadFreightRate, (packs > 0 ? num(row.freight_amt) / packs : 0))),
             freight_amt: num(firstValue(row.freight_amt, 0)),
             rounded_off: num(firstValue(row.rounded_off, 0)),
             discount_percentage: num(firstValue(row.discount_percentage, 0))
@@ -2375,7 +2412,7 @@ const InvoicePreparation = () => {
                                                     <th className="p-3 border-r w-28 text-center">Re Sale</th>
                                                     <th className="p-3 border-r w-32 text-center">Conv To Hank</th>
                                                     <th className="p-3 border-r w-32 text-center">Conv To Cone</th>
-                                                    <th className="p-3 text-center w-24">Action</th>
+                                                    <th className="p-3 text-center w-20">Action</th>
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-slate-300">

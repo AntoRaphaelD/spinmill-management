@@ -244,8 +244,19 @@ const invoiceCtrl = createMasterController(InvoiceHeader, [
     { model: Account, as: 'Party' },
     { model: Broker, as: 'Broker' },
     { model: Transport },
-    { model: InvoiceDetail, include: [{ model: Product }] }
 ]);
+
+const getDespatchFreightPerBag = (despatch) => {
+    if (!despatch) return 0;
+    if (num(despatch.freight_per_bag) > 0) return num(despatch.freight_per_bag);
+    if (num(despatch.original_no_of_bags) > 0 && num(despatch.original_freight) > 0) {
+        return num(despatch.original_freight) / num(despatch.original_no_of_bags);
+    }
+    if (num(despatch.no_of_bags) > 0 && num(despatch.freight) > 0) {
+        return num(despatch.freight) / num(despatch.no_of_bags);
+    }
+    return 0;
+};
 
 const calculateInvoiceBreakdown = ({ Details = [], config, freight_charges, sales_type }) => {
     const gstPercentage = num(config?.gst_percentage);
@@ -701,9 +712,7 @@ invoiceCtrl.create = async (req, res) => {
             const despatch = await DespatchEntry.findByPk(header.load_id, { transaction: t });
             if (despatch) {
                 const invoice_bags = processedRows.reduce((sum, r) => sum + num(r.packs), 0);
-                const freight_per_bag = num(despatch.freight_per_bag) > 0 
-                    ? num(despatch.freight_per_bag) 
-                    : (num(despatch.no_of_bags) > 0 ? num(despatch.freight) / num(despatch.no_of_bags) : 0);
+                const freight_per_bag = getDespatchFreightPerBag(despatch);
                 const new_bags = num(despatch.no_of_bags) - invoice_bags;
                 const new_freight = new_bags * freight_per_bag;
                 await despatch.update({
@@ -814,9 +823,7 @@ invoiceCtrl.update = async (req, res) => {
             if (new_load_id) {
                 const despatch = await DespatchEntry.findByPk(new_load_id, { transaction: t });
                 if (despatch) {
-                    const freight_per_bag = num(despatch.freight_per_bag) > 0 
-                        ? num(despatch.freight_per_bag) 
-                        : (num(despatch.no_of_bags) > 0 ? num(despatch.freight) / num(despatch.no_of_bags) : 0);
+                    const freight_per_bag = getDespatchFreightPerBag(despatch);
                     const change_in_bags = new_invoice_bags - old_invoice_bags;
                     const new_bags = num(despatch.no_of_bags) - change_in_bags;
                     const new_freight = new_bags * freight_per_bag;
@@ -832,9 +839,7 @@ invoiceCtrl.update = async (req, res) => {
             if (old_load_id) {
                 const oldDespatch = await DespatchEntry.findByPk(old_load_id, { transaction: t });
                 if (oldDespatch) {
-                    const freight_per_bag = num(oldDespatch.freight_per_bag) > 0 
-                        ? num(oldDespatch.freight_per_bag) 
-                        : (num(oldDespatch.no_of_bags) > 0 ? num(oldDespatch.freight) / num(oldDespatch.no_of_bags) : 0);
+                    const freight_per_bag = getDespatchFreightPerBag(oldDespatch);
                     const new_bags = num(oldDespatch.no_of_bags) + old_invoice_bags;
                     const new_freight = new_bags * freight_per_bag;
                     await oldDespatch.update({
@@ -847,9 +852,7 @@ invoiceCtrl.update = async (req, res) => {
             if (new_load_id) {
                 const newDespatch = await DespatchEntry.findByPk(new_load_id, { transaction: t });
                 if (newDespatch) {
-                    const freight_per_bag = num(newDespatch.freight_per_bag) > 0 
-                        ? num(newDespatch.freight_per_bag) 
-                        : (num(newDespatch.no_of_bags) > 0 ? num(newDespatch.freight) / num(newDespatch.no_of_bags) : 0);
+                    const freight_per_bag = getDespatchFreightPerBag(newDespatch);
                     const new_bags = num(newDespatch.no_of_bags) - new_invoice_bags;
                     const new_freight = new_bags * freight_per_bag;
                     await newDespatch.update({
@@ -884,9 +887,7 @@ invoiceCtrl.delete = async (req, res) => {
             const despatch = await DespatchEntry.findByPk(invoice.load_id, { transaction: t });
             if (despatch) {
                 const invoice_bags = details.reduce((sum, r) => sum + num(r.packs), 0);
-                const freight_per_bag = num(despatch.freight_per_bag) > 0 
-                    ? num(despatch.freight_per_bag) 
-                    : (num(despatch.no_of_bags) > 0 ? num(despatch.freight) / num(despatch.no_of_bags) : 0);
+                const freight_per_bag = getDespatchFreightPerBag(despatch);
                 const new_bags = num(despatch.no_of_bags) + invoice_bags;
                 const new_freight = new_bags * freight_per_bag;
                 await despatch.update({
@@ -931,9 +932,7 @@ invoiceCtrl.bulkDelete = async (req, res) => {
                 const despatch = await DespatchEntry.findByPk(invoice.load_id, { transaction: t });
                 if (despatch) {
                     const invoice_bags = details.reduce((sum, r) => sum + num(r.packs), 0);
-                    const freight_per_bag = num(despatch.freight_per_bag) > 0 
-                        ? num(despatch.freight_per_bag) 
-                        : (num(despatch.no_of_bags) > 0 ? num(despatch.freight) / num(despatch.no_of_bags) : 0);
+                    const freight_per_bag = getDespatchFreightPerBag(despatch);
                     const new_bags = num(despatch.no_of_bags) + invoice_bags;
                     const new_freight = new_bags * freight_per_bag;
                     await despatch.update({
@@ -979,9 +978,7 @@ invoiceCtrl.reject = async (req, res) => {
             const despatch = await DespatchEntry.findByPk(invoice.load_id, { transaction: t });
             if (despatch) {
                 const invoice_bags = details.reduce((sum, r) => sum + num(r.packs), 0);
-                const freight_per_bag = num(despatch.freight_per_bag) > 0 
-                    ? num(despatch.freight_per_bag) 
-                    : (num(despatch.no_of_bags) > 0 ? num(despatch.freight) / num(despatch.no_of_bags) : 0);
+                const freight_per_bag = getDespatchFreightPerBag(despatch);
                 const new_bags = num(despatch.no_of_bags) + invoice_bags;
                 const new_freight = new_bags * freight_per_bag;
                 await despatch.update({
